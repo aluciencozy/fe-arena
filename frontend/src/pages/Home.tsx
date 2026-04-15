@@ -1,0 +1,70 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+const Home = () => {
+  // Local state to hold the username and room ID input values
+  const [username, setUsername] = useState("");
+  const [roomId, setRoomId] = useState("");
+
+  // Hook to programmatically navigate to different routes
+  const navigate = useNavigate();
+
+  // Handler for when the user submits the form to join a room
+  const handleJoinRoom = (e: React.SubmitEvent<HTMLFormElement>) => {
+    e.preventDefault(); // Prevent page reload on form submission
+
+    // Ensure both fields are filled out before navigating
+    if (!username.trim() || !roomId.trim()) return;
+
+    // Navigate to the Room page injecting the room ID into the URL
+    navigate(`/room/${roomId.toUpperCase()}`);
+  };
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-4">
+      <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900/50 p-8 shadow-xl backdrop-blur-sm">
+        
+        <div className="mb-8 text-center">
+          <h1 className="text-4xl font-black tracking-tight text-white mb-2">
+            GUESS THE OST
+          </h1>
+          <p className="text-zinc-400">Enter a room code to join the game.</p>
+        </div>
+
+        <form onSubmit={handleJoinRoom} className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-zinc-300">Username</label>
+            <Input 
+              type="text" 
+              placeholder="xX_DemonSlayer_Xx" 
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="bg-zinc-950 border-zinc-800 text-white placeholder:text-zinc-600"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-zinc-300">Room Code</label>
+            <Input 
+              type="text" 
+              placeholder="ABCD" 
+              value={roomId}
+              onChange={(e) => setRoomId(e.target.value)}
+              className="bg-zinc-950 border-zinc-800 text-white uppercase placeholder:text-zinc-600"
+              maxLength={6}
+            />
+          </div>
+
+          <Button type="submit" className="w-full font-bold" size="lg">
+            Join Lobby
+          </Button>
+        </form>
+
+      </div>
+    </div>
+  );
+}
+
+export default Home;

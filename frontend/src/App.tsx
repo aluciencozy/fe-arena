@@ -1,9 +1,18 @@
-import { Button } from "@/components/ui/button"
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Home from "./pages/Home";
+import Room from "./pages/Room";
 
 export default function App() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-950">
-      <Button>Systems Online</Button>
-    </div>
-  )
+    // BrowserRouter: engine that watches the URL bar in the browser.
+    <BrowserRouter>
+      {/* Routes: decides which component to render based on the URL */}
+      <Routes>
+        <Route path="/" element={<Home />} />
+        
+        {/* Route for the game room, capturing the room ID as a parameter */}
+        <Route path="/room/:id" element={<Room />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
