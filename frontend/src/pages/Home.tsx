@@ -3,10 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+import { useGameStore } from "@/store/gameStore";
+
 const Home = () => {
   // Local state to hold the username and room ID input values
   const [username, setUsername] = useState("");
   const [roomId, setRoomId] = useState("");
+
+  // Access the setPlayerName function from the global game store to save the player's name
+  const setPlayerName = useGameStore((state) => state.setPlayerName);
 
   // Hook to programmatically navigate to different routes
   const navigate = useNavigate();
@@ -17,6 +22,9 @@ const Home = () => {
 
     // Ensure both fields are filled out before navigating
     if (!username.trim() || !roomId.trim()) return;
+
+    // Save username to global store
+    setPlayerName(username.trim());
 
     // Navigate to the Room page injecting the room ID into the URL
     navigate(`/room/${roomId.toUpperCase()}`);
