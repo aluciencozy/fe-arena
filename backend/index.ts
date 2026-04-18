@@ -3,6 +3,8 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 
+import { registerRoomHandler } from './src/sockets/room.handlers.js';
+
 const app = express();
 app.use(cors()); // Allows standard REST API requests
 
@@ -20,8 +22,8 @@ const io = new Server(httpServer, {
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
 
-  // Send a welcome message strictly to the person who just connected
-  socket.emit('welcome', 'Hello from the WebSocket server!');
+  // Register room-related handlers
+  registerRoomHandler(io, socket);
 
   // Listen for disconnections
   socket.on('disconnect', () => {
