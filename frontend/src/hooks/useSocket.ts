@@ -5,8 +5,8 @@ import { io, Socket } from 'socket.io-client';
 const socket: Socket = io('http://localhost:3001', { autoConnect: false });
 
 export const useSocket = (roomCode: string, playerName: string) => {
-  // State to hold room events from the server
-  const [notifications, setNotifications] = useState<string[]>([]);
+  const [notifications, setNotifications] = useState<string[]>([]); // State to hold room notifications
+  const [players, setPlayers] = useState<string[]>([]); // State to hold the current players in room
 
   useEffect(() => {
     socket.connect(); // Manually connect the socket
@@ -16,19 +16,24 @@ export const useSocket = (roomCode: string, playerName: string) => {
 
     // Handler function to process incoming room notifications
     const handleRoomNotification = (notification: string) => {
-      // Update state, append new notification to the list of room events
       setNotifications((prevNotifications) => [...prevNotifications, notification]);
-    }
+    };
 
-    // Listen for the 'room:notification' event from the server
+    const handleRoomState = (roomPlayers: string[]) => { 
+      setPlayers(roomPlayers) 
+    };
+
+    // Listen for the 'room:notification' and 'room:state' events from the server
     socket.on('room:notification', handleRoomNotification);
+    socket.on('room:state', handleRoomState);
 
-    // Cleanup function to disconnect the socket when the component unmounts
+    // Remove event listeners and disconnect the socket
     return () => {
-      socket.off('room:notification', handleRoomNotification); // Remove the event listener
-      socket.disconnect(); // Disconnect the socket
+      socket.off('room:notification', handleRoomNotification);
+      socket.off('room:state', handleRoomState);
+      socket.disconnect();
     }
   }, [roomCode, playerName]); // Re-run effect if roomCode or playerName changes
 
-  return { notifications };
+  return { notifications, players };
 }

@@ -6,12 +6,17 @@ const Room = () => {
   const playerName = useGameStore((state) => state.playerName);
 
   // Get the notifications from the useSocket hook, which listens for room events from the server
-  const { notifications } = useSocket("default-room", playerName); 
+  const { notifications, players } = useSocket("default-room", playerName); 
 
   return (
     <div className="flex flex-col min-h-screen items-center justify-center bg-zinc-950 text-white">
       <h1 className="text-3xl font-bold text-zinc-400">Hi {playerName}!</h1>
       <ul className="text-zinc-400">{notifications.map((msg, i) => <li key={i}>{msg}</li>)}</ul>
+      <br />
+      <div className="flex flex-col justify-center items-center gap-3">
+        <h2>Players</h2>
+        <ul>{players.map(player => <li key={player}>{player}</li>)}</ul>
+      </div>
     </div>
   );
 }
