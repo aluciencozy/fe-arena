@@ -1,9 +1,10 @@
-import express from 'express';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
-import cors from 'cors';
+import express from "express";
+import { createServer } from "http";
+import { Server } from "socket.io";
+import cors from "cors";
 
-import { registerRoomHandler } from './src/sockets/room.handlers.js';
+import { registerRoomHandler } from "./src/sockets/room.handlers.js";
+import { registerGameHandler } from "./src/sockets/game.handlers.js";
 
 const app = express();
 app.use(cors()); // Allows standard REST API requests
@@ -14,19 +15,20 @@ const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: "http://localhost:5173", // Vite frontend URL
-    methods: ["GET", "POST"]
-  }
+    methods: ["GET", "POST"],
+  },
 });
 
 // Listen for incoming connections
-io.on('connection', (socket) => {
+io.on("connection", (socket) => {
   console.log(`User connected: ${socket.id}`);
 
-  // Register room-related handlers
+  // Register handlers for room and game events for this socket connection
   registerRoomHandler(io, socket);
+  registerGameHandler(io, socket);
 
   // Listen for disconnections
-  socket.on('disconnect', () => {
+  socket.on("disconnect", () => {
     console.log(`User disconnected: ${socket.id}`);
   });
 });
