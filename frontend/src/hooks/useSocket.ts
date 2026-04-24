@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import type { ChatMessage } from "../types/";
+import type { UnifiedMessage } from "../types/";
+
+const MAX_MESSAGE_CAPACITY = 100; // Maximum number of messages to keep in state
 
 // Create a Socket.io client instance with autoConnect set to false
 const socket: Socket = io("http://localhost:3001", { autoConnect: false });
 
 export const useSocket = (roomCode: string, playerName: string) => {
-  const [notifications, setNotifications] = useState<string[]>([]); // State to hold room notifications
   const [players, setPlayers] = useState<string[]>([]); // State to hold the current players in room
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]); // State to hold chat messages
+  const [messages, setMessages] = useState<UnifiedMessage[]>([]); // State to hold chat messages
 
   useEffect(() => {
     socket.connect(); // Manually connect the socket
@@ -18,10 +19,15 @@ export const useSocket = (roomCode: string, playerName: string) => {
 
     // Handler function to update notifications state when a 'room:notification' event is received
     const handleRoomNotification = (notification: string) => {
-      setNotifications((prevNotifications) => [
-        ...prevNotifications,
-        notification,
-      ]);
+      const message: UnifiedMessage = {
+        id: `${Date.now()}-${Math.random()}`, // Generate a unique ID for the message
+        type: "SYSTEM",
+        text: notification,
+        timestamp: Date.now(),
+      };
+      setMessages((prevMessages) =>
+        [...prevMessages, message].slice(-MAX_MESSAGE_CAPACITY),
+      );
     };
 
     // Handler function to update players state when a 'room:state' event is received
@@ -30,8 +36,23 @@ export const useSocket = (roomCode: string, playerName: string) => {
     };
 
     // Handler function to update chatMessages state when a 'chat:broadcast' event is received
-    const handleChatBroadcast = (message: ChatMessage) => {
-      setChatMessages((prevMessages) => [...prevMessages, message]);
+    const handleChatBroadcast = ({
+      username,
+      message,
+    }: {
+      username: string;
+      message: string;
+    }) => {
+      const chatMessage: UnifiedMessage = {
+        id: `${Date.now()}-${Math.random()}`, // Generate a unique ID for the message
+        type: "USER",
+        sender: username,
+        text: message,
+        timestamp: Date.now(),
+      };
+      setMessages((prevMessages) =>
+        [...prevMessages, chatMessage].slice(-MAX_MESSAGE_CAPACITY),
+      );
     };
 
     // Listen for the 'room:notification' and 'room:state' events from the server
@@ -49,9 +70,10 @@ export const useSocket = (roomCode: string, playerName: string) => {
   }, [roomCode, playerName]); // Re-run effect if roomCode or playerName changes
 
   const sendChatMessage = (message: string) => {
-    if (!message.trim()) return; // Do not send empty messages
-    socket.emit("chat:message", message);
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage) return; // Do not send empty messages
+    socket.emit("chat:message", trimmedMessage);
   };
 
-  return { notifications, players, chatMessages, sendChatMessage };
+  return { players, messages, sendChatMessage };
 };

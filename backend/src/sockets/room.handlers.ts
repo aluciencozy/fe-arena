@@ -7,6 +7,11 @@ import {
 export const registerRoomHandler = (io: Server, socket: Socket) => {
   // Listen for the "room:join" event from the client
   socket.on("room:join", (roomId: string, username: string) => {
+    if (!roomId || !roomId.trim() || !username || !username.trim()) {
+      socket.emit("room:error", "Room ID and username are required.");
+      return;
+    }
+
     socket.join(roomId); // Put the socket in the specified room
 
     // Add the player to the room and get the current players in the room

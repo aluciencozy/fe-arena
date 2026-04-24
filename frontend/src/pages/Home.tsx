@@ -33,7 +33,6 @@ const Home = () => {
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-4">
       <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900/50 p-8 shadow-xl backdrop-blur-sm">
-        
         <div className="mb-8 text-center">
           <h1 className="text-4xl font-black tracking-tight text-white mb-2">
             GUESS THE OST
@@ -43,10 +42,12 @@ const Home = () => {
 
         <form onSubmit={handleJoinRoom} className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-zinc-300">Username</label>
-            <Input 
-              type="text" 
-              placeholder="xX_DemonSlayer_Xx" 
+            <label className="text-sm font-medium text-zinc-300">
+              Username
+            </label>
+            <Input
+              type="text"
+              placeholder="xX_DemonSlayer_Xx"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="bg-zinc-950 border-zinc-800 text-white placeholder:text-zinc-600"
@@ -54,10 +55,12 @@ const Home = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-zinc-300">Room Code</label>
-            <Input 
-              type="text" 
-              placeholder="ABCD" 
+            <label className="text-sm font-medium text-zinc-300">
+              Room Code
+            </label>
+            <Input
+              type="text"
+              placeholder="ABCD"
               value={roomId}
               onChange={(e) => setRoomId(e.target.value)}
               className="bg-zinc-950 border-zinc-800 text-white uppercase placeholder:text-zinc-600"
@@ -65,14 +68,18 @@ const Home = () => {
             />
           </div>
 
-          <Button type="submit" className="w-full font-bold" size="lg">
+          <Button
+            type="submit"
+            className="w-full font-bold"
+            size="lg"
+            disabled={!username.trim() || !roomId.trim()}
+          >
             Join Lobby
           </Button>
         </form>
-
       </div>
     </div>
   );
-}
+};
 
 export default Home;
