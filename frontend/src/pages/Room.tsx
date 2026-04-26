@@ -1,11 +1,14 @@
 import { useGameStore } from "@/store/gameStore";
 import { useSocket } from "@/hooks/useSocket";
+import { useParams } from "react-router-dom";
 import ChatBox from "@/components/game/ChatBox";
 
 const Room = () => {
+  const { id: dynamicRoomId } = useParams(); // Get the room ID from the URL
+
   const playerName = useGameStore((state) => state.playerName);
   const { players, messages, sendChatMessage } = useSocket(
-    "default-room",
+    dynamicRoomId || "default-room",
     playerName,
   );
 
@@ -15,7 +18,9 @@ const Room = () => {
       <div className="flex-1 flex flex-col gap-4">
         {/* Header */}
         <header className="flex justify-between items-center bg-zinc-900 p-4 rounded-xl border border-zinc-800">
-          <h1 className="text-2xl font-bold text-zinc-100">Room: DEFAULT</h1>
+          <h1 className="text-2xl font-bold text-zinc-100">
+            Room: {dynamicRoomId || "DEFAULT"}
+          </h1>
           <span className="text-zinc-400">
             Playing as:{" "}
             <span className="text-emerald-400 font-semibold">{playerName}</span>
