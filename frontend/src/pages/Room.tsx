@@ -1,6 +1,7 @@
+import { useParams } from "react-router-dom";
+import YouTube from "react-youtube";
 import { useGameStore } from "@/store/gameStore";
 import { useSocket } from "@/hooks/useSocket";
-import { useParams } from "react-router-dom";
 import ChatBox from "@/components/game/ChatBox";
 
 const Room = () => {
@@ -27,12 +28,16 @@ const Room = () => {
           </span>
         </header>
 
-        {/* Audio/Video Stage (Placeholder for now) */}
+        {/* Audio/Video Stage */}
         <main className="flex-1 bg-zinc-900 rounded-xl border border-zinc-800 flex items-center justify-center">
-          <div className="text-zinc-500 flex flex-col items-center">
-            <span className="text-4xl mb-4">🎵</span>
-            <p>YouTube Player will go here</p>
-          </div>
+          <YouTube
+            videoId="B5UUcVGqBDE"
+            opts={{
+              width: "100%",
+              height: "100%",
+            }}
+            className="overflow-hidden aspect-video w-full"
+          />
         </main>
       </div>
 
