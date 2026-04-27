@@ -7,6 +7,9 @@ const userSessions = new Map<string, { roomId: string; username: string }>();
 // Utility functions to manage rooms and user sessions
 export const getUserSession = (socketId: string) => userSessions.get(socketId);
 
+// Get the list of players in a room, or an empty array if the room doesn't exist
+export const getPlayersInRoom = (roomId: string) => rooms.get(roomId) || [];
+
 export const addPlayerToRoom = (
   roomId: string,
   username: string,

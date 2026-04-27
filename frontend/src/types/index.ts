@@ -18,5 +18,8 @@ export interface GameState {
   currentVideoID: string | null;
   videoStartTime: number;
   roundStartTime: number | null;
+}
+
+export interface GameStore extends GameState {
   setGameState: (newState: Partial<GameState>) => void;
 }

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { io, Socket } from "socket.io-client";
-import type { UnifiedMessage } from "../types/";
+import type { UnifiedMessage, GameState } from "../types/";
+import { useGameStateStore } from "@/store/gameStore";
 
 const MAX_MESSAGE_CAPACITY = 100; // Maximum number of messages to keep in state
 
@@ -63,11 +64,16 @@ export const useSocket = (roomCode: string, playerName: string) => {
       );
     };
 
+    const handleGameState = (gameState: GameState) => {
+      useGameStateStore.getState().setGameState(gameState);
+    };
+
     // Listen for relevant events from the server
     socket.on("room:notification", handleRoomNotification);
     socket.on("room:state", handleRoomState);
     socket.on("room:error", handleRoomError);
     socket.on("chat:broadcast", handleChatBroadcast);
+    socket.on("game:state", handleGameState);
 
     // Remove event listeners and disconnect the socket
     return () => {
@@ -75,6 +81,7 @@ export const useSocket = (roomCode: string, playerName: string) => {
       socket.off("room:state", handleRoomState);
       socket.off("room:error", handleRoomError);
       socket.off("chat:broadcast", handleChatBroadcast);
+      socket.off("game:state", handleGameState);
       socket.disconnect();
     };
   }, [roomCode, playerName]); // Re-run effect if roomCode or playerName changes
@@ -85,5 +92,9 @@ export const useSocket = (roomCode: string, playerName: string) => {
     socket.emit("chat:message", trimmedMessage);
   };
 
-  return { players, messages, sendChatMessage };
+  const startGame = (roomId: string) => {
+    socket.emit("game:start", roomId);
+  };
+
+  return { players, messages, sendChatMessage, startGame };
 };
