@@ -1,16 +1,26 @@
-import { useGameStore } from "@/store/gameStore";
+import { useParams, useNavigate } from "react-router-dom";
+import YouTube from "react-youtube";
+import { useGameStore, useGameStateStore } from "@/store/gameStore";
 import { useSocket } from "@/hooks/useSocket";
-import { useParams } from "react-router-dom";
 import ChatBox from "@/components/game/ChatBox";
 
 const Room = () => {
   const { id: dynamicRoomId } = useParams(); // Get the room ID from the URL
+  const navigate = useNavigate(); // Hook to programmatically navigate between routes
+
+  if (!dynamicRoomId) {
+    navigate("/"); // Redirect to home if no room ID is present
+    return null; // Render nothing while redirecting
+  }
 
   const playerName = useGameStore((state) => state.playerName);
-  const { players, messages, sendChatMessage } = useSocket(
-    dynamicRoomId || "default-room",
+  const { players, messages, sendChatMessage, startGame } = useSocket(
+    dynamicRoomId,
     playerName,
   );
+
+  const phase = useGameStateStore((state) => state.phase);
+  const currentVideoId = useGameStateStore((state) => state.currentVideoID);
 
   return (
     <div className="flex h-screen bg-zinc-950 text-white overflow-hidden p-4 gap-4">
@@ -19,7 +29,7 @@ const Room = () => {
         {/* Header */}
         <header className="flex justify-between items-center bg-zinc-900 p-4 rounded-xl border border-zinc-800">
           <h1 className="text-2xl font-bold text-zinc-100">
-            Room: {dynamicRoomId || "DEFAULT"}
+            Room: {dynamicRoomId}
           </h1>
           <span className="text-zinc-400">
             Playing as:{" "}
@@ -27,12 +37,22 @@ const Room = () => {
           </span>
         </header>
 
-        {/* Audio/Video Stage (Placeholder for now) */}
+        {/* Audio/Video Stage */}
         <main className="flex-1 bg-zinc-900 rounded-xl border border-zinc-800 flex items-center justify-center">
-          <div className="text-zinc-500 flex flex-col items-center">
-            <span className="text-4xl mb-4">🎵</span>
-            <p>YouTube Player will go here</p>
-          </div>
+          {phase === "PLAYING" && currentVideoId ? (
+            <YouTube
+              videoId={currentVideoId} // Fallback video ID
+              opts={{
+                width: "100%",
+                height: "100%",
+              }}
+              className="overflow-hidden aspect-video w-full"
+            />
+          ) : (
+            <div className="text-center text-zinc-500">
+              <h2 className="text-3xl font-bold mb-2">Waiting to start...</h2>
+            </div>
+          )}
         </main>
       </div>
 
@@ -55,6 +75,19 @@ const Room = () => {
             ))}
           </ul>
         </div>
+
+        {/* Game Start Button */}
+        {phase === "LOBBY" && (
+          <button
+            className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-xl transition-colors"
+            onClick={() => {
+              // Emit the game start event
+              startGame();
+            }}
+          >
+            Start Game
+          </button>
+        )}
 
         {/* Chat Box */}
         <div className="flex-1 bg-zinc-900 rounded-xl border border-zinc-800 flex flex-col overflow-hidden">
