@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import YouTube from "react-youtube";
+import YouTube, { type YouTubeEvent } from "react-youtube";
 import { useGameStore, useGameStateStore } from "@/store/gameStore";
 import { useSocket } from "@/hooks/useSocket";
 import ChatBox from "@/components/game/ChatBox";
@@ -13,14 +13,28 @@ const Room = () => {
     return null; // Render nothing while redirecting
   }
 
+  // Access player name and game state from the global stores
   const playerName = useGameStore((state) => state.playerName);
+  const phase = useGameStateStore((state) => state.phase);
+  const currentVideoId = useGameStateStore((state) => state.currentVideoID);
+  const videoStartTime = useGameStateStore((state) => state.videoStartTime);
+  const roundStartTime = useGameStateStore((state) => state.roundStartTime);
+
+  // Use the custom hook to manage WebSocket connections and game state synchronization by grabbed the necessary data and functions for the room
   const { players, messages, sendChatMessage, startGame } = useSocket(
     dynamicRoomId,
     playerName,
   );
 
-  const phase = useGameStateStore((state) => state.phase);
-  const currentVideoId = useGameStateStore((state) => state.currentVideoID);
+  const handlePlayerReady = (event: YouTubeEvent) => {
+    if (!roundStartTime) return; // Ensure round start time is set before calculating elapsed time
+
+    const elapsedTime = (Date.now() - roundStartTime) / 1000; // Calculate elapsed time in seconds
+    const syncTime = videoStartTime + elapsedTime; // Calculate the time to sync the video to
+
+    event.target.seekTo(syncTime, true); // Seek the video to the calculated sync time
+    event.target.playVideo(); // Start playing the video
+  };
 
   return (
     <div className="flex h-screen bg-zinc-950 text-white overflow-hidden p-4 gap-4">
@@ -46,6 +60,7 @@ const Room = () => {
                 width: "100%",
                 height: "100%",
               }}
+              onReady={handlePlayerReady}
               className="overflow-hidden aspect-video w-full"
             />
           ) : (
@@ -81,7 +96,7 @@ const Room = () => {
           <button
             className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-xl transition-colors"
             onClick={() => {
-              // Emit the game start event
+              // Emit the game:start event
               startGame();
             }}
           >
