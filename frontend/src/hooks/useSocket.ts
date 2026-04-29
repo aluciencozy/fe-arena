@@ -68,12 +68,17 @@ export const useSocket = (roomCode: string, playerName: string) => {
       useGameStateStore.getState().setGameState(gameState);
     };
 
+    const handleGameError = (errorMessage: string) => {
+      alert(`Game Error: ${errorMessage}`);
+    };
+
     // Listen for relevant events from the server
     socket.on("room:notification", handleRoomNotification);
     socket.on("room:state", handleRoomState);
     socket.on("room:error", handleRoomError);
     socket.on("chat:broadcast", handleChatBroadcast);
     socket.on("game:state", handleGameState);
+    socket.on("game:error", handleGameError);
 
     // Remove event listeners and disconnect the socket
     return () => {
@@ -82,6 +87,7 @@ export const useSocket = (roomCode: string, playerName: string) => {
       socket.off("room:error", handleRoomError);
       socket.off("chat:broadcast", handleChatBroadcast);
       socket.off("game:state", handleGameState);
+      socket.off("game:error", handleGameError);
       socket.disconnect();
     };
   }, [roomCode, playerName]); // Re-run effect if roomCode or playerName changes
@@ -92,8 +98,8 @@ export const useSocket = (roomCode: string, playerName: string) => {
     socket.emit("chat:message", trimmedMessage);
   };
 
-  const startGame = (roomId: string) => {
-    socket.emit("game:start", roomId);
+  const startGame = () => {
+    socket.emit("game:start");
   };
 
   return { players, messages, sendChatMessage, startGame };

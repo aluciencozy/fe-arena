@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import YouTube from "react-youtube";
 import { useGameStore, useGameStateStore } from "@/store/gameStore";
 import { useSocket } from "@/hooks/useSocket";
@@ -6,14 +6,21 @@ import ChatBox from "@/components/game/ChatBox";
 
 const Room = () => {
   const { id: dynamicRoomId } = useParams(); // Get the room ID from the URL
+  const navigate = useNavigate(); // Hook to programmatically navigate between routes
+
+  if (!dynamicRoomId) {
+    navigate("/"); // Redirect to home if no room ID is present
+    return null; // Render nothing while redirecting
+  }
 
   const playerName = useGameStore((state) => state.playerName);
   const { players, messages, sendChatMessage, startGame } = useSocket(
-    dynamicRoomId || "default-room",
+    dynamicRoomId,
     playerName,
   );
 
   const phase = useGameStateStore((state) => state.phase);
+  const currentVideoId = useGameStateStore((state) => state.currentVideoID);
 
   return (
     <div className="flex h-screen bg-zinc-950 text-white overflow-hidden p-4 gap-4">
@@ -22,7 +29,7 @@ const Room = () => {
         {/* Header */}
         <header className="flex justify-between items-center bg-zinc-900 p-4 rounded-xl border border-zinc-800">
           <h1 className="text-2xl font-bold text-zinc-100">
-            Room: {dynamicRoomId || "DEFAULT"}
+            Room: {dynamicRoomId}
           </h1>
           <span className="text-zinc-400">
             Playing as:{" "}
@@ -32,9 +39,9 @@ const Room = () => {
 
         {/* Audio/Video Stage */}
         <main className="flex-1 bg-zinc-900 rounded-xl border border-zinc-800 flex items-center justify-center">
-          {phase === "PLAYING" ? (
+          {phase === "PLAYING" && currentVideoId ? (
             <YouTube
-              videoId="B5UUcVGqBDE"
+              videoId={currentVideoId} // Fallback video ID
               opts={{
                 width: "100%",
                 height: "100%",
@@ -75,7 +82,7 @@ const Room = () => {
             className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-xl transition-colors"
             onClick={() => {
               // Emit the game start event
-              startGame(dynamicRoomId || "default-room");
+              startGame();
             }}
           >
             Start Game

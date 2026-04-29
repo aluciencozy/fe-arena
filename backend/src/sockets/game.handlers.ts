@@ -20,7 +20,7 @@ export const registerGameHandler = (io: Server, socket: Socket) => {
 
     if (!session) return; // If there's no session for the socket, do nothing
 
-    const { roomId, username } = session;
+    const { roomId } = session;
 
     const players = getPlayersInRoom(roomId);
 

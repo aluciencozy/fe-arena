@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { PlayerState, GameStore } from "../types";
+import type { PlayerState, GameStore, GameState } from "../types";
 
 // Create a global store using Zustand to manage player information across the app
 export const useGameStore = create<PlayerState>((set) => ({
@@ -15,6 +15,6 @@ export const useGameStateStore = create<GameStore>((set) => ({
   currentVideoID: null,
   videoStartTime: 0,
   roundStartTime: null,
-  setGameState: (newState: Partial<GameStore>) =>
+  setGameState: (newState: Partial<GameState>) =>
     set((state) => ({ ...state, ...newState })),
 }));
