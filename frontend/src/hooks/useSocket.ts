@@ -48,17 +48,22 @@ export const useSocket = (roomCode: string, playerName: string) => {
     const handleChatBroadcast = ({
       username,
       message,
+      type,
     }: {
       username: string;
       message: string;
+      type?: "USER" | "SYSTEM";
     }) => {
+      if (message.trim() === "") return; // Do not add empty user messages to chat
+
       const chatMessage: UnifiedMessage = {
         id: `${Date.now()}-${Math.random()}`, // Generate a unique ID for the message
-        type: "USER",
+        type: type || "USER", // Default to "USER" type if not provided
         sender: username,
         text: message,
         timestamp: Date.now(),
       };
+
       setMessages((prevMessages) =>
         [...prevMessages, chatMessage].slice(-MAX_MESSAGE_CAPACITY),
       );
