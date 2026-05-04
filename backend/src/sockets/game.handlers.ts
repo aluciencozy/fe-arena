@@ -1,13 +1,12 @@
 import { Server, Socket } from "socket.io";
 import { getUserSession, getPlayersInRoom } from "../services/room.service.js";
 import type { GameState } from "../types/index.js";
-import { createGame, getGameState } from "../services/game.service.js";
-
-// Temporary sample playlist with video IDs and their corresponding answers
-const PLAYLIST = [
-  { videoId: "B5UUcVGqBDE", answer: "attack on titan" },
-  { videoId: "j6eA1_K7fO0", answer: "naruto" },
-];
+import {
+  createGame,
+  getGameState,
+  startRoundTimer,
+  PLAYLIST,
+} from "../services/game.service.js";
 
 export const registerGameHandler = (io: Server, socket: Socket) => {
   socket.on("chat:message", (message: string) => {
@@ -39,6 +38,7 @@ export const registerGameHandler = (io: Server, socket: Socket) => {
         return;
       }
 
+      // Check if there is a roundStartTime, if not just broadcast the message like normal
       if (gameState.roundStartTime === null) {
         io.to(roomId).emit("chat:broadcast", { username, message });
         return;
@@ -49,6 +49,9 @@ export const registerGameHandler = (io: Server, socket: Socket) => {
       const damage = Math.max(100, Math.min(1000, 1000 - elapsedSeconds));
       gameState.pendingDamage[username] = damage;
       gameState.guessedCorrectly.push(username);
+
+      // Clear the round timer when a correct guess is made to prevent it from ending the round while we're in the grace period
+      if (gameState.roundTimer) clearTimeout(gameState.roundTimer);
 
       // If the game is currently in the PLAYING phase, transition to GRACE_PERIOD to give players a moment to see the correct guess and damage dealt before moving to the next round or ending the game
       if (gameState.phase === "PLAYING") {
@@ -110,6 +113,8 @@ export const registerGameHandler = (io: Server, socket: Socket) => {
               PLAYLIST[gameState.currentRound % PLAYLIST.length]!.videoId;
 
             io.to(roomId).emit("game:state", gameState);
+
+            startRoundTimer(roomId, io); // Start the round timer for the new round
           }, 2000); // Short delay before starting the next round or ending the game to allow clients to update their UI
         }, 3000);
       }
@@ -161,6 +166,8 @@ export const registerGameHandler = (io: Server, socket: Socket) => {
     };
 
     createGame(roomId, gameState);
+
+    startRoundTimer(roomId, io); // Start the round timer when the game starts
 
     io.to(roomId).emit("game:state", gameState);
   });

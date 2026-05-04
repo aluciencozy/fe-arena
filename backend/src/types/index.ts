@@ -7,4 +7,5 @@ export interface GameState {
   videoStartTime: number;
   roundStartTime: number | null;
   guessedCorrectly: string[];
+  roundTimer?: NodeJS.Timeout;
 }
