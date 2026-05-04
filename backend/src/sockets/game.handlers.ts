@@ -33,15 +33,20 @@ export const registerGameHandler = (io: Server, socket: Socket) => {
       !gameState.guessedCorrectly.includes(username)
     ) {
       // Check if the message is incorrect (case-insensitive, ignoring leading/trailing whitespace)
-      if (message.trim().toLowerCase() !== currentVideo?.answer.toLowerCase()) {
+      if (message.trim().toLowerCase() !== currentVideo?.answer?.toLowerCase()) {
         // If the message is not the correct guess, send the chat message as a normal user message
+        io.to(roomId).emit("chat:broadcast", { username, message });
+        return;
+      }
+
+      if (gameState.roundStartTime === null) {
         io.to(roomId).emit("chat:broadcast", { username, message });
         return;
       }
 
       // Calculate damage based on how long the round has been going on, with a minimum of 100 damage and a maximum of 1000 damage, and store it in the pendingDamage object for the player who guessed correctly
       const elapsedSeconds = Math.floor((Date.now() - gameState.roundStartTime!) / 1000);
-      const damage = Math.max(100, 1000 - elapsedSeconds);
+      const damage = Math.max(100, Math.min(1000, 1000 - elapsedSeconds));
       gameState.pendingDamage[username] = damage;
       gameState.guessedCorrectly.push(username);
 
