@@ -12,9 +12,11 @@ export const useGameStateStore = create<GameStore>((set) => ({
   phase: "LOBBY",
   currentRound: 0,
   health: {},
+  pendingDamage: {},
   currentVideoID: null,
   videoStartTime: 0,
   roundStartTime: null,
+  guessedCorrectly: [],
   setGameState: (newState: Partial<GameState>) =>
     set((state) => ({ ...state, ...newState })),
 }));
