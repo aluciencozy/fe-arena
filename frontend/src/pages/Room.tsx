@@ -68,15 +68,29 @@ const Room = () => {
         {/* Audio/Video Stage */}
         <main className="flex-1 bg-zinc-900 rounded-xl border border-zinc-800 flex items-center justify-center">
           {(phase === "PLAYING" || phase === "GRACE_PERIOD") && currentVideoId ? (
-            <YouTube
-              videoId={currentVideoId} // Fallback video ID
-              opts={{
-                width: "100%",
-                height: "100%",
-              }}
-              onReady={handlePlayerReady}
-              className="overflow-hidden aspect-video w-full"
-            />
+            <div className="w-full overflow-hidden flex flex-col items-center justify-center relative">
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30 w-full h-full flex justify-center items-center">
+                Listening...
+              </div>
+              <YouTube
+                videoId={currentVideoId}
+                opts={{
+                  width: "100%",
+                  height: "100%",
+                  playerVars: {
+                    controls: 0, // Hide player controls
+                    disablekb: 1, // Disable keyboard controls
+                    modestbranding: 1, // Hide YouTube logo
+                    iv_load_policy: 3, // Hide video annotations
+                    fs: 0, // Disable fullscreen
+                    rel: 0, // Don't show related videos at the end
+                    // autoplay: 0, // This will be handled manually in the future
+                  },
+                }}
+                onReady={handlePlayerReady}
+                className="overflow-hidden aspect-video w-full opacity-0 pointer-events-none"
+              />
+            </div>
           ) : (
             <div className="text-center text-zinc-500">
               <h2 className="text-3xl font-bold mb-2">Waiting to start...</h2>
@@ -116,6 +130,12 @@ const Room = () => {
                   <p className="text-2xl">{health[opponentName]}</p>
                 </div>
               </div>
+              <button
+                className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-xl transition-colors"
+                onClick={startGame}
+              >
+                Play Again
+              </button>
             </div>
           )}
         </main>
