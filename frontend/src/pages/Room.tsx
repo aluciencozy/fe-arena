@@ -19,12 +19,16 @@ const Room = () => {
   const currentVideoId = useGameStateStore((state) => state.currentVideoID);
   const videoStartTime = useGameStateStore((state) => state.videoStartTime);
   const roundStartTime = useGameStateStore((state) => state.roundStartTime);
+  const health = useGameStateStore((state) => state.health);
 
   // Use the custom hook to manage WebSocket connections and game state synchronization by grabbed the necessary data and functions for the room
   const { players, messages, sendChatMessage, startGame } = useSocket(
     dynamicRoomId,
     playerName,
   );
+
+  const opponent = players.find((p) => p !== playerName);
+  const opponentName = opponent ? opponent : "Waiting for opponent...";
 
   const handlePlayerReady = (event: YouTubeEvent) => {
     if (!roundStartTime) return; // Ensure round start time is set before calculating elapsed time
@@ -42,18 +46,28 @@ const Room = () => {
       <div className="flex-1 flex flex-col gap-4">
         {/* Header */}
         <header className="flex justify-between items-center bg-zinc-900 p-4 rounded-xl border border-zinc-800">
-          <h1 className="text-2xl font-bold text-zinc-100">
-            Room: {dynamicRoomId}
-          </h1>
+          <h1 className="text-2xl font-bold text-zinc-100">Room: {dynamicRoomId}</h1>
           <span className="text-zinc-400">
             Playing as:{" "}
             <span className="text-emerald-400 font-semibold">{playerName}</span>
           </span>
         </header>
 
+        {/* Example layout, adjust to your exact variables */}
+        <div className="flex justify-between w-full px-8 py-4 bg-zinc-900 text-white">
+          <div className="flex flex-col items-start">
+            <span className="font-bold text-blue-400">{playerName}</span>
+            <span className="text-2xl">{health[playerName]} HP</span>
+          </div>
+          <div className="flex flex-col items-end">
+            <span className="font-bold text-red-400">{opponentName}</span>
+            <span className="text-2xl">{health[opponentName]} HP</span>
+          </div>
+        </div>
+
         {/* Audio/Video Stage */}
         <main className="flex-1 bg-zinc-900 rounded-xl border border-zinc-800 flex items-center justify-center">
-          {phase === "PLAYING" && currentVideoId ? (
+          {(phase === "PLAYING" || phase === "GRACE_PERIOD") && currentVideoId ? (
             <YouTube
               videoId={currentVideoId} // Fallback video ID
               opts={{
@@ -68,6 +82,42 @@ const Room = () => {
               <h2 className="text-3xl font-bold mb-2">Waiting to start...</h2>
             </div>
           )}
+
+          {phase === "ROUND_END" && (
+            <div className="absolute inset-0 bg-zinc-900/90 flex flex-col items-center justify-center gap-4">
+              <h2 className="text-4xl font-bold text-emerald-400">
+                Round Over! Next song starting soon...
+              </h2>
+              <div className="flex gap-8">
+                <div className="text-center">
+                  <span className="text-lg font-bold">{playerName}</span>
+                  <p className="text-2xl">{health[playerName]}</p>
+                </div>
+                <div className="text-center">
+                  <span className="text-lg font-bold">{opponentName}</span>
+                  <p className="text-2xl">{health[opponentName]}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {phase === "GAME_OVER" && (
+            <div className="absolute inset-0 bg-zinc-900/90 flex flex-col items-center justify-center gap-4">
+              <h2 className="text-4xl font-bold text-emerald-400">
+                {health[playerName] > health[opponentName] ? "You Win!" : "You Lose!"}
+              </h2>
+              <div className="flex gap-8">
+                <div className="text-center">
+                  <span className="text-lg font-bold">{playerName}</span>
+                  <p className="text-2xl">{health[playerName]}</p>
+                </div>
+                <div className="text-center">
+                  <span className="text-lg font-bold">{opponentName}</span>
+                  <p className="text-2xl">{health[opponentName]}</p>
+                </div>
+              </div>
+            </div>
+          )}
         </main>
       </div>
 
@@ -80,10 +130,7 @@ const Room = () => {
           </h2>
           <ul className="overflow-y-auto flex-1 space-y-2">
             {players.map((player) => (
-              <li
-                key={player}
-                className="flex items-center gap-2 text-zinc-300"
-              >
+              <li key={player} className="flex items-center gap-2 text-zinc-300">
                 <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
                 {player}
               </li>
