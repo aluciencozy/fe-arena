@@ -14,28 +14,58 @@ export const addPlayerToRoom = (
   roomId: string,
   username: string,
   socketId: string,
-): { currentPlayers: string[]; isNewPlayer: boolean } => {
-  // If the room doesn't exist, create it and add the player to it
-  if (!rooms.has(roomId)) {
-    userSessions.set(socketId, { roomId, username });
+): { ok: true; currentPlayers: string[]; isNewPlayer: boolean } | { ok: false; error: string } => {
+  const normalizedRoomId = roomId.trim().toUpperCase();
+  const normalizedUsername = username.trim();
+  const existingSession = userSessions.get(socketId);
+
+  if (
+    existingSession?.roomId === normalizedRoomId &&
+    existingSession.username.toLowerCase() === normalizedUsername.toLowerCase()
+  ) {
     return {
-      currentPlayers: rooms.set(roomId, [username]).get(roomId) as string[],
+      ok: true,
+      currentPlayers: rooms.get(normalizedRoomId) || [existingSession.username],
+      isNewPlayer: false,
+    };
+  }
+
+  // If the room doesn't exist, create it and add the player to it
+  if (!rooms.has(normalizedRoomId)) {
+    userSessions.set(socketId, {
+      roomId: normalizedRoomId,
+      username: normalizedUsername,
+    });
+    return {
+      ok: true,
+      currentPlayers: rooms
+        .set(normalizedRoomId, [normalizedUsername])
+        .get(normalizedRoomId) as string[],
       isNewPlayer: true,
     };
   }
 
   // If the room exists, add the player to it if they are not already in it
-  const players = rooms.get(roomId) as string[];
+  const players = rooms.get(normalizedRoomId) as string[];
 
-  if (players.find((player) => player === username)) {
-    // Update session for the socket in case the same user is reconnecting with a different socket
-    userSessions.set(socketId, { roomId, username });
-    return { currentPlayers: players, isNewPlayer: false };
+  if (
+    players.some(
+      (player) => player.toLowerCase() === normalizedUsername.toLowerCase(),
+    )
+  ) {
+    return { ok: false, error: "That username is already taken in this room." };
   }
 
-  players.push(username);
-  userSessions.set(socketId, { roomId, username });
-  return { currentPlayers: players, isNewPlayer: true };
+  if (players.length >= 2) {
+    return { ok: false, error: "This room already has 2 players." };
+  }
+
+  players.push(normalizedUsername);
+  userSessions.set(socketId, {
+    roomId: normalizedRoomId,
+    username: normalizedUsername,
+  });
+  return { ok: true, currentPlayers: players, isNewPlayer: true };
 };
 
 export const removePlayerFromRoom = (

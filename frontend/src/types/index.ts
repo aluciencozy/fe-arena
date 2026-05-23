@@ -12,14 +12,27 @@ export interface PlayerState {
 }
 
 export interface GameState {
-  phase: "LOBBY" | "PLAYING" | "ROUND_END" | "GAME_OVER" | "GRACE_PERIOD";
+  phase:
+    | "LOBBY"
+    | "COUNTDOWN"
+    | "PLAYING"
+    | "ROUND_END"
+    | "GAME_OVER"
+    | "GRACE_PERIOD"
+    | "REVEAL";
   currentRound: number;
   health: Record<string, number>;
   pendingDamage: Record<string, number>;
   currentVideoID: string | null;
   videoStartTime: number;
   roundStartTime: number | null;
+  countdownEndsAt: number | null;
+  roundEndsAt: number | null;
   guessedCorrectly: string[];
+  ready: Record<string, boolean>;
+  winner: string | null;
+  revealedAnswer: string | null;
+  playlistIndex: number;
 }
 
 export interface GameStore extends GameState {
