@@ -209,8 +209,6 @@ const revealAfterGrace = (
   const record = games.get(roomId);
   if (!record) return;
 
-  clearTimers(record);
-
   const currentVideo = getCurrentPlaylistItem(record);
   record.state.phase = "REVEAL";
   record.state.revealedAnswer = currentVideo.answer;
