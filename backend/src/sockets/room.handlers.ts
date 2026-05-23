@@ -39,12 +39,6 @@ export const registerRoomHandler = (io: Server, socket: Socket) => {
 
     const { currentPlayers, isNewPlayer } = joinResult;
 
-    if (joinResult.replacedSocketId) {
-      const replacedSocket = io.sockets.sockets.get(joinResult.replacedSocketId);
-      replacedSocket?.leave(normalizedRoomId);
-      replacedSocket?.disconnect(true);
-    }
-
     socket.join(normalizedRoomId); // Put the socket in the specified room
 
     // Emit the current state of the room to all users in the room

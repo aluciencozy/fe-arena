@@ -201,6 +201,32 @@ const timeoutRound = (roomId: string, events: GameEvents) => {
   }, REVEAL_SECONDS * 1000);
 };
 
+const revealAfterGrace = (
+  roomId: string,
+  players: string[],
+  events: GameEvents,
+) => {
+  const record = games.get(roomId);
+  if (!record) return;
+
+  const currentVideo = getCurrentPlaylistItem(record);
+  record.state.phase = "REVEAL";
+  record.state.revealedAnswer = currentVideo.answer;
+  record.state.roundStartTime = null;
+  record.state.roundEndsAt = null;
+  record.state.countdownEndsAt = null;
+
+  events.emitSystemMessage(`The answer was ${currentVideo.answer}.`);
+  events.emitState(record.state);
+
+  record.revealTimer = setTimeout(() => {
+    const activeRecord = games.get(roomId);
+    if (!activeRecord || activeRecord.state.phase !== "REVEAL") return;
+
+    advanceToNextRound(roomId, players, events);
+  }, REVEAL_SECONDS * 1000);
+};
+
 const finishGracePeriod = (
   roomId: string,
   players: string[],
@@ -253,7 +279,7 @@ const finishGracePeriod = (
     return;
   }
 
-  advanceToNextRound(roomId, players, events);
+  revealAfterGrace(roomId, players, events);
 };
 
 export const getGameState = (roomId: string): GameState | undefined => {

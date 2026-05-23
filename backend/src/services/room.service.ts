@@ -14,14 +14,7 @@ export const addPlayerToRoom = (
   roomId: string,
   username: string,
   socketId: string,
-):
-  | {
-      ok: true;
-      currentPlayers: string[];
-      isNewPlayer: boolean;
-      replacedSocketId?: string;
-    }
-  | { ok: false; error: string } => {
+): { ok: true; currentPlayers: string[]; isNewPlayer: boolean } | { ok: false; error: string } => {
   const normalizedRoomId = roomId.trim().toUpperCase();
   const normalizedUsername = username.trim();
   const existingSession = userSessions.get(socketId);
@@ -60,38 +53,7 @@ export const addPlayerToRoom = (
   );
 
   if (matchingPlayer) {
-    const replacedSocketId = [...userSessions.entries()].find(
-      ([otherSocketId, session]) =>
-        otherSocketId !== socketId &&
-        session.roomId === normalizedRoomId &&
-        session.username.toLowerCase() === normalizedUsername.toLowerCase(),
-    )?.[0];
-
-    if (replacedSocketId) {
-      userSessions.delete(replacedSocketId);
-    }
-
-    userSessions.set(socketId, {
-      roomId: normalizedRoomId,
-      username: matchingPlayer,
-    });
-
-    const result: {
-      ok: true;
-      currentPlayers: string[];
-      isNewPlayer: boolean;
-      replacedSocketId?: string;
-    } = {
-      ok: true,
-      currentPlayers: players,
-      isNewPlayer: false,
-    };
-
-    if (replacedSocketId) {
-      result.replacedSocketId = replacedSocketId;
-    }
-
-    return result;
+    return { ok: false, error: "That username is already taken in this room." };
   }
 
   if (players.length >= 2) {
