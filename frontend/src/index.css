@@ -49,10 +49,6 @@
 }
 
 :root {
-    --sharp-edge-base: #898989;
-    --sharp-edge-surface: #d9d9d9;
-    --sharp-edge-danger: #ff4d4d;
-    --sharp-edge-play: #4dffbc;
     --background: #eeeeee;
     --foreground: #303030;
     --card: #d9d9d9;
@@ -134,4 +130,10 @@
   html {
     @apply font-sans;
     }
+}
+
+@media (pointer: coarse) {
+  body {
+    background-attachment: scroll;
+  }
 }
