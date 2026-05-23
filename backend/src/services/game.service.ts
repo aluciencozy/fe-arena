@@ -41,8 +41,19 @@ const createReady = (players: string[], readyValue = false) =>
     return ready;
   }, {});
 
-const shufflePlaylist = () =>
-  [...PLAYLIST].sort(() => Math.random() - 0.5);
+const shufflePlaylist = () => {
+  const shuffled = [...PLAYLIST];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [
+      shuffled[swapIndex]!,
+      shuffled[index]!,
+    ];
+  }
+
+  return shuffled;
+};
 
 const getCurrentPlaylistItem = (record: GameRecord) =>
   record.playlist[record.state.playlistIndex % record.playlist.length]!;
@@ -153,7 +164,7 @@ const advanceToNextRound = (
   const record = games.get(roomId);
   if (!record) return;
 
-  record.state.phase = "ROUND_END";
+  record.state.phase = "COUNTDOWN";
   record.state.currentRound += 1;
   record.state.playlistIndex =
     (record.state.playlistIndex + 1) % record.playlist.length;
@@ -165,7 +176,6 @@ const advanceToNextRound = (
   record.state.pendingDamage = {};
   record.state.revealedAnswer = null;
 
-  events.emitState(record.state);
   startCountdown(roomId, players, events);
 };
 

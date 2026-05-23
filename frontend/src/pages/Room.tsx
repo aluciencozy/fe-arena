@@ -34,11 +34,15 @@ const Room = () => {
     playerName,
   );
   const [now, setNow] = useState(Date.now());
+  const hasActiveTimer = countdownEndsAt !== null || roundEndsAt !== null;
 
   useEffect(() => {
+    if (!hasActiveTimer) return;
+
+    setNow(Date.now());
     const timer = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [hasActiveTimer]);
 
   const countdownSeconds = countdownEndsAt
     ? Math.max(0, Math.ceil((countdownEndsAt - now) / 1000))
