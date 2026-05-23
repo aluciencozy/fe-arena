@@ -103,9 +103,9 @@ export const useSocket = (roomCode: string, playerName: string) => {
     socket.emit("chat:message", trimmedMessage);
   };
 
-  const startGame = () => {
-    socket.emit("game:start");
+  const setReady = () => {
+    socket.emit("game:ready");
   };
 
-  return { players, messages, sendChatMessage, startGame };
+  return { players, messages, sendChatMessage, setReady };
 };

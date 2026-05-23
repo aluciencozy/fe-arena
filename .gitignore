@@ -45,3 +45,5 @@ coverage/
 .turbo
 .cache
 .pnpm-debug.log*
+
+copilot-instructions.md
