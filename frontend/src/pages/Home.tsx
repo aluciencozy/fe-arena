@@ -31,39 +31,37 @@ const Home = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-4">
-      <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900/50 p-8 shadow-xl backdrop-blur-sm">
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="w-full max-w-md rounded-2xl border bg-card/90 p-8 shadow-xl backdrop-blur-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-4xl font-black tracking-tight text-white mb-2">
+          <h1 className="mb-2 text-4xl font-black tracking-tight text-foreground">
             GUESS THE OST
           </h1>
-          <p className="text-zinc-400">Enter a room code to join the game.</p>
+          <p className="text-muted-foreground">
+            Enter a room code to join the game.
+          </p>
         </div>
 
         <form onSubmit={handleJoinRoom} className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-zinc-300">
-              Username
-            </label>
+            <label className="text-sm font-medium text-foreground">Username</label>
             <Input
               type="text"
               placeholder="xX_DemonSlayer_Xx"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="bg-zinc-950 border-zinc-800 text-white placeholder:text-zinc-600"
+              className="bg-background"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-zinc-300">
-              Room Code
-            </label>
+            <label className="text-sm font-medium text-foreground">Room Code</label>
             <Input
               type="text"
               placeholder="ABCD"
               value={roomId}
               onChange={(e) => setRoomId(e.target.value)}
-              className="bg-zinc-950 border-zinc-800 text-white uppercase placeholder:text-zinc-600"
+              className="bg-background uppercase"
               maxLength={6}
             />
           </div>

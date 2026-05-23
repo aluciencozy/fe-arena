@@ -4,6 +4,7 @@ import YouTube, { type YouTubeEvent } from "react-youtube";
 import { useGameStore, useGameStateStore } from "@/store/gameStore";
 import { useSocket } from "@/hooks/useSocket";
 import ChatBox from "@/components/game/ChatBox";
+import { Button } from "@/components/ui/button";
 
 const Room = () => {
   const { id: dynamicRoomId } = useParams(); // Get the room ID from the URL
@@ -71,43 +72,43 @@ const Room = () => {
   };
 
   return (
-    <div className="flex h-screen bg-zinc-950 text-white overflow-hidden p-4 gap-4">
+    <div className="flex h-screen overflow-hidden gap-4 p-4 text-foreground">
       {/* LEFT COLUMN: Main Game Area */}
       <div className="flex-1 flex flex-col gap-4">
         {/* Header */}
-        <header className="flex justify-between items-center bg-zinc-900 p-4 rounded-lg border border-zinc-800">
-          <h1 className="text-2xl font-bold text-zinc-100">
+        <header className="flex items-center justify-between rounded-lg border bg-card/90 p-4 backdrop-blur-sm">
+          <h1 className="text-2xl font-bold text-foreground">
             Room: {dynamicRoomId}
           </h1>
-          <span className="text-zinc-400">
+          <span className="text-muted-foreground">
             Playing as:{" "}
-            <span className="text-emerald-400 font-semibold">{playerName}</span>
+            <span className="font-semibold text-primary">{playerName}</span>
           </span>
         </header>
 
         <section className="grid grid-cols-4 gap-3">
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-3">
-            <p className="text-xs uppercase text-zinc-500">Phase</p>
+          <div className="rounded-lg border bg-card/90 p-3">
+            <p className="text-xs uppercase text-muted-foreground">Phase</p>
             <p className="text-lg font-semibold">{phase.replace("_", " ")}</p>
           </div>
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-3">
-            <p className="text-xs uppercase text-zinc-500">Round</p>
+          <div className="rounded-lg border bg-card/90 p-3">
+            <p className="text-xs uppercase text-muted-foreground">Round</p>
             <p className="text-lg font-semibold">{currentRound + 1}</p>
           </div>
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-3">
-            <p className="text-xs uppercase text-zinc-500">Countdown</p>
+          <div className="rounded-lg border bg-card/90 p-3">
+            <p className="text-xs uppercase text-muted-foreground">Countdown</p>
             <p className="text-lg font-semibold">
               {countdownSeconds ?? "--"}
             </p>
           </div>
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-3">
-            <p className="text-xs uppercase text-zinc-500">Timer</p>
+          <div className="rounded-lg border bg-card/90 p-3">
+            <p className="text-xs uppercase text-muted-foreground">Timer</p>
             <p className="text-lg font-semibold">{roundSeconds ?? "--"}</p>
           </div>
         </section>
 
         {/* Audio/Video Stage */}
-        <main className="flex-1 bg-zinc-900 rounded-lg border border-zinc-800 flex items-center justify-center overflow-hidden">
+        <main className="flex flex-1 items-center justify-center overflow-hidden rounded-lg border bg-card/90">
           {(phase === "PLAYING" || phase === "GRACE_PERIOD") &&
           currentVideoId ? (
             <YouTube
@@ -120,8 +121,8 @@ const Room = () => {
               className="overflow-hidden aspect-video w-full"
             />
           ) : (
-            <div className="text-center text-zinc-500 px-6">
-              <h2 className="text-3xl font-bold mb-2 text-zinc-300">
+            <div className="px-6 text-center text-muted-foreground">
+              <h2 className="mb-2 text-3xl font-bold text-foreground">
                 {phase === "COUNTDOWN"
                   ? `Starting in ${countdownSeconds ?? 0}`
                   : phase === "REVEAL"
@@ -131,12 +132,12 @@ const Room = () => {
                       : "Waiting to start..."}
               </h2>
               {revealedAnswer && (
-                <p className="text-lg text-emerald-400">
+                <p className="text-lg text-primary">
                   Answer: {revealedAnswer}
                 </p>
               )}
               {winner && (
-                <p className="text-lg text-emerald-400">Winner: {winner}</p>
+                <p className="text-lg text-primary">Winner: {winner}</p>
               )}
             </div>
           )}
@@ -146,26 +147,26 @@ const Room = () => {
       {/* RIGHT COLUMN: Social Sidebar */}
       <div className="w-80 flex flex-col gap-4">
         {/* Player Roster */}
-        <div className="h-1/3 bg-zinc-900 rounded-lg border border-zinc-800 p-4 flex flex-col">
-          <h2 className="text-sm font-bold text-zinc-500 uppercase tracking-wider mb-3">
+        <div className="flex h-1/3 flex-col rounded-lg border bg-card/90 p-4">
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted-foreground">
             Players ({players.length})
           </h2>
           <ul className="overflow-y-auto flex-1 space-y-2">
             {players.map((player) => (
               <li
                 key={player}
-                className="flex items-center justify-between gap-2 text-zinc-300"
+                className="flex items-center justify-between gap-2 text-foreground"
               >
                 <span className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span className="h-2 w-2 rounded-full bg-primary"></span>
                   {player}
                 </span>
-                <span className="text-xs text-zinc-500">
+                <span className="text-xs text-muted-foreground">
                   {health[player] ?? 5000} HP
                 </span>
                 <span
                   className={`text-xs font-semibold ${
-                    ready[player] ? "text-emerald-400" : "text-zinc-500"
+                    ready[player] ? "text-primary" : "text-muted-foreground"
                   }`}
                 >
                   {ready[player] ? "Ready" : "Not Ready"}
@@ -176,21 +177,22 @@ const Room = () => {
         </div>
 
         {(phase === "LOBBY" || phase === "GAME_OVER") && (
-          <button
-            className="bg-emerald-500 hover:bg-emerald-600 disabled:bg-zinc-700 disabled:text-zinc-400 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+          <Button
             disabled={!canReady}
+            size="lg"
+            className="w-full font-bold"
             onClick={() => {
               setReady();
             }}
           >
             {readyButtonLabel}
-          </button>
+          </Button>
         )}
 
         {/* Chat Box */}
-        <div className="flex-1 bg-zinc-900 rounded-lg border border-zinc-800 flex flex-col overflow-hidden">
-          <div className="bg-zinc-950/50 p-3 border-b border-zinc-800">
-            <h2 className="text-sm font-bold text-zinc-500 uppercase tracking-wider">
+        <div className="flex flex-1 flex-col overflow-hidden rounded-lg border bg-card/90">
+          <div className="border-b bg-muted/40 p-3">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
               Live Chat
             </h2>
           </div>
