@@ -1,7 +1,5 @@
 import { useRef, useEffect, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import type { UnifiedMessage } from "@/types";
 
 interface ChatBoxProps {
@@ -18,7 +16,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ messages, onSendMessage }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!inputValue.trim()) return;
     onSendMessage(inputValue);
@@ -26,35 +24,55 @@ const ChatBox: React.FC<ChatBoxProps> = ({ messages, onSendMessage }) => {
   };
 
   return (
-    <div className="flex flex-col h-full w-full max-w-md border rounded-xl shadow-sm bg-card overflow-hidden">
-      <div className="px-4 py-3 border-b bg-muted/50">
-        <h3 className="text-sm font-semibold text-foreground">Room Chat</h3>
+    <div className="flex flex-col h-full w-full bg-background border-4 border-black dark:border-white shadow-[6px_6px_0px_rgba(0,0,0,1)] dark:shadow-[6px_6px_0px_rgba(255,255,255,1)] relative overflow-hidden bg-halftone">
+      
+      {/* Dynamic diagonal stripe header */}
+      <div className="border-b-4 border-black dark:border-white bg-black dark:bg-white text-white dark:text-black py-2.5 px-4 flex justify-between items-center font-bold tracking-widest text-xs select-none">
+        <span>LIVE COMIC STREAM</span>
+        <span className="animate-pulse bg-red-600 px-1 text-[10px] text-white">LIVE</span>
       </div>
 
-      <ScrollArea className="flex-1 p-4">
-        <div className="flex flex-col gap-3">
+      <ScrollArea className="flex-1 p-4 bg-white dark:bg-black bg-speedlines">
+        <div className="flex flex-col gap-4">
           {messages.map((msg) => (
             <div
               key={msg.id}
-              className={`text-sm ${
+              className={`flex flex-col ${
                 msg.type === "SYSTEM"
-                  ? "text-muted-foreground italic text-center text-xs my-1"
-                  : "text-foreground wrap-break-word"
+                  ? "items-center my-1"
+                  : "items-start"
               }`}
             >
-              {msg.type === "USER" && (
-                <span className="font-bold text-primary mr-2">
-                  {msg.sender}:
-                </span>
+              {msg.type === "SYSTEM" ? (
+                <div className="text-center text-[11px] text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900 border-2 border-dashed border-black dark:border-white/50 py-1.5 px-3 font-semibold uppercase tracking-wider">
+                  SYSTEM: {msg.text}
+                </div>
+              ) : (
+                <div className="flex flex-col items-start gap-1 w-full">
+                  {/* Sender Badge */}
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-black dark:bg-white text-white dark:text-black px-2 py-0.5 border-2 border-black dark:border-white -skew-x-6 transform shadow-[1.5px_1.5px_0px_rgba(0,0,0,1)] dark:shadow-[1.5px_1.5px_0px_rgba(255,255,255,1)]">
+                    {msg.sender}
+                  </span>
+                  
+                  {/* Dialogue Bubble */}
+                  <div className="relative border-2 border-black dark:border-white bg-white dark:bg-black text-black dark:text-white px-5 py-3 shadow-[3px_3px_0px_rgba(0,0,0,1)] dark:shadow-[3px_3px_0px_rgba(255,255,255,1)] max-w-[90%] font-black leading-snug rounded-[24px]">
+                    <p className="break-all whitespace-pre-wrap text-sm">{msg.text}</p>
+                    
+                    {/* Speech bubble tail pointer decoration */}
+                    <div className="absolute left-3 top-[-6px] w-2 h-2 bg-white dark:bg-black border-l-2 border-t-2 border-black dark:border-white rotate-45"></div>
+                  </div>
+                </div>
               )}
-              {msg.text}
             </div>
           ))}
+          
           <div ref={messagesEndRef} />
 
           {messages.length === 0 && (
-            <div className="text-center text-muted-foreground text-sm italic mt-10">
-              No messages yet. Say hello!
+            <div className="flex flex-col items-center justify-center py-12 text-zinc-500">
+              <div className="text-xs font-bold uppercase tracking-widest text-center">
+                Waiting for dialogue...
+              </div>
             </div>
           )}
         </div>
@@ -62,18 +80,21 @@ const ChatBox: React.FC<ChatBoxProps> = ({ messages, onSendMessage }) => {
 
       <form
         onSubmit={handleSubmit}
-        className="p-3 border-t bg-background flex gap-2"
+        className="p-3 border-t-4 border-black dark:border-white bg-white dark:bg-black flex gap-2"
       >
-        <Input
+        <input
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          placeholder="Guess the OST or chat..."
-          className="flex-1"
+          placeholder="Type your guess or chat..."
+          className="flex-1 bg-white dark:bg-black text-black dark:text-white px-3 py-2 border-2 border-black dark:border-white font-bold text-xs uppercase placeholder-zinc-500 focus:outline-none focus:bg-zinc-50 dark:focus:bg-zinc-950"
           autoComplete="off"
         />
-        <Button type="submit" variant="default">
-          Send
-        </Button>
+        <button 
+          type="submit" 
+          className="bg-black dark:bg-white text-white dark:text-black font-extrabold uppercase text-xs tracking-wider px-4 py-2 border-2 border-black dark:border-white hover:bg-zinc-900 dark:hover:bg-zinc-100 shadow-[3px_3px_0px_rgba(0,0,0,1)] dark:shadow-[3px_3px_0px_rgba(255,255,255,1)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_rgba(0,0,0,1)] dark:active:shadow-[1px_1px_0px_rgba(255,255,255,1)] transition-all"
+        >
+          SEND!
+        </button>
       </form>
     </div>
   );

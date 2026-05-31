@@ -1,13 +1,13 @@
+@import url('https://fonts.googleapis.com/css2?family=Itim&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: var(--font-sans);
-    --font-sans: 'Geist Variable', sans-serif;
+    --font-heading: 'Itim', cursive, sans-serif;
+    --font-sans: 'Itim', cursive, sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -49,91 +49,179 @@
 }
 
 :root {
-    --background: #eeeeee;
-    --foreground: #303030;
-    --card: #d9d9d9;
-    --card-foreground: #303030;
-    --popover: #d9d9d9;
-    --popover-foreground: #303030;
-    --primary: #4dffbc;
-    --primary-foreground: #1f1f1f;
-    --secondary: #c6c6c6;
-    --secondary-foreground: #303030;
-    --muted: #cecece;
-    --muted-foreground: #666666;
-    --accent: #898989;
-    --accent-foreground: #f8f8f8;
-    --destructive: #ff4d4d;
-    --border: #898989;
-    --input: #d9d9d9;
-    --ring: #4dffbc;
-    --chart-1: #4dffbc;
-    --chart-2: #ff4d4d;
-    --chart-3: #898989;
-    --chart-4: #d9d9d9;
-    --chart-5: #b0b0b0;
-    --radius: 0.625rem;
-    --sidebar: #d9d9d9;
-    --sidebar-foreground: #303030;
-    --sidebar-primary: #4dffbc;
-    --sidebar-primary-foreground: #1f1f1f;
-    --sidebar-accent: #898989;
-    --sidebar-accent-foreground: #f8f8f8;
-    --sidebar-border: #898989;
-    --sidebar-ring: #4dffbc;
+    --background: #ffffff;
+    --foreground: #000000;
+    --card: #ffffff;
+    --card-foreground: #000000;
+    --popover: #ffffff;
+    --popover-foreground: #000000;
+    --primary: #000000;
+    --primary-foreground: #ffffff;
+    --secondary: #ffffff;
+    --secondary-foreground: #000000;
+    --muted: #f3f4f6;
+    --muted-foreground: #4b5563;
+    --accent: #000000;
+    --accent-foreground: #ffffff;
+    --destructive: #ff2a2a;
+    --border: #000000;
+    --input: #ffffff;
+    --ring: #000000;
+    --chart-1: #000000;
+    --chart-2: #ff2a2a;
+    --chart-3: #4b5563;
+    --chart-4: #e5e7eb;
+    --chart-5: #9ca3af;
+    --radius: 0px; /* Sharp corners for authentic comic feel */
+    --sidebar: #ffffff;
+    --sidebar-foreground: #000000;
+    --sidebar-primary: #000000;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #000000;
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-border: #000000;
+    --sidebar-ring: #000000;
 }
 
 .dark {
-    --background: #303030;
-    --foreground: #f0f0f0;
-    --card: #3b3b3b;
-    --card-foreground: #f0f0f0;
-    --popover: #3b3b3b;
-    --popover-foreground: #f0f0f0;
-    --primary: #4dffbc;
-    --primary-foreground: #1f1f1f;
-    --secondary: #555555;
-    --secondary-foreground: #f0f0f0;
-    --muted: #4a4a4a;
-    --muted-foreground: #cfcfcf;
-    --accent: #898989;
-    --accent-foreground: #ffffff;
-    --destructive: #ff4d4d;
-    --border: #6d6d6d;
-    --input: #555555;
-    --ring: #4dffbc;
-    --chart-1: #4dffbc;
-    --chart-2: #ff4d4d;
-    --chart-3: #898989;
-    --chart-4: #d9d9d9;
-    --chart-5: #b0b0b0;
-    --sidebar: #3b3b3b;
-    --sidebar-foreground: #f0f0f0;
-    --sidebar-primary: #4dffbc;
-    --sidebar-primary-foreground: #1f1f1f;
-    --sidebar-accent: #898989;
-    --sidebar-accent-foreground: #ffffff;
-    --sidebar-border: #6d6d6d;
-    --sidebar-ring: #4dffbc;
+    --background: #000000;
+    --foreground: #ffffff;
+    --card: #000000;
+    --card-foreground: #ffffff;
+    --popover: #000000;
+    --popover-foreground: #ffffff;
+    --primary: #ffffff;
+    --primary-foreground: #000000;
+    --secondary: #000000;
+    --secondary-foreground: #ffffff;
+    --muted: #111827;
+    --muted-foreground: #9ca3af;
+    --accent: #ffffff;
+    --accent-foreground: #000000;
+    --destructive: #ff4f4f;
+    --border: #ffffff;
+    --input: #000000;
+    --ring: #ffffff;
+    --chart-1: #ffffff;
+    --chart-2: #ff4f4f;
+    --chart-3: #9ca3af;
+    --chart-4: #1f2937;
+    --chart-5: #374151;
+    --sidebar: #000000;
+    --sidebar-foreground: #ffffff;
+    --sidebar-primary: #ffffff;
+    --sidebar-primary-foreground: #000000;
+    --sidebar-accent: #ffffff;
+    --sidebar-accent-foreground: #000000;
+    --sidebar-border: #ffffff;
+    --sidebar-ring: #ffffff;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
+    font-family: 'Itim', cursive, sans-serif;
+  }
   body {
     @apply bg-background text-foreground;
-    background-image:
-      linear-gradient(135deg, color-mix(in srgb, var(--background) 86%, var(--primary)) 0%, var(--background) 45%, color-mix(in srgb, var(--background) 80%, var(--destructive)) 100%);
-    background-attachment: fixed;
-    }
+    background-image: none; /* Removed gradients */
+    background-color: var(--background);
+  }
   html {
     @apply font-sans;
-    }
-}
-
-@media (pointer: coarse) {
-  body {
-    background-attachment: scroll;
   }
 }
+
+/* Custom Manga Style Utilities */
+.manga-panel {
+  @apply border-4 border-black bg-white text-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all;
+}
+.dark .manga-panel {
+  @apply border-4 border-white bg-black text-white shadow-[6px_6px_0px_0px_rgba(255,255,255,1)];
+}
+
+.manga-panel-sm {
+  @apply border-2 border-black bg-white text-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all;
+}
+.dark .manga-panel-sm {
+  @apply border-2 border-white bg-black text-white shadow-[3px_3px_0px_0px_rgba(255,255,255,1)];
+}
+
+.manga-bubble {
+  @apply relative border-2 border-black bg-white text-black rounded-xl p-3 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all;
+}
+.dark .manga-bubble {
+  @apply border-2 border-white bg-black text-white shadow-[3px_3px_0px_0px_rgba(255,255,255,1)];
+}
+
+/* Halftone Grid overlay */
+.bg-halftone {
+  background-image: radial-gradient(rgba(0, 0, 0, 0.08) 12%, transparent 13%);
+  background-size: 8px 8px;
+}
+.dark .bg-halftone {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 12%, transparent 13%);
+}
+
+/* Diagonal Speed-lines Overlay */
+.bg-speedlines {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 10px,
+    rgba(0, 0, 0, 0.03) 10px,
+    rgba(0, 0, 0, 0.03) 12px
+  );
+}
+.dark .bg-speedlines {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 10px,
+    rgba(255, 255, 255, 0.03) 10px,
+    rgba(255, 255, 255, 0.03) 12px
+  );
+}
+
+/* Diagonal Polygon Slashes for Lobby Split-screen */
+.clip-slash-left {
+  clip-path: polygon(0 0, 58% 0, 42% 100%, 0 100%);
+}
+.clip-slash-right {
+  clip-path: polygon(58% 0, 100% 0, 100% 100%, 42% 100%);
+}
+
+/* Custom styles for speech bubble tails pointing right or left */
+.bubble-tail-left {
+  position: absolute;
+  left: -6px;
+  top: 16px;
+  width: 10px;
+  height: 10px;
+  background-color: inherit;
+  border-left: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.bubble-tail-right {
+  position: absolute;
+  right: -6px;
+  top: 16px;
+  width: 10px;
+  height: 10px;
+  background-color: inherit;
+  border-right: 2px solid currentColor;
+  border-top: 2px solid currentColor;
+  transform: rotate(45deg);
+}
+
+/* Hide scrollbars during active play typing */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
