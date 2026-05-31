@@ -363,6 +363,40 @@ export const setPlayerReady = (
   return { ok: true, state: record.state };
 };
 
+const normalizeString = (str: string): string => {
+  return str
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s]/g, "") // Remove punctuation
+    .replace(/\s+/g, " ");   // Collapse multiple spaces to a single space
+};
+
+const getLevenshteinDistance = (a: string, b: string): number => {
+  const tmp: number[][] = Array.from({ length: a.length + 1 }, () =>
+    Array(b.length + 1).fill(0),
+  );
+
+  for (let i = 0; i <= a.length; i++) {
+    tmp[i]![0] = i;
+  }
+
+  for (let j = 0; j <= b.length; j++) {
+    tmp[0]![j] = j;
+  }
+
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      tmp[i]![j] = Math.min(
+        tmp[i - 1]![j]! + 1, // Deletion
+        tmp[i]![j - 1]! + 1, // Insertion
+        tmp[i - 1]![j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1), // Substitution
+      );
+    }
+  }
+
+  return tmp[a.length]![b.length]!;
+};
+
 export const handleGuess = (
   roomId: string,
   username: string,
@@ -382,7 +416,23 @@ export const handleGuess = (
   }
 
   const currentVideo = getCurrentPlaylistItem(record);
-  if (message.trim().toLowerCase() !== currentVideo.answer.toLowerCase()) {
+  const normalizedGuess = normalizeString(message);
+  const normalizedAnswer = normalizeString(currentVideo.answer);
+
+  const distance = getLevenshteinDistance(normalizedGuess, normalizedAnswer);
+  
+  // Dynamic threshold based on length:
+  // length <= 4: 0 typos allowed
+  // 5 <= length <= 9: 1 typo allowed
+  // length >= 10: 2 typos allowed
+  let allowedDistance = 0;
+  if (normalizedAnswer.length >= 5 && normalizedAnswer.length <= 9) {
+    allowedDistance = 1;
+  } else if (normalizedAnswer.length >= 10) {
+    allowedDistance = 2;
+  }
+
+  if (distance > allowedDistance) {
     return false;
   }
 
@@ -392,7 +442,11 @@ export const handleGuess = (
   const elapsedSeconds = Math.floor(
     (Date.now() - record.state.roundStartTime) / 1000,
   );
-  const damage = Math.max(100, Math.min(1000, 1000 - elapsedSeconds));
+  const baseDamage = Math.max(100, Math.min(1000, 1000 - elapsedSeconds));
+
+  // Exponential scaling based on currentRound (1.2 ^ currentRound)
+  const roundMultiplier = Math.pow(1.2, record.state.currentRound);
+  const damage = Math.round(baseDamage * roundMultiplier);
 
   record.state.pendingDamage[username] = damage;
   record.state.guessedCorrectly.push(username);
