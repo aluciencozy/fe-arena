@@ -196,6 +196,14 @@
   box-shadow: 0 0 15px 3px rgba(77, 255, 188, 0.3);
 }
 
+.clip-slash-left {
+  clip-path: polygon(0 0, 58% 0, 42% 100%, 0 100%);
+}
+
+.clip-slash-right {
+  clip-path: polygon(58% 0, 100% 0, 100% 100%, 42% 100%);
+}
+
 /* Hide scrollbars */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
