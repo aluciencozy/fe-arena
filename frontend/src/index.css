@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Itim&display=swap');
+@import "@fontsource-variable/geist";
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -6,8 +6,15 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: 'Itim', cursive, sans-serif;
-    --font-sans: 'Itim', cursive, sans-serif;
+    --font-heading: 'Geist Sans', sans-serif;
+    --font-sans: 'Geist Sans', sans-serif;
+    
+    --color-player-1: var(--player-1);
+    --color-player-2: var(--player-2);
+    --color-player-1-glow: var(--player-1-glow);
+    --color-player-2-glow: var(--player-2-glow);
+    --color-card-glass: var(--card-glass);
+    
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -16,11 +23,7 @@
     --color-sidebar-primary: var(--sidebar-primary);
     --color-sidebar-foreground: var(--sidebar-foreground);
     --color-sidebar: var(--sidebar);
-    --color-chart-5: var(--chart-5);
-    --color-chart-4: var(--chart-4);
-    --color-chart-3: var(--chart-3);
-    --color-chart-2: var(--chart-2);
-    --color-chart-1: var(--chart-1);
+    
     --color-ring: var(--ring);
     --color-input: var(--input);
     --color-border: var(--border);
@@ -39,6 +42,7 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
+    
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -49,82 +53,103 @@
 }
 
 :root {
-    --background: #ffffff;
-    --foreground: #000000;
-    --card: #ffffff;
-    --card-foreground: #000000;
-    --popover: #ffffff;
-    --popover-foreground: #000000;
-    --primary: #000000;
-    --primary-foreground: #ffffff;
-    --secondary: #ffffff;
-    --secondary-foreground: #000000;
-    --muted: #f3f4f6;
-    --muted-foreground: #4b5563;
-    --accent: #000000;
-    --accent-foreground: #ffffff;
-    --destructive: #ff2a2a;
-    --border: #000000;
-    --input: #ffffff;
-    --ring: #000000;
-    --chart-1: #000000;
-    --chart-2: #ff2a2a;
-    --chart-3: #4b5563;
-    --chart-4: #e5e7eb;
-    --chart-5: #9ca3af;
-    --radius: 0px; /* Sharp corners for authentic comic feel */
-    --sidebar: #ffffff;
-    --sidebar-foreground: #000000;
-    --sidebar-primary: #000000;
-    --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #000000;
-    --sidebar-accent-foreground: #ffffff;
-    --sidebar-border: #000000;
-    --sidebar-ring: #000000;
+    /* Player Accent Themes (Configurable!) */
+    --player-1: #4dffbc;
+    --player-2: #ff4d4d;
+    --player-1-glow: rgba(77, 255, 188, 0.25);
+    --player-2-glow: rgba(255, 77, 77, 0.25);
+
+    /* Background and Layout (Configurable!) */
+    --background: #0B0F19;
+    --foreground: #F3F4F6;
+    
+    --card: #1F2833;
+    --card-glass: rgba(31, 40, 51, 0.6);
+    --card-foreground: #F3F4F6;
+    
+    --popover: #1F2833;
+    --popover-foreground: #F3F4F6;
+    
+    --primary: #4dffbc;
+    --primary-foreground: #0B0F19;
+    
+    --secondary: #1F2833;
+    --secondary-foreground: #F3F4F6;
+    
+    --muted: #1e293b;
+    --muted-foreground: #94a3b8;
+    
+    --accent: #ff4d4d;
+    --accent-foreground: #0B0F19;
+    
+    --destructive: #ff4d4d;
+    --border: #2D3748;
+    --input: #161B22;
+    --ring: #4dffbc;
+    
+    --radius: 12px;
+    
+    --sidebar: #1F2833;
+    --sidebar-foreground: #F3F4F6;
+    --sidebar-primary: #4dffbc;
+    --sidebar-primary-foreground: #0B0F19;
+    --sidebar-accent: #1e293b;
+    --sidebar-accent-foreground: #F3F4F6;
+    --sidebar-border: #2D3748;
+    --sidebar-ring: #4dffbc;
 }
 
 .dark {
-    --background: #000000;
-    --foreground: #ffffff;
-    --card: #000000;
-    --card-foreground: #ffffff;
-    --popover: #000000;
-    --popover-foreground: #ffffff;
-    --primary: #ffffff;
-    --primary-foreground: #000000;
-    --secondary: #000000;
-    --secondary-foreground: #ffffff;
-    --muted: #111827;
-    --muted-foreground: #9ca3af;
-    --accent: #ffffff;
-    --accent-foreground: #000000;
-    --destructive: #ff4f4f;
-    --border: #ffffff;
-    --input: #000000;
-    --ring: #ffffff;
-    --chart-1: #ffffff;
-    --chart-2: #ff4f4f;
-    --chart-3: #9ca3af;
-    --chart-4: #1f2937;
-    --chart-5: #374151;
-    --sidebar: #000000;
-    --sidebar-foreground: #ffffff;
-    --sidebar-primary: #ffffff;
-    --sidebar-primary-foreground: #000000;
-    --sidebar-accent: #ffffff;
-    --sidebar-accent-foreground: #000000;
-    --sidebar-border: #ffffff;
-    --sidebar-ring: #ffffff;
+    /* Keep identical to root to force dark gaming theme as default */
+    --player-1: #4dffbc;
+    --player-2: #ff4d4d;
+    --player-1-glow: rgba(77, 255, 188, 0.25);
+    --player-2-glow: rgba(255, 77, 77, 0.25);
+
+    --background: #0B0F19;
+    --foreground: #F3F4F6;
+    
+    --card: #1F2833;
+    --card-glass: rgba(31, 40, 51, 0.6);
+    --card-foreground: #F3F4F6;
+    
+    --popover: #1F2833;
+    --popover-foreground: #F3F4F6;
+    
+    --primary: #4dffbc;
+    --primary-foreground: #0B0F19;
+    
+    --secondary: #1F2833;
+    --secondary-foreground: #F3F4F6;
+    
+    --muted: #1e293b;
+    --muted-foreground: #94a3b8;
+    
+    --accent: #ff4d4d;
+    --accent-foreground: #0B0F19;
+    
+    --destructive: #ff4d4d;
+    --border: #2D3748;
+    --input: #161B22;
+    --ring: #4dffbc;
+    
+    --sidebar: #1F2833;
+    --sidebar-foreground: #F3F4F6;
+    --sidebar-primary: #4dffbc;
+    --sidebar-primary-foreground: #0B0F19;
+    --sidebar-accent: #1e293b;
+    --sidebar-accent-foreground: #F3F4F6;
+    --sidebar-border: #2D3748;
+    --sidebar-ring: #4dffbc;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    font-family: 'Itim', cursive, sans-serif;
+    font-family: 'Geist Sans', sans-serif;
   }
   body {
     @apply bg-background text-foreground;
-    background-image: none; /* Removed gradients */
     background-color: var(--background);
   }
   html {
@@ -132,96 +157,58 @@
   }
 }
 
-/* Custom Manga Style Utilities */
-.manga-panel {
-  @apply border-4 border-black bg-white text-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all;
-}
-.dark .manga-panel {
-  @apply border-4 border-white bg-black text-white shadow-[6px_6px_0px_0px_rgba(255,255,255,1)];
+/* Sleek Gaming Theme Utilities */
+.gaming-card {
+  @apply border border-border bg-card text-foreground shadow-lg transition-all rounded-xl;
 }
 
-.manga-panel-sm {
-  @apply border-2 border-black bg-white text-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all;
-}
-.dark .manga-panel-sm {
-  @apply border-2 border-white bg-black text-white shadow-[3px_3px_0px_0px_rgba(255,255,255,1)];
+.gaming-card-glass {
+  @apply border border-border/40 bg-card-glass text-foreground shadow-xl backdrop-blur-md transition-all rounded-xl;
 }
 
-.manga-bubble {
-  @apply relative border-2 border-black bg-white text-black rounded-xl p-3 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all;
+/* Glow effects */
+.player-1-glow {
+  box-shadow: 0 0 15px 2px var(--player-1-glow);
 }
-.dark .manga-bubble {
-  @apply border-2 border-white bg-black text-white shadow-[3px_3px_0px_0px_rgba(255,255,255,1)];
-}
-
-/* Halftone Grid overlay */
-.bg-halftone {
-  background-image: radial-gradient(rgba(0, 0, 0, 0.08) 12%, transparent 13%);
-  background-size: 8px 8px;
-}
-.dark .bg-halftone {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 12%, transparent 13%);
+.player-2-glow {
+  box-shadow: 0 0 15px 2px var(--player-2-glow);
 }
 
-/* Diagonal Speed-lines Overlay */
-.bg-speedlines {
-  background: repeating-linear-gradient(
-    -45deg,
-    transparent,
-    transparent 10px,
-    rgba(0, 0, 0, 0.03) 10px,
-    rgba(0, 0, 0, 0.03) 12px
-  );
+.player-1-border-glow {
+  border-color: var(--player-1);
+  box-shadow: 0 0 10px 1px var(--player-1-glow);
 }
-.dark .bg-speedlines {
-  background: repeating-linear-gradient(
-    -45deg,
-    transparent,
-    transparent 10px,
-    rgba(255, 255, 255, 0.03) 10px,
-    rgba(255, 255, 255, 0.03) 12px
-  );
+.player-2-border-glow {
+  border-color: var(--player-2);
+  box-shadow: 0 0 10px 1px var(--player-2-glow);
 }
 
-/* Diagonal Polygon Slashes for Lobby Split-screen */
+.text-player-1-glow {
+  text-shadow: 0 0 8px var(--player-1-glow);
+}
+.text-player-2-glow {
+  text-shadow: 0 0 8px var(--player-2-glow);
+}
+
+/* Diagonal Split-screen for Lobby */
+.split-divider-line {
+  background: linear-gradient(168deg, var(--player-1) 0%, var(--player-2) 100%);
+  box-shadow: 0 0 15px 3px rgba(77, 255, 188, 0.3);
+}
+
 .clip-slash-left {
   clip-path: polygon(0 0, 58% 0, 42% 100%, 0 100%);
 }
+
 .clip-slash-right {
   clip-path: polygon(58% 0, 100% 0, 100% 100%, 42% 100%);
 }
 
-/* Custom styles for speech bubble tails pointing right or left */
-.bubble-tail-left {
-  position: absolute;
-  left: -6px;
-  top: 16px;
-  width: 10px;
-  height: 10px;
-  background-color: inherit;
-  border-left: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  transform: rotate(45deg);
-}
-
-.bubble-tail-right {
-  position: absolute;
-  right: -6px;
-  top: 16px;
-  width: 10px;
-  height: 10px;
-  background-color: inherit;
-  border-right: 2px solid currentColor;
-  border-top: 2px solid currentColor;
-  transform: rotate(45deg);
-}
-
-/* Hide scrollbars during active play typing */
+/* Hide scrollbars */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
 .no-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
-

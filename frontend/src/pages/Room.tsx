@@ -99,23 +99,23 @@ const Room = () => {
         
         {/* Dynamic Countdown Display */}
         {phase === "COUNTDOWN" ? (
-          <div className="text-center bg-black dark:bg-white text-white dark:text-black border-4 border-black dark:border-white p-8 shadow-[6px_6px_0px_rgba(0,0,0,1)] dark:shadow-[6px_6px_0px_rgba(255,255,255,1)] font-black text-6xl rotate-[-6deg] my-8 select-none animate-scale-up">
+          <div className="text-center bg-card border border-border/80 text-foreground p-8 rounded-2xl shadow-2xl font-extrabold text-6xl my-8 select-none animate-scale-up tracking-wider border-t-2 border-t-player-1 player-1-glow">
             {countdownSeconds ?? "3"}
           </div>
         ) : (
           <>
             {/* Header metadata label */}
             {phase !== "LOBBY" && (
-              <div className="text-center bg-black dark:bg-white text-white dark:text-black py-1.5 px-4 border-2 border-black dark:border-white font-extrabold uppercase text-[10px] tracking-widest -skew-x-6 transform shadow-[2px_2px_0px_rgba(0,0,0,0.15)] select-none">
+              <div className="text-center bg-card text-muted-foreground py-2 px-4 border border-border/80 rounded-lg font-bold uppercase text-[10px] tracking-widest select-none shadow-md">
                 {`ROUND ${currentRound + 1} // PHASE: ${phase}`}
               </div>
             )}
 
-            {/* Scrollable Center Chat Bubble Container (50 Message capacity during play) */}
+            {/* Scrollable Center Chat Box Container (50 Message capacity during play) */}
             {phase !== "LOBBY" && (
-              <div className="h-[280px] overflow-y-auto pr-1 flex flex-col gap-3.5 select-none pointer-events-auto bg-white/5 dark:bg-black/5 p-2 rounded-xl border border-dashed border-black/10 dark:border-white/10 no-scrollbar">
+              <div className="h-[280px] overflow-y-auto pr-1 flex flex-col gap-3 select-none pointer-events-auto gaming-card-glass p-3 no-scrollbar border-border/40 shadow-xl">
                 {gameMessages.length === 0 ? (
-                  <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 text-xs font-black uppercase tracking-wider">
+                  <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 text-xs font-semibold uppercase tracking-wider">
                     No dialogue yet...
                   </div>
                 ) : (
@@ -127,21 +127,19 @@ const Room = () => {
                         const isSelf = guessedUser === playerName;
                         return (
                           <div key={msg.id} className={`flex flex-col gap-1 w-full max-w-[85%] ${isSelf ? 'items-start self-start' : 'items-end self-end'}`}>
-                            <span className="text-[9px] font-black uppercase tracking-wider bg-black dark:bg-white text-white dark:text-black px-1.5 py-0.5 border border-black dark:border-white">
+                            <span className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded text-background ${isSelf ? 'bg-player-1 shadow-[0_0_8px_var(--player-1-glow)]' : 'bg-player-2 shadow-[0_0_8px_var(--player-2-glow)]'}`}>
                               {guessedUser}
                             </span>
-                            {/* Stark monochrome bubble style for correct guesses with zero red accents */}
-                            <div className="relative border-2 border-black dark:border-white bg-black dark:bg-white text-white dark:text-black px-5 py-2.5 shadow-[3px_3px_0px_rgba(0,0,0,1)] dark:shadow-[3px_3px_0px_rgba(255,255,255,1)] text-xs font-black rounded-[20px] border-4 shadow-[4px_4px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_rgba(255,255,255,1)]">
+                            <div className={`relative border bg-card px-4 py-2.5 text-xs font-bold rounded-lg shadow-md ${isSelf ? 'border-player-1/60 border-l-4 border-l-player-1 text-player-1 shadow-[0_0_10px_var(--player-1-glow)]' : 'border-player-2/60 border-r-4 border-r-player-2 text-player-2 shadow-[0_0_10px_var(--player-2-glow)]'}`}>
                               <p className="break-all whitespace-pre-wrap">
                                 {isSelf ? "CORRECT! YOU GUESSED IT!" : "CORRECT ANSWER DETECTED: [████████]"}
                               </p>
-                              <div className={isSelf ? "bubble-tail-left" : "bubble-tail-right"}></div>
                             </div>
                           </div>
                         );
                       }
                       return (
-                        <div key={msg.id} className="text-center text-[10px] text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900/50 border border-dashed border-zinc-300 dark:border-zinc-800 py-1 px-3 self-center font-bold uppercase tracking-wider">
+                        <div key={msg.id} className="text-center text-[10px] text-zinc-400 bg-input/60 border border-border/50 py-1 px-3 self-center font-bold uppercase tracking-wider rounded-md">
                           SYSTEM: {msg.text}
                         </div>
                       );
@@ -150,12 +148,11 @@ const Room = () => {
                     const isSelf = msg.sender === playerName;
                     return (
                       <div key={msg.id} className={`flex flex-col gap-1 w-full max-w-[85%] ${isSelf ? 'items-start self-start' : 'items-end self-end'}`}>
-                        <span className="text-[9px] font-black uppercase tracking-wider bg-black dark:bg-white text-white dark:text-black px-1.5 py-0.5 border border-black dark:border-white shadow-[1px_1px_0px_rgba(0,0,0,0.1)]">
+                        <span className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded text-background ${isSelf ? 'bg-player-1' : 'bg-player-2'}`}>
                           {msg.sender}
                         </span>
-                        <div className="relative border-2 border-black dark:border-white bg-white dark:bg-zinc-950 text-black dark:text-white px-5 py-2.5 shadow-[3px_3px_0px_rgba(0,0,0,1)] dark:shadow-[3px_3px_0px_rgba(255,255,255,1)] text-xs font-black rounded-[20px]">
+                        <div className={`relative border border-border/80 bg-card/85 text-foreground px-4 py-2.5 shadow-md text-xs font-semibold rounded-lg ${isSelf ? 'border-l-4 border-l-player-1' : 'border-r-4 border-r-player-2'}`}>
                           <p className="break-all whitespace-pre-wrap">{msg.text}</p>
-                          <div className={isSelf ? "bubble-tail-left" : "bubble-tail-right"}></div>
                         </div>
                       </div>
                     );
@@ -173,7 +170,7 @@ const Room = () => {
                 onChange={(e) => setGuessValue(e.target.value)}
                 placeholder={phase === "LOBBY" ? "TYPE A LOBBY MESSAGE..." : "GUESS THE OST..."}
                 disabled={phase === "REVEAL" || phase === "GAME_OVER" || (phase !== "LOBBY" && guessedCorrectly.includes(playerName))}
-                className="w-full text-center bg-white dark:bg-black text-black dark:text-white px-4 py-3.5 border-4 border-black dark:border-white font-extrabold text-xs uppercase placeholder-zinc-500 shadow-[6px_6px_0px_rgba(0,0,0,1)] dark:shadow-[6px_6px_0px_rgba(255,255,255,1)] focus:outline-none focus:translate-x-0.5 focus:translate-y-0.5 focus:shadow-[4px_4px_0px_rgba(0,0,0,1)] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full text-center bg-input border border-border text-foreground px-4 py-3 rounded-lg font-bold text-xs uppercase placeholder-zinc-600 shadow-md focus:outline-none focus:border-player-1 focus:ring-1 focus:ring-player-1/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 autoComplete="off"
                 autoFocus
               />
@@ -181,7 +178,7 @@ const Room = () => {
 
             {/* Timer status indicator during active rounds */}
             {phase !== "LOBBY" && (
-              <div className="text-center font-black text-xs uppercase tracking-wider text-zinc-500 bg-white/80 dark:bg-black/80 px-2 py-1 select-none self-center border border-zinc-200 dark:border-zinc-800 shadow-[2px_2px_0px_rgba(0,0,0,0.05)]">
+              <div className="text-center font-bold text-[10px] uppercase tracking-widest text-zinc-400 bg-input/80 px-3 py-1.5 select-none self-center border border-border rounded-md shadow-sm">
                 TIMER: {roundSeconds ?? "--"}S LEFT
               </div>
             )}
@@ -190,13 +187,13 @@ const Room = () => {
 
         {/* Overlay results / alerts inside core */}
         {revealedAnswer && phase !== "LOBBY" && (
-          <div className="border-2 border-black dark:border-white bg-black dark:bg-white text-white dark:text-black py-2 px-4 text-center font-extrabold text-xs shadow-[2px_2px_0px_rgba(0,0,0,0.1)] select-none">
+          <div className="border border-player-1 bg-card text-player-1 py-2 px-4 text-center font-extrabold text-xs rounded-lg shadow-[0_0_10px_var(--player-1-glow)] select-none">
             ANSWER: {revealedAnswer.toUpperCase()}
           </div>
         )}
         
         {winner && phase !== "LOBBY" && (
-          <div className="border-4 border-black dark:border-white bg-black dark:bg-white text-white dark:text-black text-center font-black text-xs py-2 uppercase tracking-widest shadow-[3px_3px_0px_rgba(0,0,0,1)] dark:shadow-[3px_3px_0px_rgba(255,255,255,1)] animate-bounce mt-1 select-none">
+          <div className="border border-player-2 bg-card text-player-2 text-center font-extrabold text-sm py-3 px-6 rounded-lg uppercase tracking-widest shadow-[0_0_12px_var(--player-2-glow)] animate-pulse mt-2 select-none">
             WINNER: {winner.toUpperCase()}
           </div>
         )}
@@ -205,7 +202,7 @@ const Room = () => {
         {phase === "GAME_OVER" && (
           <button
             onClick={() => setReady()}
-            className="w-full manga-panel font-extrabold text-xs uppercase tracking-widest py-3 bg-black dark:bg-white text-white dark:text-black hover:bg-zinc-900 cursor-pointer shadow-[3px_3px_0px_rgba(0,0,0,1)] active:translate-x-0.5 pointer-events-auto"
+            className="w-full font-extrabold text-xs uppercase tracking-widest py-3 border border-player-1 bg-player-1/10 hover:bg-player-1/25 text-player-1 rounded-lg transition-all shadow-[0_0_15px_rgba(77,255,188,0.2)] hover:shadow-[0_0_25px_rgba(77,255,188,0.4)] cursor-pointer active:translate-y-px pointer-events-auto"
           >
             REMATCH READY UP
           </button>
@@ -231,7 +228,7 @@ const Room = () => {
   const opponentReady = opponentName ? (ready[opponentName] || false) : false;
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-halftone bg-speedlines text-foreground bg-background transition-colors duration-500">
+    <div className="relative w-screen h-screen overflow-hidden text-foreground bg-background bg-[radial-gradient(circle_at_center,_rgba(31,40,51,0.15)_0%,_rgba(11,15,25,1)_100%)] transition-colors duration-500">
       
       {/* ---------------------------------------------------- */}
       {/* BACKGROUND LAYER 1: Lobby Split-Slash (LOBBY phase only) */}
@@ -239,33 +236,32 @@ const Room = () => {
       {phase === "LOBBY" && (
         <div className="absolute inset-0 z-10 pointer-events-none select-none">
           {/* LEFT SLASH HALF (YOU) */}
-          <div className="absolute inset-0 clip-slash-left bg-white dark:bg-black text-black dark:text-white flex flex-col justify-center items-start pl-24 pr-48 transition-all duration-500">
-            <span className="text-[10px] font-black uppercase tracking-widest bg-black dark:bg-white text-white dark:text-black px-2 py-0.5 mb-2 -skew-x-12 transform shadow-[2px_2px_0px_rgba(0,0,0,1)]">
+          <div className="absolute inset-0 clip-slash-left bg-gradient-to-r from-[rgba(11,15,25,0.95)] via-[rgba(31,40,51,0.85)] to-transparent text-foreground flex flex-col justify-center items-start pl-24 pr-48 transition-all duration-500">
+            <span className="text-[10px] font-extrabold uppercase tracking-widest bg-player-1 text-background px-3 py-1 mb-2 transform -skew-x-12 shadow-[0_0_10px_var(--player-1-glow)]">
               PLAYER ONE // YOU
             </span>
             
             <div className="flex items-center gap-6 relative">
-              <h2 className="text-6xl font-black uppercase tracking-tighter underline decoration-double decoration-4">
+              <h2 className="text-6xl font-extrabold uppercase tracking-tighter text-player-1 text-player-1-glow">
                 {playerName}
               </h2>
-              {/* Single floating message bubble to the right of your name */}
+              {/* Single floating message box to the right of your name */}
               {lastPlayerMsg && (
-                <div className="relative border-2 border-black dark:border-white bg-white dark:bg-zinc-950 text-black dark:text-white px-5 py-2.5 shadow-[3px_3px_0px_rgba(0,0,0,1)] dark:shadow-[3px_3px_0px_rgba(255,255,255,1)] text-xs font-black rounded-[20px] max-w-xs animate-scale-up z-20 pointer-events-auto">
-                  <p className="break-all whitespace-pre-wrap">{lastPlayerMsg.text}</p>
-                  <div className="bubble-tail-left"></div>
+                <div className="relative border border-player-1/50 bg-card px-5 py-3 shadow-[0_0_12px_var(--player-1-glow)] text-xs font-semibold rounded-lg max-w-xs animate-scale-up z-20 pointer-events-auto border-l-4 border-l-player-1">
+                  <p className="break-all whitespace-pre-wrap text-foreground">{lastPlayerMsg.text}</p>
                 </div>
               )}
             </div>
 
-            {/* Ready controls positioned directly below Player 1 name inside left slot (Pure monochrome style) */}
-            <div className="flex flex-col items-start mt-4 gap-3 pointer-events-auto">
-              <span className={`text-sm font-black uppercase tracking-wider px-3 py-1 border-2 border-black dark:border-white shadow-[2px_2px_0px_rgba(0,0,0,1)] dark:shadow-[2px_2px_0px_rgba(255,255,255,1)] transform -rotate-1 ${playerReady ? "bg-black dark:bg-white text-white dark:text-black" : "bg-transparent text-zinc-400 dark:text-zinc-600 border-dashed"}`}>
+            {/* Ready controls positioned directly below Player 1 name inside left slot */}
+            <div className="flex flex-col items-start mt-6 gap-3 pointer-events-auto">
+              <span className={`text-xs font-bold uppercase tracking-widest px-3 py-1.5 border rounded-md transition-all ${playerReady ? "bg-player-1 text-background border-player-1 shadow-[0_0_10px_var(--player-1-glow)]" : "bg-transparent text-zinc-500 border-zinc-700 border-dashed"}`}>
                 {playerReady ? "READIED" : "NOT READY"}
               </span>
               {players.length === 2 && (
                 <button
                   onClick={() => setReady()}
-                  className="px-6 py-2 border-4 border-black dark:border-white text-xs font-black uppercase tracking-widest shadow-[3px_3px_0px_rgba(0,0,0,1)] dark:shadow-[3px_3px_0px_rgba(255,255,255,1)] hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black active:translate-x-0.5 active:translate-y-0.5 transition-all cursor-pointer select-none"
+                  className={`px-5 py-2.5 border rounded-lg text-xs font-bold uppercase tracking-widest transition-all cursor-pointer select-none active:translate-y-px ${playerReady ? "border-zinc-700 text-zinc-400 hover:bg-zinc-800" : "border-player-1 text-player-1 hover:bg-player-1/10 shadow-[0_0_10px_var(--player-1-glow)]"}`}
                 >
                   {playerReady ? "UNREADY" : "READY UP"}
                 </button>
@@ -274,38 +270,37 @@ const Room = () => {
           </div>
 
           {/* RIGHT SLASH HALF (OPPONENT / WAITING) */}
-          <div className="absolute inset-0 clip-slash-right bg-black dark:bg-white text-white dark:text-black flex flex-col justify-center items-end pr-24 pl-48 transition-all duration-500">
+          <div className="absolute inset-0 clip-slash-right bg-gradient-to-l from-[rgba(11,15,25,0.95)] via-[rgba(31,40,51,0.85)] to-transparent text-foreground flex flex-col justify-center items-end pr-24 pl-48 transition-all duration-500">
             {opponentName ? (
               <div className="flex flex-col items-end">
-                <span className="text-[10px] font-black uppercase tracking-widest bg-white dark:bg-black text-black dark:text-white px-2 py-0.5 mb-2 -skew-x-12 transform shadow-[2px_2px_0px_rgba(255,255,255,1)]">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest bg-player-2 text-background px-3 py-1 mb-2 transform -skew-x-12 shadow-[0_0_10px_var(--player-2-glow)]">
                   PLAYER TWO // CHALLENGER
                 </span>
                 
                 <div className="flex items-center gap-6 relative">
-                  {/* Single floating message bubble to the left of opponent's name */}
+                  {/* Single floating message box to the left of opponent's name */}
                   {lastOpponentMsg && (
-                    <div className="relative border-2 border-white dark:border-black bg-white dark:bg-zinc-950 text-black dark:text-white px-5 py-2.5 shadow-[3px_3px_0px_rgba(255,255,255,1)] dark:shadow-[3px_3px_0px_rgba(0,0,0,1)] text-xs font-black rounded-[20px] max-w-xs animate-scale-up z-20 pointer-events-auto">
-                      <p className="break-all whitespace-pre-wrap">{lastOpponentMsg.text}</p>
-                      <div className="bubble-tail-right"></div>
+                    <div className="relative border border-player-2/50 bg-card px-5 py-3 shadow-[0_0_12px_var(--player-2-glow)] text-xs font-semibold rounded-lg max-w-xs animate-scale-up z-20 pointer-events-auto border-r-4 border-r-player-2">
+                      <p className="break-all whitespace-pre-wrap text-foreground">{lastOpponentMsg.text}</p>
                     </div>
                   )}
-                  <h2 className="text-6xl font-black uppercase tracking-tighter underline decoration-double decoration-4">
+                  <h2 className="text-6xl font-extrabold uppercase tracking-tighter text-player-2 text-player-2-glow">
                     {opponentName}
                   </h2>
                 </div>
 
-                <div className="flex items-center gap-2 mt-4">
-                  <span className={`text-sm font-black uppercase tracking-wider px-3 py-1 border-2 border-white dark:border-black shadow-[2px_2px_0px_rgba(255,255,255,1)] dark:shadow-[3px_3px_0px_rgba(0,0,0,1)] transform rotate-1 ${opponentReady ? "bg-white dark:bg-black text-black dark:text-white" : "bg-transparent text-zinc-600 dark:text-zinc-400 border-dashed"}`}>
+                <div className="flex items-center gap-2 mt-6">
+                  <span className={`text-xs font-bold uppercase tracking-widest px-3 py-1.5 border rounded-md transition-all ${opponentReady ? "bg-player-2 text-background border-player-2 shadow-[0_0_10px_var(--player-2-glow)]" : "bg-transparent text-zinc-500 border-zinc-700 border-dashed"}`}>
                     {opponentReady ? "READIED" : "NOT READY"}
                   </span>
                 </div>
               </div>
             ) : (
               <div className="flex flex-col items-end animate-pulse">
-                <span className="text-[10px] font-black uppercase tracking-widest bg-white dark:bg-black text-black dark:text-white px-2 py-0.5 mb-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest bg-zinc-800 text-zinc-400 px-3 py-1 mb-2 rounded border border-zinc-700">
                   PLAYER TWO // LOBBY EMPTY
                 </span>
-                <h2 className="text-5xl font-black uppercase tracking-tighter italic text-center text-zinc-400 dark:text-zinc-600">
+                <h2 className="text-5xl font-extrabold uppercase tracking-tighter italic text-center text-zinc-600">
                   WAITING FOR CHALLENGER...
                 </h2>
               </div>
@@ -314,10 +309,10 @@ const Room = () => {
 
           {/* DIAGONAL DIVISION STROKE & CENTER VS BADGE */}
           <div className="absolute inset-0 z-20 flex justify-center items-center">
-            <div className="w-[8px] h-[150%] bg-black dark:bg-white rotate-[168deg] transform origin-center absolute shadow-[4px_0px_0px_rgba(0,0,0,0.15)] transition-all duration-500"></div>
+            <div className="w-[4px] h-[150%] rotate-[168deg] transform origin-center absolute split-divider-line transition-all duration-500"></div>
             {players.length === 2 && (
-              <div className="bg-black dark:bg-white text-white dark:text-black border-4 border-white dark:border-black font-black text-5xl py-4 px-8 shadow-[6px_6px_0px_rgba(0,0,0,1)] dark:shadow-[6px_6px_0px_rgba(255,255,255,1)] rotate-[-10deg] z-30 select-none tracking-widest">
-                VS
+              <div className="bg-card text-foreground border border-border font-extrabold text-4xl py-3 px-7 rounded-xl shadow-2xl rotate-[-10deg] z-30 select-none tracking-widest">
+                <span className="bg-gradient-to-r from-player-1 to-player-2 bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(77,255,188,0.3)]">VS</span>
               </div>
             )}
           </div>
@@ -365,7 +360,7 @@ const Room = () => {
         {phase === "LOBBY" && (
           <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-30 pointer-events-auto select-none">
             {players.length < 2 && (
-              <div className="text-xl font-black uppercase tracking-widest text-center mix-blend-difference text-white py-4 px-8 select-none">
+              <div className="text-sm font-extrabold uppercase tracking-widest text-center text-zinc-500 bg-input/80 border border-border/80 px-6 py-3 rounded-lg shadow-lg animate-pulse">
                 Waiting for challenger to join...
               </div>
             )}
@@ -379,23 +374,23 @@ const Room = () => {
       {phase !== "LOBBY" && (
         <div className="absolute inset-x-8 bottom-8 flex justify-between items-end pointer-events-none select-none z-10 transition-all duration-500">
           {/* Player 1 HUD (Bottom Left) */}
-          <div className="manga-panel-sm p-4 bg-white dark:bg-black w-80 pointer-events-auto flex flex-col gap-2.5 shadow-[4px_4px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_rgba(255,255,255,1)] animate-fade-in">
+          <div className="gaming-card-glass p-4 w-80 pointer-events-auto flex flex-col gap-2.5 player-1-glow border-t-2 border-t-player-1 animate-fade-in">
             <div className="flex items-center justify-between">
-              <span className="font-black uppercase text-base tracking-tight">
-                PLAYER: {playerName} <span className="text-[9px] bg-black dark:bg-white text-white dark:text-black px-1.5 py-0.5 font-bold ml-1">YOU</span>
+              <span className="font-extrabold uppercase text-sm tracking-wide text-foreground">
+                PLAYER: {playerName} <span className="text-[9px] bg-player-1 text-background px-1.5 py-0.5 font-bold ml-1 rounded">YOU</span>
               </span>
-              <span className="text-xs font-black text-zinc-500">
+              <span className="text-xs font-bold text-player-1 text-player-1-glow">
                 {health[playerName] ?? 5000} HP
               </span>
             </div>
-            <div className="w-full h-6 border-2 border-black dark:border-white bg-zinc-100 dark:bg-zinc-950 relative overflow-hidden">
+            <div className="w-full h-4 border border-border bg-input/80 rounded-md relative overflow-hidden">
               <div 
-                className="h-full bg-black dark:bg-white transition-all duration-300 ease-out" 
+                className="h-full bg-player-1 transition-all duration-300 ease-out shadow-[0_0_8px_var(--player-1-glow)]" 
                 style={{ width: `${Math.max(0, Math.min(100, ((health[playerName] ?? 5000) / 5000) * 100))}%` }}
               ></div>
             </div>
             {guessedCorrectly.includes(playerName) && (
-              <span className="text-xs font-black uppercase text-white bg-black dark:text-black dark:bg-white py-1 px-3 self-start transform -rotate-1 mt-1.5">
+              <span className="text-xs font-bold uppercase text-background bg-player-1 py-1 px-3 self-start rounded-md shadow-[0_0_8px_var(--player-1-glow)] mt-1">
                 CORRECT!
               </span>
             )}
@@ -406,23 +401,23 @@ const Room = () => {
             const oppName = players.find((p) => p !== playerName) || "Challenger";
             const hasOpponent = players.some((p) => p !== playerName);
             return (
-              <div className="manga-panel-sm p-4 bg-white dark:bg-black w-80 pointer-events-auto flex flex-col gap-2.5 shadow-[4px_4px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_rgba(255,255,255,1)] animate-fade-in">
+              <div className="gaming-card-glass p-4 w-80 pointer-events-auto flex flex-col gap-2.5 player-2-glow border-t-2 border-t-player-2 animate-fade-in">
                 <div className="flex items-center justify-between">
-                  <span className="font-black uppercase text-base tracking-tight">
+                  <span className="font-extrabold uppercase text-sm tracking-wide text-foreground">
                     OPPONENT: {oppName}
                   </span>
-                  <span className="text-xs font-black text-zinc-500">
+                  <span className="text-xs font-bold text-player-2 text-player-2-glow">
                     {hasOpponent ? `${health[oppName] ?? 5000} HP` : "-- HP"}
                   </span>
                 </div>
-                <div className="w-full h-6 border-2 border-black dark:border-white bg-zinc-100 dark:bg-zinc-950 relative overflow-hidden">
+                <div className="w-full h-4 border border-border bg-input/80 rounded-md relative overflow-hidden">
                   <div 
-                    className="h-full bg-black dark:bg-white transition-all duration-300 ease-out" 
+                    className="h-full bg-player-2 transition-all duration-300 ease-out shadow-[0_0_8px_var(--player-2-glow)]" 
                     style={{ width: `${hasOpponent ? Math.max(0, Math.min(100, ((health[oppName] ?? 5000) / 5000) * 100)) : 0}%` }}
                   ></div>
                 </div>
                 {hasOpponent && guessedCorrectly.includes(oppName) && (
-                  <span className="text-xs font-black uppercase text-white bg-black dark:text-black dark:bg-white py-1 px-3 self-end transform rotate-1 mt-1.5">
+                  <span className="text-xs font-bold uppercase text-background bg-player-2 py-1 px-3 self-end rounded-md shadow-[0_0_8px_var(--player-2-glow)] mt-1">
                     CORRECT!
                   </span>
                 )}
