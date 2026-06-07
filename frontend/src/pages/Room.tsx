@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import YouTube, { type YouTubeEvent } from "react-youtube";
 import { useGameStore, useGameStateStore } from "@/store/gameStore";
 import { useSocket } from "@/hooks/useSocket";
+import { GameStartSequence } from "@/components/GameStartSequence";
 
 const Room = () => {
   const { id: dynamicRoomId } = useParams(); // Get the room ID from the URL
@@ -37,18 +38,32 @@ const Room = () => {
   const [now, setNow] = useState(Date.now());
   const [guessValue, setGuessValue] = useState("");
   const [gameStartTime, setGameStartTime] = useState<number | null>(null);
+  const [visualPhase, setVisualPhase] = useState(phase);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasActiveTimer = countdownEndsAt !== null || roundEndsAt !== null;
 
   // Clear chat / capture timestamp when active game starts
   useEffect(() => {
-    if (phase === "COUNTDOWN" || phase === "PLAYING") {
+    if (phase === "INTRO_ANIMATION" || phase === "COUNTDOWN" || phase === "PLAYING") {
       setGameStartTime(Date.now());
     } else if (phase === "LOBBY") {
       setGameStartTime(null);
     }
   }, [phase]);
+
+  // Sync visualPhase with phase, delaying the transition from LOBBY to COUNTDOWN
+  // until the overlay settled state finishes and the screen starts fading back to the game (4.8s delay)
+  useEffect(() => {
+    if (phase === "INTRO_ANIMATION" && visualPhase === "LOBBY") {
+      const timer = setTimeout(() => {
+        setVisualPhase("COUNTDOWN");
+      }, 4800);
+      return () => clearTimeout(timer);
+    } else if (phase !== "INTRO_ANIMATION") {
+      setVisualPhase(phase);
+    }
+  }, [phase, visualPhase]);
 
   // Auto scroll to the bottom of the log when new messages arrive or game starts
   useEffect(() => {
@@ -98,21 +113,21 @@ const Room = () => {
       <div className="w-[420px] pointer-events-auto flex flex-col gap-4">
         
         {/* Dynamic Countdown Display */}
-        {phase === "COUNTDOWN" ? (
+        {visualPhase === "COUNTDOWN" ? (
           <div className="text-center bg-card border border-border/80 text-foreground p-8 rounded-2xl shadow-2xl font-extrabold text-6xl my-8 select-none animate-scale-up tracking-wider border-t-2 border-t-player-1 player-1-glow">
-            {countdownSeconds ?? "3"}
+            {countdownSeconds ?? "5"}
           </div>
         ) : (
           <>
             {/* Header metadata label */}
-            {phase !== "LOBBY" && (
+            {visualPhase !== "LOBBY" && (
               <div className="text-center bg-card text-muted-foreground py-2 px-4 border border-border/80 rounded-lg font-bold uppercase text-[10px] tracking-widest select-none shadow-md">
-                {`ROUND ${currentRound + 1} // PHASE: ${phase}`}
+                {`ROUND ${currentRound + 1}`}
               </div>
             )}
 
             {/* Scrollable Center Chat Box Container (50 Message capacity during play) */}
-            {phase !== "LOBBY" && (
+            {visualPhase !== "LOBBY" && (
               <div className="h-[280px] overflow-y-auto pr-1 flex flex-col gap-3 select-none pointer-events-auto gaming-card-glass p-3 no-scrollbar border-border/40 shadow-xl">
                 {gameMessages.length === 0 ? (
                   <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 text-xs font-semibold uppercase tracking-wider">
@@ -168,7 +183,7 @@ const Room = () => {
               <input
                 value={guessValue}
                 onChange={(e) => setGuessValue(e.target.value)}
-                placeholder={phase === "LOBBY" ? "TYPE A LOBBY MESSAGE..." : "GUESS THE OST..."}
+                placeholder={visualPhase === "LOBBY" ? "TYPE A LOBBY MESSAGE..." : "GUESS THE OST..."}
                 disabled={phase === "REVEAL" || phase === "GAME_OVER" || (phase !== "LOBBY" && guessedCorrectly.includes(playerName))}
                 className="w-full text-center bg-input border border-border text-foreground px-4 py-3 rounded-lg font-bold text-xs uppercase placeholder-zinc-600 shadow-md focus:outline-none focus:border-player-1 focus:ring-1 focus:ring-player-1/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 autoComplete="off"
@@ -177,7 +192,7 @@ const Room = () => {
             </form>
 
             {/* Timer status indicator during active rounds */}
-            {phase !== "LOBBY" && (
+            {visualPhase !== "LOBBY" && (
               <div className="text-center font-bold text-[10px] uppercase tracking-widest text-zinc-400 bg-input/80 px-3 py-1.5 select-none self-center border border-border rounded-md shadow-sm">
                 TIMER: {roundSeconds ?? "--"}S LEFT
               </div>
@@ -186,13 +201,13 @@ const Room = () => {
         )}
 
         {/* Overlay results / alerts inside core */}
-        {revealedAnswer && phase !== "LOBBY" && (
+        {revealedAnswer && visualPhase !== "LOBBY" && (
           <div className="border border-player-1 bg-card text-player-1 py-2 px-4 text-center font-extrabold text-xs rounded-lg shadow-[0_0_10px_var(--player-1-glow)] select-none">
             ANSWER: {revealedAnswer.toUpperCase()}
           </div>
         )}
         
-        {winner && phase !== "LOBBY" && (
+        {winner && visualPhase !== "LOBBY" && (
           <div className="border border-player-2 bg-card text-player-2 text-center font-extrabold text-sm py-3 px-6 rounded-lg uppercase tracking-widest shadow-[0_0_12px_var(--player-2-glow)] animate-pulse mt-2 select-none">
             WINNER: {winner.toUpperCase()}
           </div>
@@ -230,10 +245,15 @@ const Room = () => {
   return (
     <div className="relative w-screen h-screen overflow-hidden text-foreground bg-background bg-[radial-gradient(circle_at_center,_rgba(31,40,51,0.15)_0%,_rgba(11,15,25,1)_100%)] transition-colors duration-500">
       
-      {/* ---------------------------------------------------- */}
+      {/* Game start animation overlay */}
+      <GameStartSequence 
+        playerName={playerName} 
+        opponentName={opponentName} 
+      />
+      
       {/* BACKGROUND LAYER 1: Lobby Split-Slash (LOBBY phase only) */}
       {/* ---------------------------------------------------- */}
-      {phase === "LOBBY" && (
+      {visualPhase === "LOBBY" && (
         <div className="absolute inset-0 z-10 pointer-events-none select-none">
           {/* LEFT SLASH HALF (YOU) */}
           <div className="absolute inset-0 clip-slash-left bg-gradient-to-r from-[rgba(11,15,25,0.95)] via-[rgba(31,40,51,0.85)] to-transparent text-foreground flex flex-col justify-center items-start pl-24 pr-48 transition-all duration-500">
@@ -319,10 +339,9 @@ const Room = () => {
         </div>
       )}
 
-      {/* ---------------------------------------------------- */}
       {/* BACKGROUND LAYER 2: Dimmed active play overlay */}
       {/* ---------------------------------------------------- */}
-      {phase !== "LOBBY" && (
+      {visualPhase !== "LOBBY" && (
         <div className="absolute inset-0 bg-black/15 dark:bg-black/40 z-0 pointer-events-none"></div>
       )}
 
@@ -351,13 +370,13 @@ const Room = () => {
       {/* ---------------------------------------------------- */}
       {/* FOREGROUND LAYER 1: Centered Chat & Guess Core Stage */}
       {/* ---------------------------------------------------- */}
-      <div className={`absolute inset-0 flex flex-col items-center z-20 pointer-events-none ${phase === "LOBBY" ? "justify-end pb-32" : "justify-center pb-20"}`}>
+      <div className={`absolute inset-0 flex flex-col items-center z-20 pointer-events-none ${visualPhase === "LOBBY" ? "justify-end pb-32" : "justify-center pb-20"}`}>
         
         {/* During Active game: render full chat core vertically centered. During Lobby: core renders centered, keeping space for split names */}
         {renderCenteredCore()}
         
         {/* Lobby warning labels at the bottom (No overlay ready up button here anymore) */}
-        {phase === "LOBBY" && (
+        {visualPhase === "LOBBY" && (
           <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-30 pointer-events-auto select-none">
             {players.length < 2 && (
               <div className="text-sm font-extrabold uppercase tracking-widest text-center text-zinc-500 bg-input/80 border border-border/80 px-6 py-3 rounded-lg shadow-lg animate-pulse">
@@ -371,7 +390,7 @@ const Room = () => {
       {/* ---------------------------------------------------- */}
       {/* FOREGROUND LAYER 2: Corner HP HUDs (PLAYING phases only) */}
       {/* ---------------------------------------------------- */}
-      {phase !== "LOBBY" && (
+      {visualPhase !== "LOBBY" && (
         <div className="absolute inset-x-8 bottom-8 flex justify-between items-end pointer-events-none select-none z-10 transition-all duration-500">
           {/* Player 1 HUD (Bottom Left) */}
           <div className="gaming-card-glass p-4 w-80 pointer-events-auto flex flex-col gap-2.5 player-1-glow border-t-2 border-t-player-1 animate-fade-in">

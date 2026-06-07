@@ -14,6 +14,7 @@ export interface PlayerState {
 export interface GameState {
   phase:
     | "LOBBY"
+    | "INTRO_ANIMATION"
     | "COUNTDOWN"
     | "PLAYING"
     | "ROUND_END"
