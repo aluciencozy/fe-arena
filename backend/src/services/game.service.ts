@@ -1,6 +1,7 @@
 import type { GameState } from "../types/index.js";
 
-const COUNTDOWN_SECONDS = 3;
+const INTRO_SECONDS = 5.8;
+const COUNTDOWN_SECONDS = 5;
 const ROUND_SECONDS = 60;
 const GRACE_SECONDS = 3;
 const REVEAL_SECONDS = 3;
@@ -16,6 +17,7 @@ type TimerHandle = ReturnType<typeof setTimeout>;
 interface GameRecord {
   state: GameState;
   playlist: typeof PLAYLIST;
+  introTimer: TimerHandle | undefined;
   countdownTimer: TimerHandle | undefined;
   roundTimer: TimerHandle | undefined;
   graceTimer: TimerHandle | undefined;
@@ -59,10 +61,12 @@ const getCurrentPlaylistItem = (record: GameRecord) =>
   record.playlist[record.state.playlistIndex % record.playlist.length]!;
 
 const clearTimers = (record: GameRecord) => {
+  if (record.introTimer) clearTimeout(record.introTimer);
   if (record.countdownTimer) clearTimeout(record.countdownTimer);
   if (record.roundTimer) clearTimeout(record.roundTimer);
   if (record.graceTimer) clearTimeout(record.graceTimer);
   if (record.revealTimer) clearTimeout(record.revealTimer);
+  record.introTimer = undefined;
   record.countdownTimer = undefined;
   record.roundTimer = undefined;
   record.graceTimer = undefined;
@@ -101,6 +105,35 @@ const syncPlayersForLobby = (state: GameState, players: string[]) => {
     state.ready[player] ??= false;
     state.health[player] ??= STARTING_HEALTH;
   }
+};
+
+const startIntroAnimation = (
+  roomId: string,
+  players: string[],
+  events: GameEvents,
+) => {
+  const record = games.get(roomId);
+  if (!record) return;
+
+  clearTimers(record);
+
+  record.state.phase = "INTRO_ANIMATION";
+  record.state.currentRound = 0;
+  record.state.playlistIndex = 0;
+  record.state.currentVideoID = null;
+  record.state.roundStartTime = null;
+  record.state.roundEndsAt = null;
+  record.state.countdownEndsAt = null;
+  record.state.revealedAnswer = null;
+  record.state.guessedCorrectly = [];
+  record.state.pendingDamage = {};
+  record.state.ready = createReady(players, true);
+
+  events.emitState(record.state);
+
+  record.introTimer = setTimeout(() => {
+    startCountdown(roomId, players, events);
+  }, INTRO_SECONDS * 1000);
 };
 
 const startCountdown = (
@@ -297,11 +330,12 @@ export const ensureGameForRoom = (
 ): GameState => {
   const existing = games.get(roomId);
 
-  if (!existing) {
+    if (!existing) {
     const state = makeInitialState(players);
     games.set(roomId, {
       state,
       playlist: shufflePlaylist(),
+      introTimer: undefined,
       countdownTimer: undefined,
       roundTimer: undefined,
       graceTimer: undefined,
@@ -332,6 +366,7 @@ export const setPlayerReady = (
   const record = games.get(roomId) || {
     state: makeInitialState(players),
     playlist: shufflePlaylist(),
+    introTimer: undefined,
     countdownTimer: undefined,
     roundTimer: undefined,
     graceTimer: undefined,
@@ -355,7 +390,7 @@ export const setPlayerReady = (
     record.playlist = shufflePlaylist();
     record.state = makeInitialState(players);
     record.state.ready = createReady(players, true);
-    startCountdown(roomId, players, events);
+    startIntroAnimation(roomId, players, events);
   } else {
     events.emitState(record.state);
   }
@@ -480,7 +515,7 @@ export const handlePlayerDisconnectForGame = (
     return;
   }
 
-  const activePhases = new Set(["COUNTDOWN", "PLAYING", "GRACE_PERIOD", "REVEAL"]);
+  const activePhases = new Set(["INTRO_ANIMATION", "COUNTDOWN", "PLAYING", "GRACE_PERIOD", "REVEAL"]);
   if (activePhases.has(record.state.phase)) {
     clearTimers(record);
     const winner = updatedPlayers[0] || null;
