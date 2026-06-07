@@ -330,7 +330,7 @@ export const ensureGameForRoom = (
 ): GameState => {
   const existing = games.get(roomId);
 
-    if (!existing) {
+  if (!existing) {
     const state = makeInitialState(players);
     games.set(roomId, {
       state,

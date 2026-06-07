@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { motion, useAnimationControls } from "framer-motion";
+import { motion, useAnimationControls } from "motion/react";
 import { useGameStateStore } from "@/store/gameStore";
 
 interface GameStartSequenceProps {
@@ -80,10 +80,10 @@ export const GameStartSequence = ({
         clearTimeout(shake3);
         clearTimeout(hideTimer);
       };
-    } else if (phase === "LOBBY") {
+    } else {
       setIsVisible(false);
     }
-  }, [phase, shakeControls]);
+  }, [phase, shakeControls, onComplete]);
 
   if (!isVisible) return null;
 
