@@ -138,7 +138,7 @@ const createRoundResult = (
 
 const recordRoundResult = (record: GameRecord, result: RoundResult) => {
   record.state.roundResult = result;
-  record.state.matchHistory = [...record.state.matchHistory, result];
+  record.state.matchHistory.push(result);
 };
 
 const clearTimers = (record: GameRecord) => {
@@ -550,6 +550,7 @@ export const voteToSkipRound = (
   record.state.roundStartTime = null;
   record.state.countdownEndsAt = null;
   record.state.pendingDamage = {};
+  record.state.skipVotes = [];
 
   events.emitSystemMessage(
     `Both players voted to skip. The answer was ${currentVideo.canonicalTitle}.`,
