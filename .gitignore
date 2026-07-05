@@ -47,3 +47,6 @@ coverage/
 .pnpm-debug.log*
 
 copilot-instructions.md
+
+# Generated catalog output. Source of truth is data/anilist-anime-candidates.json.
+data/anilist-anime-candidates.catalog.ts

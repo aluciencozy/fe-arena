@@ -4,8 +4,12 @@
   "description": "",
   "main": "index.ts",
   "scripts": {
+    "generate:catalog": "node ../scripts/generate-anilist-catalog.mjs",
+    "predev": "npm run generate:catalog",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon --exec tsx index.ts"
+    "dev": "nodemon --exec tsx index.ts",
+    "pretypecheck": "npm run generate:catalog",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [],
   "author": "",
