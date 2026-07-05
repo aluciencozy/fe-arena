@@ -1,6 +1,10 @@
-import type { GameState } from "../types/index.js";
+import type { AnswerAlias, AnswerOption, GameState } from "../types/index.js";
 import { getRoomMetadata } from "./room.service.js";
-import { getTracksForMode, getTracksForTitleIds } from "../data/catalog.js";
+import {
+  getAnswerOptionsForTitles,
+  getPlayableTitlesForMode,
+  getTitlesForTitleIds,
+} from "../data/catalog.js";
 
 const COUNTDOWN_SECONDS = 3;
 const ROUND_SECONDS = 60;
@@ -9,7 +13,17 @@ const REVEAL_SECONDS = 3;
 const STARTING_HEALTH = 5000;
 
 type TimerHandle = ReturnType<typeof setTimeout>;
-type PlaylistTrack = { id: string; videoId: string; answer: string };
+type PlaylistTrack = {
+  id: string;
+  videoId: string;
+  title?: string;
+  durationSeconds?: number;
+  titleId: string;
+  canonicalTitle: string;
+  romajiName?: string | null;
+  nativeName?: string | null;
+  answerAliases: AnswerAlias[];
+};
 
 interface GameRecord {
   state: GameState;
@@ -39,16 +53,32 @@ const createReady = (players: string[], readyValue = false) =>
     return ready;
   }, {});
 
-const getPlaylistForRoom = (roomId: string) => {
+const getTitlesForRoom = (roomId: string) => {
   const metadata = getRoomMetadata(roomId);
 
   if (!metadata || metadata.mode === "video-game") return [];
 
   if (metadata.source === "private") {
-    return getTracksForTitleIds(metadata.mode, metadata.selectedTitleIds);
+    return getTitlesForTitleIds(metadata.mode, metadata.selectedTitleIds);
   }
 
-  return getTracksForMode(metadata.mode);
+  return getPlayableTitlesForMode(metadata.mode);
+};
+
+const getAnswerOptionsForRoom = (roomId: string): AnswerOption[] =>
+  getAnswerOptionsForTitles(getTitlesForRoom(roomId));
+
+const getPlaylistForRoom = (roomId: string): PlaylistTrack[] => {
+  return getTitlesForRoom(roomId).flatMap((title) =>
+    title.tracks.map((track) => ({
+      ...track,
+      titleId: title.id,
+      canonicalTitle: title.canonicalTitle,
+      romajiName: title.romajiName ?? null,
+      nativeName: title.nativeName ?? null,
+      answerAliases: title.answerAliases,
+    })),
+  );
 };
 
 const shufflePlaylist = (playlist: PlaylistTrack[]) => {
@@ -79,7 +109,10 @@ const clearTimers = (record: GameRecord) => {
   record.revealTimer = undefined;
 };
 
-const makeInitialState = (players: string[]): GameState => ({
+const makeInitialState = (
+  players: string[],
+  answerOptions: AnswerOption[] = [],
+): GameState => ({
   phase: "LOBBY",
   currentRound: 0,
   health: createHealth(players),
@@ -94,6 +127,7 @@ const makeInitialState = (players: string[]): GameState => ({
   winner: null,
   revealedAnswer: null,
   playlistIndex: 0,
+  answerOptions,
 });
 
 const syncPlayersForLobby = (state: GameState, players: string[]) => {
@@ -132,6 +166,7 @@ const startCountdown = (
   record.state.revealedAnswer = null;
   record.state.guessedCorrectly = [];
   record.state.pendingDamage = {};
+  record.state.answerOptions = getAnswerOptionsForRoom(roomId);
   record.state.ready = createReady(players, true);
 
   events.emitState(record.state);
@@ -158,6 +193,7 @@ const startRound = (roomId: string, events: GameEvents) => {
   record.state.revealedAnswer = null;
   record.state.guessedCorrectly = [];
   record.state.pendingDamage = {};
+  record.state.answerOptions = getAnswerOptionsForRoom(roomId);
 
   events.emitState(record.state);
 
@@ -197,10 +233,12 @@ const timeoutRound = (roomId: string, events: GameEvents) => {
 
   const currentVideo = getCurrentPlaylistItem(record);
   record.state.phase = "REVEAL";
-  record.state.revealedAnswer = currentVideo.answer;
+  record.state.revealedAnswer = currentVideo.canonicalTitle;
   record.state.roundEndsAt = null;
   record.state.roundStartTime = null;
-  events.emitSystemMessage(`Time is up! The answer was ${currentVideo.answer}.`);
+  events.emitSystemMessage(
+    `Time is up! The answer was ${currentVideo.canonicalTitle}.`,
+  );
   events.emitState(record.state);
 
   record.revealTimer = setTimeout(() => {
@@ -221,12 +259,12 @@ const revealAfterGrace = (
 
   const currentVideo = getCurrentPlaylistItem(record);
   record.state.phase = "REVEAL";
-  record.state.revealedAnswer = currentVideo.answer;
+  record.state.revealedAnswer = currentVideo.canonicalTitle;
   record.state.roundStartTime = null;
   record.state.roundEndsAt = null;
   record.state.countdownEndsAt = null;
 
-  events.emitSystemMessage(`The answer was ${currentVideo.answer}.`);
+  events.emitSystemMessage(`The answer was ${currentVideo.canonicalTitle}.`);
   events.emitState(record.state);
 
   record.revealTimer = setTimeout(() => {
@@ -308,7 +346,7 @@ export const ensureGameForRoom = (
   const existing = games.get(roomId);
 
   if (!existing) {
-    const state = makeInitialState(players);
+    const state = makeInitialState(players, getAnswerOptionsForRoom(roomId));
     games.set(roomId, {
       state,
       playlist: shufflePlaylist(getPlaylistForRoom(roomId)),
@@ -323,6 +361,7 @@ export const ensureGameForRoom = (
   if (existing.state.phase === "LOBBY" || existing.state.phase === "GAME_OVER") {
     syncPlayersForLobby(existing.state, players);
   }
+  existing.state.answerOptions = getAnswerOptionsForRoom(roomId);
 
   return existing.state;
 };
@@ -340,7 +379,7 @@ export const setPlayerReady = (
   events: GameEvents,
 ): { ok: true; state: GameState } | { ok: false; error: string } => {
   const record = games.get(roomId) || {
-    state: makeInitialState(players),
+    state: makeInitialState(players, getAnswerOptionsForRoom(roomId)),
     playlist: shufflePlaylist(getPlaylistForRoom(roomId)),
     countdownTimer: undefined,
     roundTimer: undefined,
@@ -368,7 +407,7 @@ export const setPlayerReady = (
 
     clearTimers(record);
     record.playlist = playlist;
-    record.state = makeInitialState(players);
+    record.state = makeInitialState(players, getAnswerOptionsForRoom(roomId));
     record.state.ready = createReady(players, true);
     startCountdown(roomId, players, events);
   } else {
@@ -381,9 +420,47 @@ export const setPlayerReady = (
 const normalizeString = (str: string): string => {
   return str
     .toLowerCase()
+    .normalize("NFKC")
     .trim()
-    .replace(/[^\w\s]/g, "") // Remove punctuation
-    .replace(/\s+/g, " ");   // Collapse multiple spaces to a single space
+    .replace(/[^\p{Letter}\p{Number}\s]/gu, "")
+    .replace(/\s+/g, " ");
+};
+
+const getAllowedDistance = (normalizedAnswer: string) => {
+  if (normalizedAnswer.length >= 10) return 2;
+  if (normalizedAnswer.length >= 5) return 1;
+  return 0;
+};
+
+const getImplicitAnswerAliases = (track: PlaylistTrack): AnswerAlias[] =>
+  [
+    track.canonicalTitle,
+    track.romajiName,
+    track.nativeName,
+  ]
+    .filter((term): term is string => Boolean(term?.trim()))
+    .map((value) => ({ value, match: "fuzzy" }));
+
+export const isCorrectAnswer = (
+  message: string,
+  track: PlaylistTrack,
+): boolean => {
+  const normalizedGuess = normalizeString(message);
+  if (!normalizedGuess) return false;
+
+  const aliases = [...getImplicitAnswerAliases(track), ...track.answerAliases];
+
+  return aliases.some((alias) => {
+    const normalizedAlias = normalizeString(alias.value);
+    if (!normalizedAlias) return false;
+
+    if (alias.match === "exact") {
+      return normalizedGuess === normalizedAlias;
+    }
+
+    const distance = getLevenshteinDistance(normalizedGuess, normalizedAlias);
+    return distance <= getAllowedDistance(normalizedAlias);
+  });
 };
 
 const getLevenshteinDistance = (a: string, b: string): number => {
@@ -431,23 +508,7 @@ export const handleGuess = (
   }
 
   const currentVideo = getCurrentPlaylistItem(record);
-  const normalizedGuess = normalizeString(message);
-  const normalizedAnswer = normalizeString(currentVideo.answer);
-
-  const distance = getLevenshteinDistance(normalizedGuess, normalizedAnswer);
-  
-  // Dynamic threshold based on length:
-  // length <= 4: 0 typos allowed
-  // 5 <= length <= 9: 1 typo allowed
-  // length >= 10: 2 typos allowed
-  let allowedDistance = 0;
-  if (normalizedAnswer.length >= 5 && normalizedAnswer.length <= 9) {
-    allowedDistance = 1;
-  } else if (normalizedAnswer.length >= 10) {
-    allowedDistance = 2;
-  }
-
-  if (distance > allowedDistance) {
+  if (!isCorrectAnswer(message, currentVideo)) {
     return false;
   }
 

@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import YouTube, { type YouTubeEvent } from "react-youtube";
+import Fuse from "fuse.js";
+import { Settings, Volume2, VolumeX, Waves } from "lucide-react";
 import { useGameStore, useGameStateStore } from "@/store/gameStore";
 import { useSocket } from "@/hooks/useSocket";
+import type { AnswerOption } from "@/types";
 
 const Room = () => {
   const { id: dynamicRoomId } = useParams(); // Get the room ID from the URL
@@ -11,6 +14,8 @@ const Room = () => {
 
   // Access player name and game state from the global stores
   const playerName = useGameStore((state) => state.playerName);
+  const volume = useGameStore((state) => state.volume);
+  const setVolume = useGameStore((state) => state.setVolume);
   const phase = useGameStateStore((state) => state.phase);
   const currentVideoId = useGameStateStore((state) => state.currentVideoID);
   const videoStartTime = useGameStateStore((state) => state.videoStartTime);
@@ -23,6 +28,7 @@ const Room = () => {
   const countdownEndsAt = useGameStateStore((state) => state.countdownEndsAt);
   const roundEndsAt = useGameStateStore((state) => state.roundEndsAt);
   const guessedCorrectly = useGameStateStore((state) => state.guessedCorrectly);
+  const answerOptions = useGameStateStore((state) => state.answerOptions);
 
   // Use the custom hook to manage WebSocket connections and game state synchronization
   const { players, messages, sendChatMessage, setReady } = useSocket(
@@ -32,11 +38,46 @@ const Room = () => {
   
   const [now, setNow] = useState<number | null>(null);
   const [guessValue, setGuessValue] = useState("");
+  const [highlightedSuggestionIndex, setHighlightedSuggestionIndex] =
+    useState(0);
   const [gameStartTime, setGameStartTime] = useState<number | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const visualPhase = phase;
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<YouTubeEvent["target"] | null>(null);
   const hasActiveTimer = countdownEndsAt !== null || roundEndsAt !== null;
+  const playerVolume = volume === 0 ? 0 : Math.max(1, Math.round((volume / 100) ** 2 * 100));
+  const alreadyGuessedCorrectly = guessedCorrectly.includes(playerName);
+  const canUseAnswerSuggestions =
+    (phase === "PLAYING" || phase === "GRACE_PERIOD") &&
+    !alreadyGuessedCorrectly;
+  const isGuessInputDisabled =
+    phase === "REVEAL" ||
+    phase === "GAME_OVER" ||
+    (phase !== "LOBBY" && alreadyGuessedCorrectly);
+  const answerFuse = useMemo(
+    () =>
+      new Fuse(answerOptions, {
+        keys: [
+          { name: "canonicalTitle", weight: 0.65 },
+          { name: "searchTerms", weight: 0.35 },
+        ],
+        threshold: 0.4,
+        ignoreLocation: true,
+      }),
+    [answerOptions],
+  );
+  const answerSuggestions = useMemo(() => {
+    const query = guessValue.trim();
+    if (!canUseAnswerSuggestions || query.length < 2) return [];
+
+    return answerFuse.search(query).slice(0, 5).map((result) => result.item);
+  }, [answerFuse, canUseAnswerSuggestions, guessValue]);
+  const selectedSuggestionIndex =
+    answerSuggestions.length === 0
+      ? 0
+      : Math.min(highlightedSuggestionIndex, answerSuggestions.length - 1);
 
   useEffect(() => {
     if (!dynamicRoomId || !playerName) {
@@ -73,6 +114,10 @@ const Room = () => {
     };
   }, [hasActiveTimer]);
 
+  useEffect(() => {
+    playerRef.current?.setVolume(playerVolume);
+  }, [playerVolume]);
+
   const countdownSeconds = countdownEndsAt
     ? now === null
       ? null
@@ -85,6 +130,9 @@ const Room = () => {
     : null;
 
   const handlePlayerReady = (event: YouTubeEvent) => {
+    playerRef.current = event.target;
+    event.target.setVolume(playerVolume);
+
     if (!roundStartTime) return; // Ensure round start time is set before calculating elapsed time
 
     const elapsedTime = (Date.now() - roundStartTime) / 1000; // Calculate elapsed time in seconds
@@ -94,11 +142,79 @@ const Room = () => {
     event.target.playVideo(); // Start playing the video
   };
 
+  const handleVolumeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setVolume(Number(event.target.value));
+  };
+
+  const handleTestVolume = () => {
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as Window & typeof globalThis & {
+        webkitAudioContext?: typeof AudioContext;
+      }).webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    const audioContext = new AudioContextClass();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    const nowTime = audioContext.currentTime;
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(440, nowTime);
+    oscillator.frequency.exponentialRampToValueAtTime(660, nowTime + 0.18);
+
+    gainNode.gain.setValueAtTime(0, nowTime);
+    gainNode.gain.linearRampToValueAtTime((playerVolume / 100) * 0.2, nowTime + 0.03);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, nowTime + 0.35);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    oscillator.start(nowTime);
+    oscillator.stop(nowTime + 0.35);
+    oscillator.addEventListener("ended", () => void audioContext.close());
+  };
+
+  const handleGuessChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setGuessValue(event.target.value);
+    setHighlightedSuggestionIndex(0);
+  };
+
+  const submitGuess = (message: string) => {
+    if (!message.trim()) return;
+    sendChatMessage(message.trim());
+    setGuessValue("");
+  };
+
+  const submitSuggestion = (suggestion: AnswerOption) => {
+    submitGuess(suggestion.canonicalTitle);
+  };
+
   const handleGuessSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!guessValue.trim()) return;
-    sendChatMessage(guessValue.trim());
-    setGuessValue("");
+    const selectedSuggestion = answerSuggestions[selectedSuggestionIndex];
+    if (selectedSuggestion) {
+      submitSuggestion(selectedSuggestion);
+      return;
+    }
+
+    submitGuess(guessValue);
+  };
+
+  const handleGuessKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (answerSuggestions.length === 0) return;
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setHighlightedSuggestionIndex(
+        (index) => (index + 1) % answerSuggestions.length,
+      );
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setHighlightedSuggestionIndex(
+        (index) =>
+          (index - 1 + answerSuggestions.length) % answerSuggestions.length,
+      );
+    }
   };
 
   // Unified Centered Core Component containing Chat log, Guess Input, and Game State headers
@@ -178,16 +294,39 @@ const Room = () => {
             )}
 
             {/* Central Guess/Chat Input Form */}
-            <form onSubmit={handleGuessSubmit} className="flex flex-col gap-2 pointer-events-auto">
+            <form onSubmit={handleGuessSubmit} className="relative flex flex-col gap-2 pointer-events-auto">
               <input
                 value={guessValue}
-                onChange={(e) => setGuessValue(e.target.value)}
+                onChange={handleGuessChange}
+                onKeyDown={handleGuessKeyDown}
                 placeholder={visualPhase === "LOBBY" ? "TYPE A LOBBY MESSAGE..." : "GUESS THE OST..."}
-                disabled={phase === "REVEAL" || phase === "GAME_OVER" || (phase !== "LOBBY" && guessedCorrectly.includes(playerName))}
+                disabled={isGuessInputDisabled}
                 className="w-full text-center bg-input border border-border text-foreground px-4 py-3 rounded-lg font-bold text-xs uppercase placeholder-zinc-600 shadow-md focus:outline-none focus:border-player-1 focus:ring-1 focus:ring-player-1/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 autoComplete="off"
                 autoFocus
               />
+              {answerSuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-lg border border-player-1/40 bg-card shadow-2xl shadow-black/40">
+                  {answerSuggestions.map((suggestion, index) => {
+                    const isSelected = index === selectedSuggestionIndex;
+                    return (
+                      <button
+                        key={suggestion.id}
+                        type="button"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => submitSuggestion(suggestion)}
+                        className={`block w-full px-4 py-2.5 text-left text-xs font-extrabold uppercase tracking-wider transition-colors ${
+                          isSelected
+                            ? "bg-player-1 text-background"
+                            : "bg-card text-foreground hover:bg-input"
+                        }`}
+                      >
+                        {suggestion.canonicalTitle}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </form>
 
             {/* Timer status indicator during active rounds */}
@@ -255,6 +394,58 @@ const Room = () => {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden text-foreground bg-background bg-[radial-gradient(circle_at_center,_rgba(31,40,51,0.15)_0%,_rgba(11,15,25,1)_100%)] transition-colors duration-500">
+      <div className="absolute right-5 top-5 z-[60] pointer-events-auto">
+        <button
+          type="button"
+          onClick={() => setSettingsOpen((open) => !open)}
+          aria-label="Open settings"
+          className="flex size-10 items-center justify-center border border-border bg-card/90 text-foreground shadow-lg backdrop-blur transition-all hover:border-player-1 hover:text-player-1 active:translate-y-px"
+        >
+          <Settings size={18} />
+        </button>
+
+        {settingsOpen && (
+          <div className="absolute right-0 mt-3 w-72 border border-border bg-card p-4 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                {volume === 0 ? (
+                  <VolumeX className="text-player-2" size={18} />
+                ) : (
+                  <Volume2 className="text-player-1" size={18} />
+                )}
+                <span className="text-xs font-extrabold uppercase tracking-widest">
+                  Volume
+                </span>
+              </div>
+              <span className="text-xs font-black text-muted-foreground">
+                {volume}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              value={volume}
+              onChange={handleVolumeChange}
+              aria-label="App volume"
+              className="h-2 w-full cursor-pointer accent-player-1"
+            />
+            <button
+              type="button"
+              onClick={handleTestVolume}
+              className="mt-4 flex w-full items-center justify-center gap-2 border border-player-1/50 bg-player-1/10 px-3 py-2 text-xs font-extrabold uppercase tracking-widest text-player-1 transition-all hover:bg-player-1/20 active:translate-y-px"
+            >
+              <Waves size={15} />
+              Test Volume
+            </button>
+            <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Low settings are softened for quieter listening.
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* BACKGROUND LAYER 1: Lobby Split-Slash (LOBBY phase only) */}
       {/* ---------------------------------------------------- */}
       {visualPhase === "LOBBY" && (
