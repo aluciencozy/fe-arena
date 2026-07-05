@@ -396,12 +396,12 @@ const Home = () => {
         {selectedMode === "anime" && (
           <section className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[1fr_360px]">
             <div className="flex min-h-0 flex-col gap-4">
-              <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-                <div>
-                  <h2 className="text-xl font-black uppercase tracking-widest">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+                <div className="min-w-0">
+                  <h2 className="whitespace-nowrap text-xl font-black uppercase tracking-widest">
                     Anime Selection
                   </h2>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  <p className="whitespace-nowrap text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     {selectedTitleIds.length} selected / {selectedTrackCount}{" "}
                     playable tracks
                   </p>
@@ -410,16 +410,16 @@ const Home = () => {
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <div className="relative min-w-0 sm:w-72">
+                  <div className="relative min-w-0 sm:w-64">
                     <Search
-                      size={15}
+                      size={13}
                       className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground"
                     />
                     <Input
                       value={titleSearch}
                       onChange={(event) => setTitleSearch(event.target.value)}
                       placeholder="SEARCH ANIME"
-                      className="bg-input pl-9 text-xs font-black uppercase tracking-widest text-foreground placeholder:text-zinc-600"
+                      className="h-8 bg-input pl-8 text-[10px] font-black uppercase tracking-widest text-foreground placeholder:text-zinc-600"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -428,9 +428,10 @@ const Home = () => {
                       variant="outline"
                       onClick={selectFilteredAnime}
                       disabled={filteredAnimeTitles.length === 0}
-                      className="font-extrabold uppercase tracking-widest"
+                      size="sm"
+                      className="h-8 px-2 text-[10px] font-extrabold uppercase tracking-wider"
                     >
-                      <ListChecks size={16} />
+                      <ListChecks size={13} />
                       Select All
                     </Button>
                     <Button
@@ -438,16 +439,17 @@ const Home = () => {
                       variant="outline"
                       onClick={deselectFilteredAnime}
                       disabled={filteredAnimeTitles.length === 0}
-                      className="font-extrabold uppercase tracking-widest"
+                      size="sm"
+                      className="h-8 px-2 text-[10px] font-extrabold uppercase tracking-wider"
                     >
-                      <ListX size={16} />
+                      <ListX size={13} />
                       Clear
                     </Button>
                   </div>
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto pr-2">
+              <div className="anime-picker-scroll min-h-0 flex-1 overflow-y-auto pr-2">
                 <div className="grid gap-3">
                 {filteredAnimeTitles.map((title) => {
                   const selected = selectedTitleIds.includes(title.id);
