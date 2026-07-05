@@ -420,9 +420,10 @@ export const setPlayerReady = (
 const normalizeString = (str: string): string => {
   return str
     .toLowerCase()
+    .normalize("NFKC")
     .trim()
-    .replace(/[^\w\s]/g, "") // Remove punctuation
-    .replace(/\s+/g, " ");   // Collapse multiple spaces to a single space
+    .replace(/[^\p{Letter}\p{Number}\s]/gu, "")
+    .replace(/\s+/g, " ");
 };
 
 const getAllowedDistance = (normalizedAnswer: string) => {

@@ -10,4 +10,9 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    fs: {
+      allow: [path.resolve(__dirname), path.resolve(__dirname, "..")],
+    },
+  },
 })
