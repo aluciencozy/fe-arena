@@ -2,10 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { UnifiedMessage, GameState } from "../types/";
 import { useGameStateStore } from "@/store/gameStore";
-import { socket } from "@/lib/socket";
+import { connectSocket, scheduleSocketDisconnect, socket } from "@/lib/socket";
 
 const MAX_MESSAGE_CAPACITY = 100; // Maximum number of messages to keep in state
-let pendingDisconnect: number | undefined;
 
 export const useSocket = (roomCode: string, playerName: string) => {
   const [players, setPlayers] = useState<string[]>([]); // State to hold the current players in room
@@ -15,12 +14,7 @@ export const useSocket = (roomCode: string, playerName: string) => {
   useEffect(() => {
     if (!roomCode || !playerName) return;
 
-    if (pendingDisconnect) {
-      window.clearTimeout(pendingDisconnect);
-      pendingDisconnect = undefined;
-    }
-
-    socket.connect(); // Manually connect the socket
+    connectSocket(); // Manually connect the socket
 
     // Immediately emit the 'room:join' event to join the specified room with the player's name
     socket.emit("room:join", roomCode, playerName);
@@ -100,10 +94,7 @@ export const useSocket = (roomCode: string, playerName: string) => {
       socket.off("chat:broadcast", handleChatBroadcast);
       socket.off("game:state", handleGameState);
       socket.off("game:error", handleGameError);
-      pendingDisconnect = window.setTimeout(() => {
-        socket.disconnect();
-        pendingDisconnect = undefined;
-      }, 250);
+      scheduleSocketDisconnect();
     };
   }, [navigate, roomCode, playerName]); // Re-run effect if roomCode or playerName changes
 

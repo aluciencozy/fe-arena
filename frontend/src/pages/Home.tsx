@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { animeTitles } from "@/data/catalog";
-import { socket } from "@/lib/socket";
+import { connectSocket, socket } from "@/lib/socket";
 import { useGameStore } from "@/store/gameStore";
 import type { GameMode, RoomMetadata } from "@/types";
 
@@ -136,7 +136,7 @@ const Home = () => {
 
     setIsCreating(true);
     setNotice("");
-    socket.connect();
+    connectSocket();
     socket.emit("room:create-private", {
       username: trimmedUsername,
       mode: selectedMode,
@@ -159,7 +159,7 @@ const Home = () => {
 
     setNotice("");
     setIsQueueing(true);
-    socket.connect();
+    connectSocket();
     socket.emit("queue:join", {
       username: trimmedUsername,
       mode: selectedMode,
@@ -285,7 +285,7 @@ const Home = () => {
                       <div className="aspect-[16/9] w-full overflow-hidden bg-input">
                         <img
                           src={title.coverImageUrl}
-                          alt=""
+                          alt={`${title.name} cover art`}
                           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                         />
                       </div>

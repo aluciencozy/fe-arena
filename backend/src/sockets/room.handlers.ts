@@ -139,12 +139,6 @@ export const registerRoomHandler = (io: Server, socket: Socket) => {
         return;
       }
 
-      const metadata = createRoom({
-        mode,
-        source: "queue",
-        selectedTitleIds: [],
-      });
-
       const opponentSocket = io.sockets.sockets.get(
         queueResult.opponent.socketId,
       );
@@ -153,6 +147,12 @@ export const registerRoomHandler = (io: Server, socket: Socket) => {
         enqueuePlayer(socket.id, normalizedUsername, mode);
         return;
       }
+
+      const metadata = createRoom({
+        mode,
+        source: "queue",
+        selectedTitleIds: [],
+      });
 
       joinSocketToRoom(
         io,

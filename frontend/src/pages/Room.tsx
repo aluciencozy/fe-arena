@@ -30,7 +30,7 @@ const Room = () => {
     playerName,
   );
   
-  const [now, setNow] = useState(0);
+  const [now, setNow] = useState<number | null>(null);
   const [guessValue, setGuessValue] = useState("");
   const [gameStartTime, setGameStartTime] = useState<number | null>(null);
   const visualPhase = phase;
@@ -74,10 +74,14 @@ const Room = () => {
   }, [hasActiveTimer]);
 
   const countdownSeconds = countdownEndsAt
-    ? Math.max(0, Math.ceil((countdownEndsAt - now) / 1000))
+    ? now === null
+      ? null
+      : Math.max(0, Math.ceil((countdownEndsAt - now) / 1000))
     : null;
   const roundSeconds = roundEndsAt
-    ? Math.max(0, Math.ceil((roundEndsAt - now) / 1000))
+    ? now === null
+      ? null
+      : Math.max(0, Math.ceil((roundEndsAt - now) / 1000))
     : null;
 
   const handlePlayerReady = (event: YouTubeEvent) => {
@@ -210,12 +214,20 @@ const Room = () => {
 
         {/* Rematch button inside core if game is over */}
         {phase === "GAME_OVER" && (
-          <button
-            onClick={() => setReady()}
-            className="w-full font-extrabold text-xs uppercase tracking-widest py-3 border border-player-1 bg-player-1/10 hover:bg-player-1/25 text-player-1 rounded-lg transition-all shadow-[0_0_15px_rgba(77,255,188,0.2)] hover:shadow-[0_0_25px_rgba(77,255,188,0.4)] cursor-pointer active:translate-y-px pointer-events-auto"
-          >
-            REMATCH READY UP
-          </button>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => navigate("/")}
+              className="w-full font-extrabold text-xs uppercase tracking-widest py-3 border border-border bg-input hover:bg-muted text-foreground rounded-lg transition-all cursor-pointer active:translate-y-px pointer-events-auto"
+            >
+              BACK HOME
+            </button>
+            <button
+              onClick={() => setReady()}
+              className="w-full font-extrabold text-xs uppercase tracking-widest py-3 border border-player-1 bg-player-1/10 hover:bg-player-1/25 text-player-1 rounded-lg transition-all shadow-[0_0_15px_rgba(77,255,188,0.2)] hover:shadow-[0_0_25px_rgba(77,255,188,0.4)] cursor-pointer active:translate-y-px pointer-events-auto"
+            >
+              REMATCH
+            </button>
+          </div>
         )}
 
       </div>
