@@ -1,25 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-const ANILIST_GRAPHQL_URL = "https://graphql.anilist.co";
 const INPUT_JSON = path.resolve("data", "anilist-anime-candidates.json");
-
-const QUERY = `
-  query AnimeSynonyms($ids: [Int]) {
-    Page(page: 1, perPage: 50) {
-      media(id_in: $ids, type: ANIME) {
-        id
-        title {
-          romaji
-          english
-          native
-          userPreferred
-        }
-        synonyms
-      }
-    }
-  }
-`;
 
 const CURATED_EXACT_ALIASES = new Map(
   Object.entries({
@@ -120,8 +102,6 @@ const CURATED_EXACT_ALIASES = new Map(
   }),
 );
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
 const normalizeForDedupe = (value) =>
   value
     .toLowerCase()
@@ -165,6 +145,8 @@ const compactSeasonAlias = (value) => {
   return [`${acronym} s${seasonMatch[1]}`, `${acronym} season ${seasonMatch[1]}`];
 };
 
+const isEnglishOrRomajiTitle = (value) => Boolean(value?.trim()) && isAsciiPhrase(value);
+
 const toAliasObject = (value, match = "fuzzy") => {
   const trimmed = value?.trim();
   if (!trimmed) return null;
@@ -183,67 +165,18 @@ const addAlias = (aliasesByKey, value, match = "fuzzy") => {
   }
 };
 
-const fetchSynonyms = async (ids) => {
-  const response = await fetch(ANILIST_GRAPHQL_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({ query: QUERY, variables: { ids } }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`AniList request failed: ${response.status} ${await response.text()}`);
-  }
-
-  const payload = await response.json();
-  if (payload.errors) throw new Error(JSON.stringify(payload.errors, null, 2));
-
-  return payload.data.Page.media;
-};
-
-const chunk = (values, size) => {
-  const chunks = [];
-  for (let index = 0; index < values.length; index += size) {
-    chunks.push(values.slice(index, index + size));
-  }
-  return chunks;
-};
-
 const main = async () => {
   const resetExistingAliases = process.argv.includes("--reset");
   const payload = JSON.parse(await readFile(INPUT_JSON, "utf8"));
   const candidates = payload.candidates ?? [];
-  const ids = candidates.map((candidate) => candidate.anilistId).filter(Boolean);
-  const synonymsById = new Map();
-
-  for (const idChunk of chunk(ids, 50)) {
-    const mediaItems = await fetchSynonyms(idChunk);
-    for (const media of mediaItems) {
-      synonymsById.set(media.id, {
-        synonyms: media.synonyms ?? [],
-        titles: [
-          media.title?.english,
-          media.title?.romaji,
-          media.title?.native,
-          media.title?.userPreferred,
-        ],
-      });
-    }
-    await sleep(750);
-  }
 
   for (const candidate of candidates) {
     const aliasesByKey = new Map();
-    const aniListData = synonymsById.get(candidate.anilistId);
-    const titleValues = [
+    const englishAndRomajiTitles = [
       candidate.canonicalTitle,
       candidate.name,
       candidate.romajiName,
-      candidate.nativeName,
-      ...(aniListData?.titles ?? []),
-    ].filter(Boolean);
+    ].filter(isEnglishOrRomajiTitle);
 
     if (!resetExistingAliases) {
       for (const alias of candidate.answerAliases ?? []) {
@@ -251,7 +184,7 @@ const main = async () => {
       }
     }
 
-    for (const title of titleValues) {
+    for (const title of englishAndRomajiTitles) {
       addAlias(aliasesByKey, title, "fuzzy");
       addAlias(aliasesByKey, stripSeasonNoise(title), "fuzzy");
 
@@ -263,10 +196,7 @@ const main = async () => {
       }
     }
 
-    for (const synonym of aniListData?.synonyms ?? []) {
-      addAlias(aliasesByKey, synonym, "fuzzy");
-      addAlias(aliasesByKey, stripSeasonNoise(synonym), "fuzzy");
-    }
+    addAlias(aliasesByKey, candidate.nativeName, "fuzzy");
 
     for (const exactAlias of CURATED_EXACT_ALIASES.get(String(candidate.anilistId)) ?? []) {
       addAlias(aliasesByKey, exactAlias, "exact");

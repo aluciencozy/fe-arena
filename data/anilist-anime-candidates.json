@@ -57,63 +57,11 @@
           "match": "exact"
         },
         {
-          "value": "Atak Tytanów",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Ataque a los Titanes",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Ataque de Titãs",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Ataque dos Titãs",
-          "match": "fuzzy"
-        },
-        {
           "value": "Attack on Titan",
           "match": "fuzzy"
         },
         {
-          "value": "Đại Chiến Titan",
-          "match": "fuzzy"
-        },
-        {
-          "value": "L'Attacco dei Giganti",
-          "match": "fuzzy"
-        },
-        {
-          "value": "L’Attaque des Titans",
-          "match": "fuzzy"
-        },
-        {
           "value": "Shingeki no Kyojin",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Атака титанов",
-          "match": "fuzzy"
-        },
-        {
-          "value": "מתקפת הטיטאנים",
-          "match": "fuzzy"
-        },
-        {
-          "value": "الهجوم على العمالقة",
-          "match": "fuzzy"
-        },
-        {
-          "value": "حمله به تایتان",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ผ่าพิภพไททัน",
-          "match": "fuzzy"
-        },
-        {
-          "value": "进击的巨人",
           "match": "fuzzy"
         },
         {
@@ -178,75 +126,11 @@
           "match": "fuzzy"
         },
         {
-          "value": "Demon Slayer: Kimetsu no Yaiba: Bonds of Siblings",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Guardians de la nit: Kimetsu no Yaiba",
-          "match": "fuzzy"
-        },
-        {
-          "value": "İblis Keser",
-          "match": "fuzzy"
-        },
-        {
           "value": "Kimetsu no Yaiba",
           "match": "fuzzy"
         },
         {
-          "value": "Kimetsu no Yaiba: Kyoudai no Kizuna",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Miecz zabójcy demonów – Kimetsu no Yaiba",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Zabiják démonů",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ΚΥΝΗΓΟΣ ΔΑΙΜΟΝΩΝ: KIMETSU NO YAIBA",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Истребитель демонов",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Клинок, рассекающий демонов",
-          "match": "fuzzy"
-        },
-        {
-          "value": "הלהב קוטל השדים",
-          "match": "fuzzy"
-        },
-        {
-          "value": "شیطان کش",
-          "match": "fuzzy"
-        },
-        {
-          "value": "قاتل الشياطين",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ดาบพิฆาตอสูร",
-          "match": "fuzzy"
-        },
-        {
-          "value": "귀멸의 칼날",
-          "match": "fuzzy"
-        },
-        {
           "value": "鬼滅の刃",
-          "match": "fuzzy"
-        },
-        {
-          "value": "鬼滅の刃-兄妹の絆-",
-          "match": "fuzzy"
-        },
-        {
-          "value": "鬼灭之刃",
           "match": "fuzzy"
         }
       ],
@@ -286,43 +170,11 @@
           "match": "exact"
         },
         {
-          "value": "Chú Thuật Hồi Chiến",
-          "match": "fuzzy"
-        },
-        {
           "value": "JUJUTSU KAISEN",
           "match": "fuzzy"
         },
         {
-          "value": "Sorcery Fight",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Магическая битва",
-          "match": "fuzzy"
-        },
-        {
-          "value": "جوجوتسو كايسن",
-          "match": "fuzzy"
-        },
-        {
-          "value": "มหาเวทย์ผนึกมาร",
-          "match": "fuzzy"
-        },
-        {
-          "value": "주술회전",
-          "match": "fuzzy"
-        },
-        {
           "value": "呪術廻戦",
-          "match": "fuzzy"
-        },
-        {
-          "value": "咒术回战",
-          "match": "fuzzy"
-        },
-        {
-          "value": "咒術迴戰",
           "match": "fuzzy"
         }
       ],
@@ -363,39 +215,7 @@
           "match": "exact"
         },
         {
-          "value": "Carnet de la Mort",
-          "match": "fuzzy"
-        },
-        {
           "value": "Death Note",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Notatnik śmierci",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Тетрадь смерти",
-          "match": "fuzzy"
-        },
-        {
-          "value": "מחברת המוות",
-          "match": "fuzzy"
-        },
-        {
-          "value": "مذكرة الموت",
-          "match": "fuzzy"
-        },
-        {
-          "value": "สมุดโน้ตกระชากวิญญาณ",
-          "match": "fuzzy"
-        },
-        {
-          "value": "デスノート",
-          "match": "fuzzy"
-        },
-        {
-          "value": "死亡笔记",
           "match": "fuzzy"
         }
       ],
@@ -439,19 +259,7 @@
           "match": "exact"
         },
         {
-          "value": "Akademia bohaterów",
-          "match": "fuzzy"
-        },
-        {
           "value": "Boku no Hero Academia",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Học Viện Anh Hùng",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Hősakadémia",
           "match": "fuzzy"
         },
         {
@@ -459,39 +267,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Η Δική Μου Ακαδημία Ηρώων",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Моя геройская академия",
-          "match": "fuzzy"
-        },
-        {
-          "value": "אקדמיית הגיבורים שלי",
-          "match": "fuzzy"
-        },
-        {
-          "value": "أكاديميتي للأبطال",
-          "match": "fuzzy"
-        },
-        {
-          "value": "มายฮีโร่ อคาเดเมีย",
-          "match": "fuzzy"
-        },
-        {
-          "value": "나의 히어로 아카데미아 1기",
-          "match": "fuzzy"
-        },
-        {
-          "value": "나히아 1기",
-          "match": "fuzzy"
-        },
-        {
           "value": "僕のヒーローアカデミア",
-          "match": "fuzzy"
-        },
-        {
-          "value": "我的英雄学院",
           "match": "fuzzy"
         }
       ],
@@ -542,30 +318,6 @@
         {
           "value": "HUNTER×HUNTER (2011)",
           "match": "fuzzy"
-        },
-        {
-          "value": "Мисливець X Мисливець",
-          "match": "fuzzy"
-        },
-        {
-          "value": "האנטר האנטר",
-          "match": "fuzzy"
-        },
-        {
-          "value": "القناص",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ฮันเตอร์ x ฮันเตอร์",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ハンター×ハンター",
-          "match": "fuzzy"
-        },
-        {
-          "value": "全职猎人",
-          "match": "fuzzy"
         }
       ],
       "tracks": [],
@@ -605,47 +357,11 @@
           "match": "exact"
         },
         {
-          "value": "Jagoan Sekali Pukul S1",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Nhất Quyền Nhân",
-          "match": "fuzzy"
-        },
-        {
           "value": "One-Punch Man",
           "match": "fuzzy"
         },
         {
-          "value": "Wanpanman",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Ванпанчмен",
-          "match": "fuzzy"
-        },
-        {
-          "value": "איש האגרוף הבודד",
-          "match": "fuzzy"
-        },
-        {
-          "value": "رجل اللكمة الواحدة",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ون بنش مان",
-          "match": "fuzzy"
-        },
-        {
-          "value": "วันพันช์แมน",
-          "match": "fuzzy"
-        },
-        {
           "value": "ワンパンマン",
-          "match": "fuzzy"
-        },
-        {
-          "value": "一拳超人",
           "match": "fuzzy"
         }
       ],
@@ -688,47 +404,7 @@
           "match": "exact"
         },
         {
-          "value": "All'arrembaggio!",
-          "match": "fuzzy"
-        },
-        {
           "value": "ONE PIECE",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Tutti all'arrembaggio!",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Vua Hải Tặc",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Ντρέηκ, το Κυνήγι του Θησαυρού",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Ван-Пис",
-          "match": "fuzzy"
-        },
-        {
-          "value": "וואן פיס",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ون بيس",
-          "match": "fuzzy"
-        },
-        {
-          "value": "วันพีซ",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ワンピース",
-          "match": "fuzzy"
-        },
-        {
-          "value": "海贼王",
           "match": "fuzzy"
         }
       ],
@@ -772,26 +448,6 @@
         },
         {
           "value": "Tokyo Ghoul",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Tokyo Kushu",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Токийский гуль",
-          "match": "fuzzy"
-        },
-        {
-          "value": "שדי טוקיו",
-          "match": "fuzzy"
-        },
-        {
-          "value": "طوكيو غول",
-          "match": "fuzzy"
-        },
-        {
-          "value": "东京食种",
           "match": "fuzzy"
         },
         {
@@ -856,14 +512,6 @@
           "match": "exact"
         },
         {
-          "value": "+מתקפת הטיטאנים עונה 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "AoT 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "Attack on Titan",
           "match": "fuzzy"
         },
@@ -872,35 +520,11 @@
           "match": "fuzzy"
         },
         {
-          "value": "L'Attacco dei Giganti - Seconda Stagione",
-          "match": "fuzzy"
-        },
-        {
-          "value": "L'Attacco dei Giganti 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "Shingeki no Kyojin",
           "match": "fuzzy"
         },
         {
           "value": "Shingeki no Kyojin Season 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "SnK 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Атака титанов 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "حمله به تایتان فصل 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ผ่าพิภพไททัน ภาค 2",
           "match": "fuzzy"
         },
         {
@@ -958,47 +582,11 @@
           "match": "exact"
         },
         {
-          "value": "Full Metal Alchemist: Brotherhood",
-          "match": "fuzzy"
-        },
-        {
           "value": "Fullmetal Alchemist: Brotherhood",
           "match": "fuzzy"
         },
         {
           "value": "Hagane no Renkinjutsushi: FULLMETAL ALCHEMIST",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Hagaren",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Stalowy alchemik: Misja braci",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Сталевий алхімік. Братерство",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Стальной алхимик: Братство",
-          "match": "fuzzy"
-        },
-        {
-          "value": "אלכימאי המתכת: אחוות אחים",
-          "match": "fuzzy"
-        },
-        {
-          "value": "الخيميائي الفولاذي",
-          "match": "fuzzy"
-        },
-        {
-          "value": "แขนกล คนแปรธาตุ: บราเธอร์ฮูด",
-          "match": "fuzzy"
-        },
-        {
-          "value": "钢之炼金术师 FULLMETAL ALCHEMIST",
           "match": "fuzzy"
         },
         {
@@ -1047,26 +635,6 @@
         {
           "value": "NARUTO -ナルト-",
           "match": "fuzzy"
-        },
-        {
-          "value": "Наруто",
-          "match": "fuzzy"
-        },
-        {
-          "value": "נארוטו",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ناروتو",
-          "match": "fuzzy"
-        },
-        {
-          "value": "นารูโตะ นินจาจอมคาถา",
-          "match": "fuzzy"
-        },
-        {
-          "value": "火影忍者",
-          "match": "fuzzy"
         }
       ],
       "tracks": [
@@ -1113,31 +681,11 @@
           "match": "exact"
         },
         {
-          "value": "S.A.O",
-          "match": "fuzzy"
-        },
-        {
           "value": "Sword Art Online",
           "match": "fuzzy"
         },
         {
-          "value": "Мастера меча онлайн",
-          "match": "fuzzy"
-        },
-        {
-          "value": "אומנות החרב אונליין",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ซอร์ดอาร์ตออนไลน์",
-          "match": "fuzzy"
-        },
-        {
           "value": "ソードアート・オンライン",
-          "match": "fuzzy"
-        },
-        {
-          "value": "刀剑神域",
           "match": "fuzzy"
         }
       ],
@@ -1182,63 +730,11 @@
           "match": "exact"
         },
         {
-          "value": "Il tuo nome",
-          "match": "fuzzy"
-        },
-        {
           "value": "Kimi no Na wa.",
           "match": "fuzzy"
         },
         {
-          "value": "Mi a Neved?",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Tên cậu là gì",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Tu nombre",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Tvoje jméno.",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Tvoje meno.",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Twoje imię",
-          "match": "fuzzy"
-        },
-        {
           "value": "Your Name.",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Your Name. - Gestern, heute und für immer",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Твоё имя",
-          "match": "fuzzy"
-        },
-        {
-          "value": "השם שלך.",
-          "match": "fuzzy"
-        },
-        {
-          "value": "หลับตาฝันถึงชื่อเธอ",
-          "match": "fuzzy"
-        },
-        {
-          "value": "너의 이름은.",
-          "match": "fuzzy"
-        },
-        {
-          "value": "你的名字。",
           "match": "fuzzy"
         },
         {
@@ -1291,75 +787,7 @@
           "match": "exact"
         },
         {
-          "value": "A Forma da Voz",
-          "match": "fuzzy"
-        },
-        {
           "value": "A Silent Voice",
-          "match": "fuzzy"
-        },
-        {
-          "value": "A Voz do Silêncio",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Balss forma",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Dáng hình thanh âm",
-          "match": "fuzzy"
-        },
-        {
-          "value": "La Forma della Voce",
-          "match": "fuzzy"
-        },
-        {
-          "value": "La Forme de la voix",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Sakit səs",
-          "match": "fuzzy"
-        },
-        {
-          "value": "The Shape of Voice",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Tylus balsas",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Una voz silenciosa",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Дауыс пішіні",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Форма голоса",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Форма голосу",
-          "match": "fuzzy"
-        },
-        {
-          "value": "צורתו של קול",
-          "match": "fuzzy"
-        },
-        {
-          "value": "الحزن الصامت",
-          "match": "fuzzy"
-        },
-        {
-          "value": "รักไร้เสียง",
-          "match": "fuzzy"
-        },
-        {
-          "value": "声之形",
           "match": "fuzzy"
         },
         {
@@ -1425,10 +853,6 @@
           "match": "exact"
         },
         {
-          "value": "AoT 3",
-          "match": "fuzzy"
-        },
-        {
           "value": "Attack on Titan",
           "match": "fuzzy"
         },
@@ -1437,43 +861,11 @@
           "match": "fuzzy"
         },
         {
-          "value": "L'Attacco dei Giganti - Terza Stagione",
-          "match": "fuzzy"
-        },
-        {
-          "value": "L'Attacco dei Giganti 3",
-          "match": "fuzzy"
-        },
-        {
           "value": "Shingeki no Kyojin",
           "match": "fuzzy"
         },
         {
           "value": "Shingeki no Kyojin Season 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "SnK 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Атака титанов 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "מתקפת הטיטאנים עונה 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "حمله به تایتان فصل 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ผ่าพิภพไททัน ภาค 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ผ่าพิภพไททัน ภาค 3 Part 1",
           "match": "fuzzy"
         },
         {
@@ -1533,15 +925,7 @@
           "match": "exact"
         },
         {
-          "value": "BNHA 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "Boku no Hero Academia 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "MHA 2",
           "match": "fuzzy"
         },
         {
@@ -1553,35 +937,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Моя геройская академия 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "أكاديميتي للأبطال2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "มายฮีโร่ อคาเดเมีย ภาค 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "나의 히어로 아카데미아 2기",
-          "match": "fuzzy"
-        },
-        {
-          "value": "나히아 2기",
-          "match": "fuzzy"
-        },
-        {
           "value": "僕のヒーローアカデミア２",
-          "match": "fuzzy"
-        },
-        {
-          "value": "我的英雄学院 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "我的英雄学院第二季",
           "match": "fuzzy"
         }
       ],
@@ -1631,35 +987,11 @@
           "match": "exact"
         },
         {
-          "value": "AoT 4",
-          "match": "fuzzy"
-        },
-        {
           "value": "Attack on Titan",
           "match": "fuzzy"
         },
         {
           "value": "Attack on Titan Final Season",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Attack on Titan Season 4",
-          "match": "fuzzy"
-        },
-        {
-          "value": "L'Attacco dei Giganti - La Stagione Finale",
-          "match": "fuzzy"
-        },
-        {
-          "value": "L'Attacco dei Giganti 4",
-          "match": "fuzzy"
-        },
-        {
-          "value": "L'Attaque des Titans Saison Finale",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Shingeki no Kyojin 4",
           "match": "fuzzy"
         },
         {
@@ -1671,55 +1003,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "SnK 4",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Атака Титанов: Финал",
-          "match": "fuzzy"
-        },
-        {
-          "value": "מתקפת הטיטאנים העונה האחרונה",
-          "match": "fuzzy"
-        },
-        {
-          "value": "حمله به تایتان فصل 4",
-          "match": "fuzzy"
-        },
-        {
-          "value": "هجوم العملاقة الجزء الأخير",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ผ่าพิภพไททัน",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ผ่าพิภพไททัน Final Season",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ผ่าพิภพไททัน ไฟนอล ซีซั่น",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ผ่าพิภพไททัน ภาค 4",
-          "match": "fuzzy"
-        },
-        {
-          "value": "진격의 거인 더 파이널 시즌",
-          "match": "fuzzy"
-        },
-        {
-          "value": "進撃の巨人 The",
-          "match": "fuzzy"
-        },
-        {
           "value": "進撃の巨人 The Final Season",
-          "match": "fuzzy"
-        },
-        {
-          "value": "進撃の巨人4",
           "match": "fuzzy"
         }
       ],
@@ -1774,31 +1058,11 @@
           "match": "fuzzy"
         },
         {
-          "value": "YakuNeba",
-          "match": "fuzzy"
-        },
-        {
           "value": "Yakusoku no Neverland",
           "match": "fuzzy"
         },
         {
-          "value": "نيفرلاند الموعودة",
-          "match": "fuzzy"
-        },
-        {
-          "value": "พันธสัญญาเนเวอร์แลนด์",
-          "match": "fuzzy"
-        },
-        {
-          "value": "約定的夢幻島",
-          "match": "fuzzy"
-        },
-        {
           "value": "約束のネバーランド",
-          "match": "fuzzy"
-        },
-        {
-          "value": "约定的梦幻岛",
           "match": "fuzzy"
         }
       ],
@@ -1844,22 +1108,6 @@
         },
         {
           "value": "Assassination Classroom",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Klasa skrytobójców",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Lớp học ám sát",
-          "match": "fuzzy"
-        },
-        {
-          "value": "כיתת ההתנקשות",
-          "match": "fuzzy"
-        },
-        {
-          "value": "فصل الاغتيال",
           "match": "fuzzy"
         },
         {
@@ -1914,18 +1162,6 @@
           "match": "fuzzy"
         },
         {
-          "value": "Моб Психо 100",
-          "match": "fuzzy"
-        },
-        {
-          "value": "מוב פסיכו 100",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ม็อบไซโค 100 คนพลังจิต",
-          "match": "fuzzy"
-        },
-        {
           "value": "モブサイコ100",
           "match": "fuzzy"
         }
@@ -1971,27 +1207,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Thợ Săn Quỷ",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Человек-бензопила",
-          "match": "fuzzy"
-        },
-        {
-          "value": "رجل المنشار",
-          "match": "fuzzy"
-        },
-        {
-          "value": "체인소 맨",
-          "match": "fuzzy"
-        },
-        {
           "value": "チェンソーマン",
-          "match": "fuzzy"
-        },
-        {
-          "value": "链锯人",
           "match": "fuzzy"
         }
       ],
@@ -2043,27 +1259,7 @@
           "match": "exact"
         },
         {
-          "value": "Re Zero",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Re: Life in a different world from zero",
-          "match": "fuzzy"
-        },
-        {
           "value": "Re:ZERO -Starting Life in Another World-",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Re:Zero – Bắt đầu lại ở thế giới khác",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Re:Zero — жизнь с нуля в другом мире",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Re:Zero Empezar de cero en un mundo diferente",
           "match": "fuzzy"
         },
         {
@@ -2071,19 +1267,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Re:Zero รีเซทชีวิต ฝ่าวิกฤตต่างโลก",
-          "match": "fuzzy"
-        },
-        {
           "value": "Re:ゼロから始める異世界生活",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Re：从零开始的异世界生活",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ReZero",
           "match": "fuzzy"
         }
       ],
@@ -2132,23 +1316,7 @@
           "match": "exact"
         },
         {
-          "value": "Bugie d'aprile",
-          "match": "fuzzy"
-        },
-        {
-          "value": "KimiUso",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Sekunden in Moll",
-          "match": "fuzzy"
-        },
-        {
           "value": "Shigatsu wa Kimi no Uso",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Tháng Tư Là Lời Nói Dối Của Em",
           "match": "fuzzy"
         },
         {
@@ -2156,19 +1324,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Твоя апрельская ложь",
-          "match": "fuzzy"
-        },
-        {
-          "value": "השקר שלך באפריל",
-          "match": "fuzzy"
-        },
-        {
           "value": "四月は君の嘘",
-          "match": "fuzzy"
-        },
-        {
-          "value": "四月是你的谎言",
           "match": "fuzzy"
         }
       ],
@@ -2222,10 +1378,6 @@
           "match": "exact"
         },
         {
-          "value": "AoT 3",
-          "match": "fuzzy"
-        },
-        {
           "value": "Attack on Titan",
           "match": "fuzzy"
         },
@@ -2234,59 +1386,11 @@
           "match": "fuzzy"
         },
         {
-          "value": "L'Attacco dei Giganti - Terza Stagione Parte 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "L'Attaco dei Giganti 3 Parte 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "L'Attaque des Titans Partie 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "L'Attaque des Titans Saison 3 Partie 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "Shingeki no Kyojin",
           "match": "fuzzy"
         },
         {
-          "value": "Shingeki no Kyojin (2019)",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Shingeki no Kyojin Season 3 (2019)",
-          "match": "fuzzy"
-        },
-        {
           "value": "Shingeki no Kyojin Season 3 Part 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "SnK 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "מתקפת הטיטאנים עונה 3 חלק 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "حمله به تایتان فصل 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ผ่าพิภพไททัน ภาค 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ผ่าพิภพไททัน ภาค 3 Part 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ผ่าพิภพไททัน ภาค 3 พาร์ท 2",
           "match": "fuzzy"
         },
         {
@@ -2339,26 +1443,6 @@
         {
           "value": "NARUTO: Shippuuden",
           "match": "fuzzy"
-        },
-        {
-          "value": "Наруто: Ураганные хроники",
-          "match": "fuzzy"
-        },
-        {
-          "value": "נארוטו שיפודן",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ناروتو شيبودن",
-          "match": "fuzzy"
-        },
-        {
-          "value": "นารูโตะ ตำนานวายุสลาตัน",
-          "match": "fuzzy"
-        },
-        {
-          "value": "火影忍者 疾风传",
-          "match": "fuzzy"
         }
       ],
       "tracks": [],
@@ -2403,27 +1487,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Bokumachi",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Desaparecido",
-          "match": "fuzzy"
-        },
-        {
           "value": "ERASED",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Miasto beze mnie",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ย้อนอดีตไขปริศนา",
-          "match": "fuzzy"
-        },
-        {
-          "value": "รีไววัล ย้อนอดีตไขปริศนา",
           "match": "fuzzy"
         },
         {
@@ -2484,19 +1548,7 @@
           "match": "exact"
         },
         {
-          "value": "3أكاديميتي للأبطال",
-          "match": "fuzzy"
-        },
-        {
-          "value": "BNHA 3",
-          "match": "fuzzy"
-        },
-        {
           "value": "Boku no Hero Academia 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "MHA 3",
           "match": "fuzzy"
         },
         {
@@ -2508,23 +1560,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Моя геройская академия 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "มายฮีโร่ อคาเดเมีย ภาค 3",
-          "match": "fuzzy"
-        },
-        {
           "value": "僕のヒーローアカデミア３",
-          "match": "fuzzy"
-        },
-        {
-          "value": "我的英雄学院 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "我的英雄学院第三季",
           "match": "fuzzy"
         }
       ],
@@ -2562,27 +1598,11 @@
       ],
       "answerAliases": [
         {
-          "value": "S;G",
-          "match": "fuzzy"
-        },
-        {
           "value": "Steins;Gate",
           "match": "fuzzy"
         },
         {
-          "value": "Врата;Штейна",
-          "match": "fuzzy"
-        },
-        {
-          "value": "סטיינס;גייט",
-          "match": "fuzzy"
-        },
-        {
           "value": "シュタインズ・ゲート",
-          "match": "fuzzy"
-        },
-        {
-          "value": "命运石之门",
           "match": "fuzzy"
         }
       ],
@@ -2618,15 +1638,7 @@
       ],
       "answerAliases": [
         {
-          "value": "HAIKYÛ !!",
-          "match": "fuzzy"
-        },
-        {
           "value": "HAIKYU!!",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Haikyu!! L'asso del volley",
           "match": "fuzzy"
         },
         {
@@ -2634,19 +1646,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "High Kyuu!!",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ไฮคิว!! คู่ตบฟ้าประทาน",
-          "match": "fuzzy"
-        },
-        {
           "value": "ハイキュー!!",
-          "match": "fuzzy"
-        },
-        {
-          "value": "排球少年！！",
           "match": "fuzzy"
         }
       ],
@@ -2685,18 +1685,6 @@
         {
           "value": "black clover",
           "match": "exact"
-        },
-        {
-          "value": "Чёрный клевер",
-          "match": "fuzzy"
-        },
-        {
-          "value": "תלתן שחור",
-          "match": "fuzzy"
-        },
-        {
-          "value": "แบล็กโคลเวอร์",
-          "match": "fuzzy"
         },
         {
           "value": "ブラッククローバー",
@@ -2738,10 +1726,6 @@
       ],
       "answerAliases": [
         {
-          "value": "AoButa",
-          "match": "fuzzy"
-        },
-        {
           "value": "Rascal Does Not Dream of Bunny Girl Senpai",
           "match": "fuzzy"
         },
@@ -2750,27 +1734,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Негодник, которому не снилась девушка-кролик",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Этот глупый свин не понимает мечту девочки-зайки",
-          "match": "fuzzy"
-        },
-        {
-          "value": "เรื่องฝันปั่นป่วยของผมกับรุ่นพี่บันนี่เกิร์ล",
-          "match": "fuzzy"
-        },
-        {
-          "value": "青ブタ",
-          "match": "fuzzy"
-        },
-        {
           "value": "青春ブタ野郎はバニーガール先輩の夢を見ない",
-          "match": "fuzzy"
-        },
-        {
-          "value": "青春猪头少年不会梦到兔女郎学姐",
           "match": "fuzzy"
         }
       ],
@@ -2811,31 +1775,11 @@
           "match": "exact"
         },
         {
-          "value": "Gia Đình Điệp Viên",
-          "match": "fuzzy"
-        },
-        {
           "value": "SPY x FAMILY",
           "match": "fuzzy"
         },
         {
           "value": "SPY×FAMILY",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Семья шпиона",
-          "match": "fuzzy"
-        },
-        {
-          "value": "سباي إكس فاميلي",
-          "match": "fuzzy"
-        },
-        {
-          "value": "스파이 패밀리",
-          "match": "fuzzy"
-        },
-        {
-          "value": "间谍过家家",
           "match": "fuzzy"
         }
       ],
@@ -2876,27 +1820,7 @@
           "match": "exact"
         },
         {
-          "value": "Cuộc Chiến Tỏ Tình",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Kaguya Wants to be Confessed To: The Geniuses' War of Love and Brains",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Kaguya-sama : L'Amour est une guerre",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Kaguya-sama wa Kokurasetai: Tensai-tachi no Renai Zunousen",
-          "match": "fuzzy"
-        },
-        {
           "value": "Kaguya-sama wa Kokurasetai: Tensaitachi no Renai Zunousen",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Kaguya-sama: Cuộc Chiến Tỏ Tình",
           "match": "fuzzy"
         },
         {
@@ -2904,35 +1828,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Госпожа Кагуя: В любви как на войне",
-          "match": "fuzzy"
-        },
-        {
-          "value": "קאגויה סאמה",
-          "match": "fuzzy"
-        },
-        {
-          "value": "สารภาพรักกับคุณคางุยะซะดีๆ ~สงครามประสาทความรักของเหล่าอัจฉริยะ~",
-          "match": "fuzzy"
-        },
-        {
           "value": "かぐや様は告らせたい～天才たちの恋愛頭脳戦～",
-          "match": "fuzzy"
-        },
-        {
-          "value": "辉告",
-          "match": "fuzzy"
-        },
-        {
-          "value": "辉夜大小姐想让我告白～天才们的恋爱头脑战～",
-          "match": "fuzzy"
-        },
-        {
-          "value": "辉夜姬想让人告白",
-          "match": "fuzzy"
-        },
-        {
-          "value": "辉夜姬想让人告白～天才们的恋爱头脑战～",
           "match": "fuzzy"
         }
       ],
@@ -2971,26 +1867,6 @@
         {
           "value": "dr stone",
           "match": "exact"
-        },
-        {
-          "value": "Dcst",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Доктор Стоун",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ดร.สโตน เจ้าแห่งวิทยาศาสตร์กู้คืนอารยธรรมโลก",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ドクターストーン",
-          "match": "fuzzy"
-        },
-        {
-          "value": "石纪元",
-          "match": "fuzzy"
         }
       ],
       "tracks": [],
@@ -3034,19 +1910,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "ויולט אברגרדן",
-          "match": "fuzzy"
-        },
-        {
-          "value": "فيوليت",
-          "match": "fuzzy"
-        },
-        {
           "value": "ヴァイオレット・エヴァーガーデン",
-          "match": "fuzzy"
-        },
-        {
-          "value": "紫罗兰永恒花园",
           "match": "fuzzy"
         }
       ],
@@ -3087,39 +1951,11 @@
           "match": "exact"
         },
         {
-          "value": "NO GAME NO LIFE 遊戲人生",
-          "match": "fuzzy"
-        },
-        {
-          "value": "NO GAME NO LIFE游戏人生",
-          "match": "fuzzy"
-        },
-        {
           "value": "No Game, No Life",
           "match": "fuzzy"
         },
         {
-          "value": "nogenora",
-          "match": "fuzzy"
-        },
-        {
-          "value": "โนเกม โนไลฟ์",
-          "match": "fuzzy"
-        },
-        {
           "value": "ノーゲーム・ノーライフ",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ノゲノラ",
-          "match": "fuzzy"
-        },
-        {
-          "value": "游戏人生",
-          "match": "fuzzy"
-        },
-        {
-          "value": "遊戲人生",
           "match": "fuzzy"
         }
       ],
@@ -3156,31 +1992,11 @@
       ],
       "answerAliases": [
         {
-          "value": "Tiger X Dragon",
-          "match": "fuzzy"
-        },
-        {
           "value": "Toradora!",
           "match": "fuzzy"
         },
         {
-          "value": "Τίγρης και Δράκος",
-          "match": "fuzzy"
-        },
-        {
-          "value": "النمر والتنين",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ยัยเสือใสกับนายหน้าโหด",
-          "match": "fuzzy"
-        },
-        {
           "value": "とらドラ！",
-          "match": "fuzzy"
-        },
-        {
-          "value": "龙与虎",
           "match": "fuzzy"
         }
       ],
@@ -3221,23 +2037,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Stray God",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Бездомный бог",
-          "match": "fuzzy"
-        },
-        {
-          "value": "โนรางามิ เทวดาขาจร ภาค 1",
-          "match": "fuzzy"
-        },
-        {
           "value": "ノラガミ",
-          "match": "fuzzy"
-        },
-        {
-          "value": "野良神",
           "match": "fuzzy"
         }
       ],
@@ -3275,22 +2075,6 @@
       "answerAliases": [
         {
           "value": "Vinland Saga",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Сага о Винланде",
-          "match": "fuzzy"
-        },
-        {
-          "value": "סאגת וינלנד",
-          "match": "fuzzy"
-        },
-        {
-          "value": "فينلاند ساغا",
-          "match": "fuzzy"
-        },
-        {
-          "value": "สงครามคนทมิฬ",
           "match": "fuzzy"
         },
         {
@@ -3342,23 +2126,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Akame ga Kiru!",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Red Eyes Sword",
-          "match": "fuzzy"
-        },
-        {
-          "value": "أكامي: قاتلة بالإكراه!",
-          "match": "fuzzy"
-        },
-        {
           "value": "アカメが斬る！",
-          "match": "fuzzy"
-        },
-        {
-          "value": "斬！赤紅之瞳",
           "match": "fuzzy"
         }
       ],
@@ -3398,19 +2166,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Хоримия",
-          "match": "fuzzy"
-        },
-        {
-          "value": "โฮริมิยะ สาวมั่นกับนายมืดมน",
-          "match": "fuzzy"
-        },
-        {
           "value": "ホリミヤ",
-          "match": "fuzzy"
-        },
-        {
-          "value": "堀与宫村",
           "match": "fuzzy"
         }
       ],
@@ -3464,15 +2220,7 @@
           "match": "exact"
         },
         {
-          "value": "BNHA 4",
-          "match": "fuzzy"
-        },
-        {
           "value": "Boku no Hero Academia 4",
-          "match": "fuzzy"
-        },
-        {
-          "value": "MHA 4",
           "match": "fuzzy"
         },
         {
@@ -3484,27 +2232,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Моя геройская академия 4",
-          "match": "fuzzy"
-        },
-        {
-          "value": "أكاديميتي للأبطال",
-          "match": "fuzzy"
-        },
-        {
-          "value": "มายฮีโร่ อคาเดเมีย ภาค 4",
-          "match": "fuzzy"
-        },
-        {
           "value": "僕のヒーローアカデミア４",
-          "match": "fuzzy"
-        },
-        {
-          "value": "我的英雄学院 4",
-          "match": "fuzzy"
-        },
-        {
-          "value": "我的英雄学院第四季",
           "match": "fuzzy"
         }
       ],
@@ -3551,10 +2279,6 @@
           "match": "exact"
         },
         {
-          "value": "7DS",
-          "match": "fuzzy"
-        },
-        {
           "value": "Nanatsu no Taizai",
           "match": "fuzzy"
         },
@@ -3563,19 +2287,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Семь смертных грехов",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ศึกตำนาน 7 อัศวิน",
-          "match": "fuzzy"
-        },
-        {
           "value": "七つの大罪",
-          "match": "fuzzy"
-        },
-        {
-          "value": "七大罪",
           "match": "fuzzy"
         }
       ],
@@ -3628,47 +2340,11 @@
           "match": "fuzzy"
         },
         {
-          "value": "Kono Subarashii Sekai ni Syukufuku wo!",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Konosuba",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Konosuba - As Bençãos de Deus Neste Mundo Maravilhoso",
-          "match": "fuzzy"
-        },
-        {
           "value": "KONOSUBA -God's blessing on this wonderful world!",
           "match": "fuzzy"
         },
         {
-          "value": "Konosuba : Sois béni monde merveilleux !",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Konosuba: ¡Bendito sea este maravilloso mundo!",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Konosuba: Un mundo maravilloso!",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Да благословят боги сей расчудесный мир!",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ขอให้โชคดีมีชัยในโลกแฟนตาซี!",
-          "match": "fuzzy"
-        },
-        {
           "value": "この素晴らしい世界に祝福を！",
-          "match": "fuzzy"
-        },
-        {
-          "value": "为美好的世界献上祝福！",
           "match": "fuzzy"
         }
       ],
@@ -3704,27 +2380,7 @@
       ],
       "answerAliases": [
         {
-          "value": "'בליץ",
-          "match": "fuzzy"
-        },
-        {
           "value": "Bleach",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Блич",
-          "match": "fuzzy"
-        },
-        {
-          "value": "بليتش",
-          "match": "fuzzy"
-        },
-        {
-          "value": "เทพมรณะ",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ブリーチ",
           "match": "fuzzy"
         }
       ],
@@ -3779,63 +2435,11 @@
           "match": "fuzzy"
         },
         {
-          "value": "Demon Slayer: Il Treno Mugen",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Demon Slayer: Kimetsu no Yaiba - Le film : Le train de l'Infini",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Demon Slayer: Mugen Treni",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Els Guardians de la Nit: El Tren Infinit",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Guardianes de la Noche: Tren Infinito",
-          "match": "fuzzy"
-        },
-        {
           "value": "Kimetsu no Yaiba: Mugen Ressha-hen",
           "match": "fuzzy"
         },
         {
-          "value": "KnY",
-          "match": "fuzzy"
-        },
-        {
-          "value": "KnY Movie",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ΚΥΝΗΓΟΣ ΔΑΙΜΟΝΩΝ: KIMETSU NO YAIBA – Η ΤΑΙΝΙΑ: ΤΟ ΤΡΕΝΟ ΜΟΥΓΚΕΝ",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Клинок, Рассекающий Демонов: Бесконечный Поезд",
-          "match": "fuzzy"
-        },
-        {
-          "value": "قاتل الشياطين الفيلم: قطار اللانهاية",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ดาบพิฆาตอสูร เดอะมูฟวี่ : ศึกรถไฟสู่นิรันดร์",
-          "match": "fuzzy"
-        },
-        {
-          "value": "극장판 귀멸의 칼날: 무한열차편",
-          "match": "fuzzy"
-        },
-        {
           "value": "鬼滅の刃 無限列車編",
-          "match": "fuzzy"
-        },
-        {
-          "value": "鬼灭之刃：无限列车篇",
           "match": "fuzzy"
         }
       ],
@@ -3881,27 +2485,11 @@
           "match": "exact"
         },
         {
-          "value": "Kiseiju - L'ospite indesiderato",
-          "match": "fuzzy"
-        },
-        {
           "value": "Kiseijuu: Sei no Kakuritsu",
           "match": "fuzzy"
         },
         {
-          "value": "Parasite : La Maxime",
-          "match": "fuzzy"
-        },
-        {
           "value": "Parasyte -the maxim-",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Pasożyt",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Паразит: Учение о жизни",
           "match": "fuzzy"
         },
         {
@@ -3948,15 +2536,7 @@
           "match": "exact"
         },
         {
-          "value": "DarliFra",
-          "match": "fuzzy"
-        },
-        {
           "value": "DARLING in the FRANXX",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Любимый во Франксе",
           "match": "fuzzy"
         },
         {
@@ -4014,15 +2594,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Code Geass: Lelouch de la Rebelión",
-          "match": "fuzzy"
-        },
-        {
           "value": "Code Geass: Lelouch of the Rebellion",
-          "match": "fuzzy"
-        },
-        {
-          "value": "קוד גיאס: המהפכה של ללוש",
           "match": "fuzzy"
         },
         {
@@ -4073,27 +2645,11 @@
           "match": "exact"
         },
         {
-          "value": "Eva",
-          "match": "fuzzy"
-        },
-        {
           "value": "Neon Genesis Evangelion",
           "match": "fuzzy"
         },
         {
           "value": "Shin Seiki Evangelion",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Евангелион",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ניאון ג'נסיס אוונגליון",
-          "match": "fuzzy"
-        },
-        {
-          "value": "อีวานเกเลียน มหาสงครามวันพิพากษา",
           "match": "fuzzy"
         },
         {
@@ -4146,22 +2702,6 @@
           "match": "fuzzy"
         },
         {
-          "value": "Пламенный отряд",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Полум'яні вогнеборці",
-          "match": "fuzzy"
-        },
-        {
-          "value": "כוח האש",
-          "match": "fuzzy"
-        },
-        {
-          "value": "หน่วยผจญคนไฟลุก",
-          "match": "fuzzy"
-        },
-        {
           "value": "炎炎ノ消防隊",
           "match": "fuzzy"
         }
@@ -4211,14 +2751,6 @@
           "match": "exact"
         },
         {
-          "value": "2جوجوتسو كايسن",
-          "match": "fuzzy"
-        },
-        {
-          "value": "JJK2",
-          "match": "fuzzy"
-        },
-        {
           "value": "JUJUTSU KAISEN",
           "match": "fuzzy"
         },
@@ -4231,35 +2763,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Jujutsu Kaisen: Hidden Inventory / Premature Death",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Jujutsu Kaisen: Kaigyoku Gyokusetsu / Shibuya Jihen",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Jujutsu Kaisen: Shibuya Incident",
-          "match": "fuzzy"
-        },
-        {
-          "value": "มหาเวทย์ผนึกมาร ภาค 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "呪術廻戦 懐玉・玉折／渋谷事変",
-          "match": "fuzzy"
-        },
-        {
           "value": "呪術廻戦 第2期",
-          "match": "fuzzy"
-        },
-        {
-          "value": "咒术回战 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "咒術迴戰  第二季",
           "match": "fuzzy"
         }
       ],
@@ -4301,54 +2805,6 @@
           "match": "exact"
         },
         {
-          "value": "A Viagem de Chihiro",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Călătoria lui Chihiro",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Chihiro ilmmiid gaskkas",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Chihiro og álögin",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Chihiro og heksene",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Chihiro Szellemországban",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Chihiros Reise ins Zauberland",
-          "match": "fuzzy"
-        },
-        {
-          "value": "El Viaje de Chihiro",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Henkien kätkemä",
-          "match": "fuzzy"
-        },
-        {
-          "value": "La Città Incantata",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Le Voyage de Chihiro",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Ruhların Kaçışı",
-          "match": "fuzzy"
-        },
-        {
           "value": "Sen to Chihiro no Kamikakushi",
           "match": "fuzzy"
         },
@@ -4357,35 +2813,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Spirited Away: W krainie bogów",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Vaimudest viidud",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Ταξίδι στην Χώρα των Θαυμάτων",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Унесённые призраками",
-          "match": "fuzzy"
-        },
-        {
-          "value": "המסע המופלא",
-          "match": "fuzzy"
-        },
-        {
-          "value": "มิติวิญญาณมหัศจรรย์",
-          "match": "fuzzy"
-        },
-        {
           "value": "千と千尋の神隠し",
-          "match": "fuzzy"
-        },
-        {
-          "value": "千与千寻",
           "match": "fuzzy"
         }
       ],
@@ -4435,35 +2863,11 @@
           "match": "exact"
         },
         {
-          "value": "Demon Slayer: Kimetsu no Yaiba - Le quartier des plaisirs",
-          "match": "fuzzy"
-        },
-        {
           "value": "Demon Slayer: Kimetsu no Yaiba Entertainment District Arc",
           "match": "fuzzy"
         },
         {
           "value": "Kimetsu no Yaiba: Yuukaku-hen",
-          "match": "fuzzy"
-        },
-        {
-          "value": "KnY 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Miecz zabójcy demonów – Kimetsu no Yaiba: Dzielnica uciech",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Клинок, Рассекающий Демонов: Квартал Красных Фонарей",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ดาบพิฆาตอสูร ภาค 2 บทย่านเริงรมย์",
-          "match": "fuzzy"
-        },
-        {
-          "value": "귀멸의 칼날: 환락의 거리편",
           "match": "fuzzy"
         },
         {
@@ -4511,23 +2915,11 @@
           "match": "exact"
         },
         {
-          "value": "JJBA",
-          "match": "fuzzy"
-        },
-        {
           "value": "JoJo no Kimyou na Bouken ()",
           "match": "fuzzy"
         },
         {
-          "value": "JoJo no Kimyou na Bouken (2012)",
-          "match": "fuzzy"
-        },
-        {
           "value": "JoJo no Kimyou na Bouken (TV)",
-          "match": "fuzzy"
-        },
-        {
-          "value": "JoJo no Kimyou na Bouken: Sentou Chouryuu",
           "match": "fuzzy"
         },
         {
@@ -4536,58 +2928,6 @@
         },
         {
           "value": "JoJo's Bizarre Adventure (TV)",
-          "match": "fuzzy"
-        },
-        {
-          "value": "JoJo's Bizarre Adventure: Battle Tendency",
-          "match": "fuzzy"
-        },
-        {
-          "value": "JoJo's Bizarre Adventure: Phantom Blood",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Le bizzarre avventure di JoJo (2012)",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Le bizzarre avventure di JoJo: Battle Tendency",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Le bizzarre avventure di JoJo: Phantom Blood",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Невероятные приключения ДжоДжо: Призрачная кровь",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Невероятные приключения ДжоДжо: Стремление к бою",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Химерні пригоди ДжоДжо: Примарна кров",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Химерні пригоди ДжоДжо: Тяжіння до бою",
-          "match": "fuzzy"
-        },
-        {
-          "value": "مغامرات جوجو العجيبة",
-          "match": "fuzzy"
-        },
-        {
-          "value": "مغامرات جوجو العجيبة:الدماء الوهمية",
-          "match": "fuzzy"
-        },
-        {
-          "value": "مغامرات جوجو العجيبة:حمى القتال",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ジョジョの奇妙な冒険 ()",
           "match": "fuzzy"
         },
         {
@@ -4630,10 +2970,6 @@
       "answerAliases": [
         {
           "value": "Death Parade",
-          "match": "fuzzy"
-        },
-        {
-          "value": "תהלוכת המוות",
           "match": "fuzzy"
         },
         {
@@ -4690,10 +3026,6 @@
           "match": "exact"
         },
         {
-          "value": "Jagoan Sekali Pukul S2",
-          "match": "fuzzy"
-        },
-        {
           "value": "One Punch Man 2",
           "match": "fuzzy"
         },
@@ -4702,39 +3034,11 @@
           "match": "fuzzy"
         },
         {
-          "value": "One-Punch Man Phần 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "One-Punch Man Season 2",
           "match": "fuzzy"
         },
         {
-          "value": "Wanpanman 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "رجل اللكمة الواحدة 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "مرد تک مشتی",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ون بنش مان 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "วันพันช์แมน ภาคที่ 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "ワンパンマン 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "一拳超人 第二季",
           "match": "fuzzy"
         }
       ],
@@ -4773,30 +3077,6 @@
       "answerAliases": [
         {
           "value": "Cowboy Bebop",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Kowboj Bebop",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Καουμπόηδες του Διαστήματος",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Ковбой Бибоп",
-          "match": "fuzzy"
-        },
-        {
-          "value": "קאובוי ביבופ",
-          "match": "fuzzy"
-        },
-        {
-          "value": "คาวบอย บีบ๊อป",
-          "match": "fuzzy"
-        },
-        {
-          "value": "카우보이 비밥",
           "match": "fuzzy"
         },
         {
@@ -4845,75 +3125,11 @@
           "match": "exact"
         },
         {
-          "value": "Frieren - Oltre la Fine del Viaggio",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Frieren - Pháp sư tiễn táng",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Frieren – Nach dem Ende der Reise",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Frieren at the Funeral",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Frieren e a Jornada para o Além",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Frieren en el funeral",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Frieren: Beyond Journey’s End",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Frieren: Más allá del final del viaje",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Frieren: Tras finalizar el viaje",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Frieren. U kresu drogi",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Sōsō no Furīren",
-          "match": "fuzzy"
-        },
-        {
           "value": "Sousou no Frieren",
           "match": "fuzzy"
         },
         {
-          "value": "Фрирен, провожающая в последний путь",
-          "match": "fuzzy"
-        },
-        {
-          "value": "فريرن: ما وراء نهاية الرحلة",
-          "match": "fuzzy"
-        },
-        {
-          "value": "คำอธิษฐานในวันที่จากลา Frieren",
-          "match": "fuzzy"
-        },
-        {
-          "value": "장송의 프리렌",
-          "match": "fuzzy"
-        },
-        {
           "value": "葬送のフリーレン",
-          "match": "fuzzy"
-        },
-        {
-          "value": "葬送的芙莉蓮",
           "match": "fuzzy"
         }
       ],
@@ -4957,19 +3173,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Ao no Futsumashi",
-          "match": "fuzzy"
-        },
-        {
           "value": "Blue Exorcist",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Ο Γαλάζιος Εξορκιστής",
-          "match": "fuzzy"
-        },
-        {
-          "value": "اللهب الأزرق",
           "match": "fuzzy"
         },
         {
@@ -5025,19 +3229,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Восхождение героя щита",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ผู้กล้าโล่ผงาด",
-          "match": "fuzzy"
-        },
-        {
           "value": "盾の勇者の成り上がり",
-          "match": "fuzzy"
-        },
-        {
-          "value": "盾之勇者成名录",
           "match": "fuzzy"
         }
       ],
@@ -5073,27 +3265,7 @@
       ],
       "answerAliases": [
         {
-          "value": "Gambling School",
-          "match": "fuzzy"
-        },
-        {
           "value": "Kakegurui",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Kakegurui - Compulsive Gambler",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Kakegurui: Das Leben ist ein Spiel",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Безумный Азарт",
-          "match": "fuzzy"
-        },
-        {
-          "value": "โคตรเซียนโรงเรียนพนัน",
           "match": "fuzzy"
         },
         {
@@ -5142,59 +3314,11 @@
           "match": "exact"
         },
         {
-          "value": "Bereinkarnasi Malah Menjadi Slime",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Lúc đó tôi đã chuyển sinh thành Slime",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Meine Wiedergeburt als Schleim in einer anderen Welt",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Moi, quand je me réincarne en Slime",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Odrodzony jako galareta",
-          "match": "fuzzy"
-        },
-        {
           "value": "Tensei Shitara Slime Datta Ken",
           "match": "fuzzy"
         },
         {
-          "value": "TenSura",
-          "match": "fuzzy"
-        },
-        {
           "value": "That Time I Got Reincarnated as a Slime",
-          "match": "fuzzy"
-        },
-        {
-          "value": "TTIGRAAS",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Vita da Slime",
-          "match": "fuzzy"
-        },
-        {
-          "value": "О моём перерождении в слизь",
-          "match": "fuzzy"
-        },
-        {
-          "value": "เกิดใหม่ทั้งทีก็เป็นสไลม์ไปซะแล้ว",
-          "match": "fuzzy"
-        },
-        {
-          "value": "关于我转生变成史莱姆这档事",
-          "match": "fuzzy"
-        },
-        {
-          "value": "転スラ",
           "match": "fuzzy"
         },
         {
@@ -5243,19 +3367,7 @@
           "match": "exact"
         },
         {
-          "value": "GGO",
-          "match": "fuzzy"
-        },
-        {
-          "value": "SAO2",
-          "match": "fuzzy"
-        },
-        {
           "value": "Sword Art Online II",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ซอร์ดอาร์ตออนไลน์ ภาค 2",
           "match": "fuzzy"
         },
         {
@@ -5304,18 +3416,6 @@
         },
         {
           "value": "Mob Psycho 100 II",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Mob Psycho Hyaku",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Моб Психо 100 II",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ม็อบไซโค 100 คนพลังจิต ภาค 2",
           "match": "fuzzy"
         },
         {
@@ -5368,27 +3468,11 @@
           "match": "exact"
         },
         {
-          "value": "Jobless Reincarnation: I Will Seriously Try If I Go To Another World",
-          "match": "fuzzy"
-        },
-        {
           "value": "Mushoku Tensei: Isekai Ittara Honki Dasu",
           "match": "fuzzy"
         },
         {
           "value": "Mushoku Tensei: Jobless Reincarnation",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Thất nghiệp chuyển sinh",
-          "match": "fuzzy"
-        },
-        {
-          "value": "เกิดชาตินี้พี่ต้องเทพ",
-          "match": "fuzzy"
-        },
-        {
-          "value": "无职转生 ~到了异世界就拿出真本事~",
           "match": "fuzzy"
         },
         {
@@ -5437,31 +3521,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Токийские мстители",
-          "match": "fuzzy"
-        },
-        {
-          "value": "נוקמי טוקיו",
-          "match": "fuzzy"
-        },
-        {
-          "value": "โตเกียวรีเวนเจอร์ส",
-          "match": "fuzzy"
-        },
-        {
-          "value": "โตเกียว卍รีเวนเจอร์ส",
-          "match": "fuzzy"
-        },
-        {
-          "value": "东京复仇者",
-          "match": "fuzzy"
-        },
-        {
           "value": "東京リベンジャーズ",
-          "match": "fuzzy"
-        },
-        {
-          "value": "重生之道",
           "match": "fuzzy"
         }
       ],
@@ -5500,22 +3560,6 @@
         {
           "value": "Angel Beats!",
           "match": "fuzzy"
-        },
-        {
-          "value": "Ангельские ритмы",
-          "match": "fuzzy"
-        },
-        {
-          "value": "פעימות מלאך",
-          "match": "fuzzy"
-        },
-        {
-          "value": "الملاك الوحش",
-          "match": "fuzzy"
-        },
-        {
-          "value": "エンジェルビーツ",
-          "match": "fuzzy"
         }
       ],
       "tracks": [],
@@ -5553,23 +3597,7 @@
           "match": "exact"
         },
         {
-          "value": "Chào mừng đến với lớp học đề cao thực lực",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Chào mừng tới lớp học biết tuốt",
-          "match": "fuzzy"
-        },
-        {
           "value": "Classroom of the Elite",
-          "match": "fuzzy"
-        },
-        {
-          "value": "You-Zitsu",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Youjitsu",
           "match": "fuzzy"
         },
         {
@@ -5577,23 +3605,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Добро пожаловать в класс для особо одарённых",
-          "match": "fuzzy"
-        },
-        {
-          "value": "فصل النخبة",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ขอต้อนรับสู่ห้องเรียนนิยม (เฉพาะ) ยอดคน",
-          "match": "fuzzy"
-        },
-        {
           "value": "ようこそ実力至上主義の教室へ",
-          "match": "fuzzy"
-        },
-        {
-          "value": "歡迎來到實力至上主義的教室",
           "match": "fuzzy"
         }
       ],
@@ -5640,10 +3652,6 @@
           "match": "exact"
         },
         {
-          "value": "AoT 4",
-          "match": "fuzzy"
-        },
-        {
           "value": "Attack on Titan",
           "match": "fuzzy"
         },
@@ -5652,63 +3660,11 @@
           "match": "fuzzy"
         },
         {
-          "value": "L'Attacco dei Giganti 4 Parte 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "L'attaque des titans Saison Finale Partie 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "Shingeki no Kyojin: The",
           "match": "fuzzy"
         },
         {
-          "value": "Shingeki no Kyojin: The (2022)",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Shingeki no Kyojin: The Final Season (2022)",
-          "match": "fuzzy"
-        },
-        {
           "value": "Shingeki no Kyojin: The Final Season Part 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "SnK 4",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Атака титанов: Финал. Часть 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "اتک عن تایتان",
-          "match": "fuzzy"
-        },
-        {
-          "value": "حمله به تایتان فصل 4",
-          "match": "fuzzy"
-        },
-        {
-          "value": "حمله به غول ها",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ผ่าพิภพไททัน ไฟนอล ซีซั่น",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ผ่าพิภพไททัน ไฟนอล ซีซั่น Part 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ผ่าพิภพไททัน ภาค 4",
-          "match": "fuzzy"
-        },
-        {
-          "value": "進撃の巨人 The",
           "match": "fuzzy"
         },
         {
@@ -5754,23 +3710,7 @@
           "match": "exact"
         },
         {
-          "value": "Kaguya-sama wa Kokurasetai: Tensai-tachi no Renai Zunousen 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Kaguya-sama wa Kokurasetai?: Tensai-tachi no Renai Zunousen",
-          "match": "fuzzy"
-        },
-        {
           "value": "Kaguya-sama wa Kokurasetai?: Tensaitachi no Renai Zunousen",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Kaguya-sama: Cuộc Chiến Tỏ Tình (Phần 2)",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Kaguya-sama: Love is War Season 2",
           "match": "fuzzy"
         },
         {
@@ -5778,23 +3718,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Госпожа Кагуя: в любви как на войне. 2 сезон",
-          "match": "fuzzy"
-        },
-        {
-          "value": "สารภาพรักกับคุณคางุยะซะดีๆ ~สงครามประสาทความรักของเหล่าอัจฉริยะ~ ภาค 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "かぐや様は告らせたい？～天才たちの恋愛頭脳戦～",
-          "match": "fuzzy"
-        },
-        {
-          "value": "辉夜大小姐想让我告白～天才们的恋爱头脑战～ 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "辉夜大小姐想让我告白～天才们的恋爱头脑战～第二季",
           "match": "fuzzy"
         }
       ],
@@ -5838,23 +3762,11 @@
           "match": "exact"
         },
         {
-          "value": "Na Honjaman Level Up",
-          "match": "fuzzy"
-        },
-        {
           "value": "Ore dake Level Up na Ken",
           "match": "fuzzy"
         },
         {
           "value": "Solo Leveling",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Solo Leveling: Поднятие уровня в одиночку",
-          "match": "fuzzy"
-        },
-        {
-          "value": "나 혼자만 레벨업",
           "match": "fuzzy"
         },
         {
@@ -5951,15 +3863,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "יומן העתיד",
-          "match": "fuzzy"
-        },
-        {
           "value": "未来日記",
-          "match": "fuzzy"
-        },
-        {
-          "value": "未来日记",
           "match": "fuzzy"
         }
       ],
@@ -5998,39 +3902,11 @@
           "match": "exact"
         },
         {
-          "value": "JJK 0",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Jujutsu Kaisen",
-          "match": "fuzzy"
-        },
-        {
           "value": "JUJUTSU KAISEN 0",
           "match": "fuzzy"
         },
         {
-          "value": "Jujutsu Kaisen Movie",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Магическая битва 0",
-          "match": "fuzzy"
-        },
-        {
-          "value": "‎جوجوتسو كايسن 0",
-          "match": "fuzzy"
-        },
-        {
-          "value": "มหาเวทย์ผนึกมาร : ซีโร่",
-          "match": "fuzzy"
-        },
-        {
           "value": "呪術廻戦 0",
-          "match": "fuzzy"
-        },
-        {
-          "value": "咒术回战0",
           "match": "fuzzy"
         }
       ],
@@ -6079,18 +3955,6 @@
           "match": "fuzzy"
         },
         {
-          "value": "Văn hào lưu lạc",
-          "match": "fuzzy"
-        },
-        {
-          "value": "כלבי ספרות נודדים",
-          "match": "fuzzy"
-        },
-        {
-          "value": "คณะประพันธกรจรจัด",
-          "match": "fuzzy"
-        },
-        {
           "value": "文豪ストレイドッグス",
           "match": "fuzzy"
         }
@@ -6132,27 +3996,7 @@
           "match": "exact"
         },
         {
-          "value": "kisekoi",
-          "match": "fuzzy"
-        },
-        {
           "value": "My Dress-Up Darling",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Nàng Búp Bê Thử Đồ Biết Yêu",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Oyuncak Bebek Sevgilim",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Projekt: cosplay",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Si Boneka Rias Sedang Jatuh Cinta",
           "match": "fuzzy"
         },
         {
@@ -6160,27 +4004,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Sono Kisekae Ningyou wa Koi wo suru",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Любовь с иголочки",
-          "match": "fuzzy"
-        },
-        {
-          "value": "หนุ่มเย็บผ้ากับสาวนักคอสเพลย์",
-          "match": "fuzzy"
-        },
-        {
-          "value": "その着せ替え人形（ビスク・ドール）は恋をする",
-          "match": "fuzzy"
-        },
-        {
           "value": "その着せ替え人形は恋をする",
-          "match": "fuzzy"
-        },
-        {
-          "value": "着せ恋",
           "match": "fuzzy"
         }
       ],
@@ -6221,10 +4045,6 @@
         },
         {
           "value": "Kill la Kill",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Kiru Ra Kiru",
           "match": "fuzzy"
         },
         {
@@ -6281,15 +4101,7 @@
           "match": "exact"
         },
         {
-          "value": "BNHA 5",
-          "match": "fuzzy"
-        },
-        {
           "value": "Boku no Hero Academia 5",
-          "match": "fuzzy"
-        },
-        {
-          "value": "MHA 5",
           "match": "fuzzy"
         },
         {
@@ -6301,27 +4113,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Моя геройская академия 5",
-          "match": "fuzzy"
-        },
-        {
-          "value": "أكاديميتي للأبطال",
-          "match": "fuzzy"
-        },
-        {
-          "value": "มายฮีโร่ อคาเดเมีย ภาค 5",
-          "match": "fuzzy"
-        },
-        {
           "value": "僕のヒーローアカデミア５",
-          "match": "fuzzy"
-        },
-        {
-          "value": "我的英雄学院 5",
-          "match": "fuzzy"
-        },
-        {
-          "value": "我的英雄学院第五季",
           "match": "fuzzy"
         }
       ],
@@ -6359,18 +4151,6 @@
         "popular"
       ],
       "answerAliases": [
-        {
-          "value": "Tokyo Ghoul √A",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Tokyo Ghoul Root A",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Tokyo Kushu 2",
-          "match": "fuzzy"
-        },
         {
           "value": "東京喰種[トーキョーグール]√A",
           "match": "fuzzy"
@@ -6419,27 +4199,7 @@
           "match": "exact"
         },
         {
-          "value": "Đến từ Abyss",
-          "match": "fuzzy"
-        },
-        {
           "value": "Made in Abyss",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Созданный в Бездне",
-          "match": "fuzzy"
-        },
-        {
-          "value": "صنع في الهاوية",
-          "match": "fuzzy"
-        },
-        {
-          "value": "นักบุกเบิกหลุมยักษ์",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ผ่าเหวนรก",
           "match": "fuzzy"
         },
         {
@@ -6486,27 +4246,11 @@
           "match": "fuzzy"
         },
         {
-          "value": "Food Wars! The First Plate",
-          "match": "fuzzy"
-        },
-        {
           "value": "Shokugeki no Souma",
           "match": "fuzzy"
         },
         {
-          "value": "لا سلام على طعام",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ยอดนักปรุงโซมะ",
-          "match": "fuzzy"
-        },
-        {
           "value": "食戟のソーマ",
-          "match": "fuzzy"
-        },
-        {
-          "value": "食戟之灵",
           "match": "fuzzy"
         }
       ],
@@ -6542,19 +4286,7 @@
       ],
       "answerAliases": [
         {
-          "value": "Over Lord",
-          "match": "fuzzy"
-        },
-        {
           "value": "Overlord",
-          "match": "fuzzy"
-        },
-        {
-          "value": "โอเวอร์ ลอร์ด จอมมารพิชิตโลก",
-          "match": "fuzzy"
-        },
-        {
-          "value": "โอเวอร์ลอร์ด",
           "match": "fuzzy"
         },
         {
@@ -6615,10 +4347,6 @@
           "match": "fuzzy"
         },
         {
-          "value": "ไฮคิว!! คู่ตบฟ้าประทาน ภาค 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "ハイキュー!! セカンドシーズン",
           "match": "fuzzy"
         }
@@ -6668,23 +4396,11 @@
           "match": "fuzzy"
         },
         {
-          "value": "Raja Iblis Nyambi!",
-          "match": "fuzzy"
-        },
-        {
           "value": "The Devil is a Part-Timer!",
           "match": "fuzzy"
         },
         {
-          "value": "ผู้กล้าซึนซ่าส์กับจอมมารสู้ชีวิต",
-          "match": "fuzzy"
-        },
-        {
           "value": "はたらく魔王さま!",
-          "match": "fuzzy"
-        },
-        {
-          "value": "打工吧！魔王大人",
           "match": "fuzzy"
         }
       ],
@@ -6725,39 +4441,11 @@
           "match": "fuzzy"
         },
         {
-          "value": "AnoHana",
-          "match": "fuzzy"
-        },
-        {
-          "value": "AnoHana: ancora non conosciamo il nome del fiore che abbiamo visto quel giorno",
-          "match": "fuzzy"
-        },
-        {
           "value": "Anohana: The Flower We Saw That Day",
           "match": "fuzzy"
         },
         {
-          "value": "Đóa hoa đã thấy ngày ấy chúng mình vẫn chưa biết tên",
-          "match": "fuzzy"
-        },
-        {
-          "value": "We Still Don't Know the Name of the Flower We Saw That Day.",
-          "match": "fuzzy"
-        },
-        {
-          "value": "אנוהאנה: הפרח שראינו ביום ההוא",
-          "match": "fuzzy"
-        },
-        {
-          "value": "อาโนะฮานะ ดอกไม้ ความทรงจำ และมิตรภาพ",
-          "match": "fuzzy"
-        },
-        {
           "value": "あの日見た花の名前を僕達はまだ知らない。",
-          "match": "fuzzy"
-        },
-        {
-          "value": "あの花",
           "match": "fuzzy"
         }
       ],
@@ -6795,30 +4483,6 @@
       ],
       "answerAliases": [
         {
-          "value": "Danmachi",
-          "match": "fuzzy"
-        },
-        {
-          "value": "DanMachi - È sbagliato cercare di incontrare ragazze in un Dungeon?",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Danmachi: ¿Qué Tiene de Malo Intentar Ligar en una Mazmorra?",
-          "match": "fuzzy"
-        },
-        {
-          "value": "DanMachi: É Errado Tentar Pegar Garotas numa Masmorra?",
-          "match": "fuzzy"
-        },
-        {
-          "value": "DanMachi: Família Myth",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Dungeon ni Deai o Motomeru no wa Machigatte Iru Darouka: Familia Myth",
-          "match": "fuzzy"
-        },
-        {
           "value": "Dungeon ni Deai wo Motomeru no wa Machigatteiru Darou ka",
           "match": "fuzzy"
         },
@@ -6827,23 +4491,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "فارسة أحلامي",
-          "match": "fuzzy"
-        },
-        {
-          "value": "มันผิดรึไงถ้าใจอยากจะพบรักในดันเจี้ยน",
-          "match": "fuzzy"
-        },
-        {
           "value": "ダンジョンに出会いを求めるのは間違っているだろうか",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ダンまち",
-          "match": "fuzzy"
-        },
-        {
-          "value": "在地下城寻求邂逅是否搞错了什么",
           "match": "fuzzy"
         }
       ],
@@ -6882,18 +4530,6 @@
       "answerAliases": [
         {
           "value": "Soul Eater",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Пожирач душ",
-          "match": "fuzzy"
-        },
-        {
-          "value": "אכלן הנשמות",
-          "match": "fuzzy"
-        },
-        {
-          "value": "סול איטר",
           "match": "fuzzy"
         },
         {
@@ -6978,22 +4614,6 @@
         {
           "value": "Fairy Tail",
           "match": "fuzzy"
-        },
-        {
-          "value": "פיירי טייל",
-          "match": "fuzzy"
-        },
-        {
-          "value": "แฟรี่เทล ศึกจอมเวทอภินิหาร",
-          "match": "fuzzy"
-        },
-        {
-          "value": "フェアリーテイル",
-          "match": "fuzzy"
-        },
-        {
-          "value": "妖精的尾巴",
-          "match": "fuzzy"
         }
       ],
       "tracks": [],
@@ -7037,31 +4657,11 @@
           "match": "fuzzy"
         },
         {
-          "value": "My youth romantic comedy is wrong as I expected.",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Oregairu",
-          "match": "fuzzy"
-        },
-        {
           "value": "Yahari Ore no Seishun Love Come wa Machigatteiru.",
           "match": "fuzzy"
         },
         {
-          "value": "กะแล้วชีวิตรักวัยรุ่นของผมมันต้องไม่สดใสเลยสักนิด",
-          "match": "fuzzy"
-        },
-        {
           "value": "やはり俺の青春ラブコメはまちがっている。",
-          "match": "fuzzy"
-        },
-        {
-          "value": "俺ガイル",
-          "match": "fuzzy"
-        },
-        {
-          "value": "我的青春恋爱物语果然有问题",
           "match": "fuzzy"
         }
       ],
@@ -7108,31 +4708,7 @@
           "match": "exact"
         },
         {
-          "value": "Heaven-Piercing Gurren Lagann",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Heavenly Breakthrough Gurren Lagann",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Sfondamento dei cieli Gurren Lagann",
-          "match": "fuzzy"
-        },
-        {
           "value": "Tengen Toppa Gurren Lagann",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Ґуррен Лаґанн",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Гуррен-Лаганн",
-          "match": "fuzzy"
-        },
-        {
-          "value": "อภินิหารหุ่นทะลวงสวรรค์",
           "match": "fuzzy"
         },
         {
@@ -7181,39 +4757,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Konosuba : Une explosion dans ce monde merveilleux !",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Konosuba 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Konosuba! - As Bençãos de Deus Neste Mundo Maravilhoso 2!",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Konosuba! Un mundo maravilloso 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Да благословят боги сей расчудесный мир! 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ขอให้โชคดีมีชัยในโลกแฟนตาซี! ภาค 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "この素晴らしい世界に祝福を！2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "为美好的世界献上祝福！2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "为美好的世界献上祝福第二季",
           "match": "fuzzy"
         }
       ],
@@ -7256,10 +4800,6 @@
           "match": "exact"
         },
         {
-          "value": "Re: 제로부터 시작하는 이세계 생활 2기",
-          "match": "fuzzy"
-        },
-        {
           "value": "Re:ZERO -Starting Life in Another World-",
           "match": "fuzzy"
         },
@@ -7268,15 +4808,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Re:Zero — жизнь с нуля в другом мире. Второй сезон",
-          "match": "fuzzy"
-        },
-        {
           "value": "Re:Zero kara Hajimeru Isekai Seikatsu",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Re:Zero kara Hajimeru Isekai Seikatsu (2020)",
           "match": "fuzzy"
         },
         {
@@ -7284,23 +4816,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Re:Zero รีเซทชีวิต ฝ่าวิกฤตต่างโลก ภาค 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Re:ゼロから始める異世界生活",
-          "match": "fuzzy"
-        },
-        {
           "value": "Re:ゼロから始める異世界生活 2nd Season",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Re:从零开始的异世界生活 2 上半",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Re:从零开始的异世界生活第二季（上半）",
           "match": "fuzzy"
         }
       ],
@@ -7347,27 +4863,11 @@
           "match": "fuzzy"
         },
         {
-          "value": "DAN DA DAN: FIRST ENCOUNTER",
-          "match": "fuzzy"
-        },
-        {
           "value": "Dandadan",
           "match": "fuzzy"
         },
         {
-          "value": "Дандадан",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ดันดาดัน",
-          "match": "fuzzy"
-        },
-        {
           "value": "ダンダダン",
-          "match": "fuzzy"
-        },
-        {
-          "value": "膽大黨",
           "match": "fuzzy"
         }
       ],
@@ -7405,10 +4905,6 @@
       "answerAliases": [
         {
           "value": "Dororo",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Дороро",
           "match": "fuzzy"
         },
         {
@@ -7462,23 +4958,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Cyberpunk: Mercenários",
-          "match": "fuzzy"
-        },
-        {
-          "value": "CYBERPUNK: อาชญากรแดนเถื่อน",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Киберпанк: Бегущие по краю",
-          "match": "fuzzy"
-        },
-        {
           "value": "サイバーパンク エッジランナーズ",
-          "match": "fuzzy"
-        },
-        {
-          "value": "電馭叛客：邊緣行者",
           "match": "fuzzy"
         }
       ],
@@ -7522,47 +5002,11 @@
           "match": "exact"
         },
         {
-          "value": "Eu Quero Comer Seu Pâncreas",
-          "match": "fuzzy"
-        },
-        {
           "value": "I Want to Eat Your Pancreas",
           "match": "fuzzy"
         },
         {
-          "value": "Je veux manger ton pancréas",
-          "match": "fuzzy"
-        },
-        {
           "value": "Kimi no Suizou wo Tabetai",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Kimisui",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Quiero Comerme tu Páncreas",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Tớ Muốn Ăn Tụy Của Cậu",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Voglio mangiare il tuo pancreas",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Vull menjar-me el teu pàncrees",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Хочу съесть твою поджелудочную железу",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ตับอ่อนเธอนั้นขอฉันเถอะนะ",
           "match": "fuzzy"
         },
         {
@@ -7619,23 +5063,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Assassination Classroom",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Assassination Classroom Season 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "Assassination Classroom Second Season",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Klasa skrytobójców 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "فصل الاغتيال 2",
           "match": "fuzzy"
         },
         {
@@ -7687,19 +5115,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Haikyu!! Karasuno High vs Shiratorizawa Academy",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Haikyuu!! 3",
-          "match": "fuzzy"
-        },
-        {
           "value": "Haikyuu!!: Karasuno Koukou VS Shiratorizawa Gakuen Koukou",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ไฮคิว!! คู่ตบฟ้าประทาน ภาค 3",
           "match": "fuzzy"
         },
         {
@@ -7745,19 +5161,7 @@
           "match": "exact"
         },
         {
-          "value": "Code Geass: Hangyaku no Lelouch",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Code Geass: Hangyaku no Lelouch 2nd Season",
-          "match": "fuzzy"
-        },
-        {
           "value": "Code Geass: Hangyaku no Lelouch R2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Code Geass: Hangyaku no Lelouch Second Season",
           "match": "fuzzy"
         },
         {
@@ -7805,30 +5209,6 @@
         {
           "value": "monster",
           "match": "exact"
-        },
-        {
-          "value": "Монстр",
-          "match": "fuzzy"
-        },
-        {
-          "value": "מונסטר",
-          "match": "fuzzy"
-        },
-        {
-          "value": "מפלצת",
-          "match": "fuzzy"
-        },
-        {
-          "value": "مونستر",
-          "match": "fuzzy"
-        },
-        {
-          "value": "وحش",
-          "match": "fuzzy"
-        },
-        {
-          "value": "モンスター",
-          "match": "fuzzy"
         }
       ],
       "tracks": [],
@@ -7870,35 +5250,7 @@
           "match": "exact"
         },
         {
-          "value": "Diários de uma Apotecária",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Die Tagebücher der Apothekerin",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Drugstore Soliloquy",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Dược sư tự sự",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Il monologo della Speziale",
-          "match": "fuzzy"
-        },
-        {
           "value": "Kusuriya no Hitorigoto",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Les Carnets de l'Apothicaire",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Los diarios de la boticaria",
           "match": "fuzzy"
         },
         {
@@ -7906,39 +5258,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Zapiski zielarki",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Записки аптекаря",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Монолог фармацевта",
-          "match": "fuzzy"
-        },
-        {
-          "value": "يوميات الصيدلانيّة",
-          "match": "fuzzy"
-        },
-        {
-          "value": "สืบคดีปริศนา หมอยาตำรับโคมแดง",
-          "match": "fuzzy"
-        },
-        {
-          "value": "약사의 혼잣말",
-          "match": "fuzzy"
-        },
-        {
-          "value": "药屋少女的呢喃",
-          "match": "fuzzy"
-        },
-        {
           "value": "薬屋のひとりごと",
-          "match": "fuzzy"
-        },
-        {
-          "value": "藥師少女的獨語",
           "match": "fuzzy"
         }
       ],
@@ -7979,27 +5299,7 @@
           "match": "exact"
         },
         {
-          "value": "Kaguya-sama wa Kokurasetai",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Kaguya-sama wa Kokurasetai 3rd Season",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Kaguya-sama wa Kokurasetai: Tensai-tachi no Renai Zunousen 3",
-          "match": "fuzzy"
-        },
-        {
           "value": "Kaguya-sama wa Kokurasetai: Ultra Romantic",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Kaguya-sama: Cuộc Chiến Tỏ Tình - Ultra Romantic",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Kaguya-sama: Love is War",
           "match": "fuzzy"
         },
         {
@@ -8007,35 +5307,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Kaguya-sama: Love is War Season 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Nona Kaguya Ingin Ditembak: Ultra Romantic",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Госпожа Кагуя: в любви как на войне. Ультраромантика",
-          "match": "fuzzy"
-        },
-        {
-          "value": "สารภาพรักกับคุณคางุยะ ซะดี ๆ -อุลตร้า โรแมนติก-",
-          "match": "fuzzy"
-        },
-        {
-          "value": "สารภาพรักกับคุณคางุยะซะดี ๆ ~สงครามประสาทความรักของเหล่าอัจฉริยะ~ ภาค 3",
-          "match": "fuzzy"
-        },
-        {
           "value": "かぐや様は告らせたい-ウルトラロマンティック-",
-          "match": "fuzzy"
-        },
-        {
-          "value": "辉夜大小姐想让我告白～天才们的恋爱头脑战～ 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "辉夜大小姐想让我告白～天才们的恋爱头脑战～ 第三季",
           "match": "fuzzy"
         }
       ],
@@ -8083,14 +5355,6 @@
           "match": "fuzzy"
         },
         {
-          "value": "Сага о Винланде 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ヴィンランド・サガ",
-          "match": "fuzzy"
-        },
-        {
           "value": "ヴィンランド・サガ SEASON2",
           "match": "fuzzy"
         }
@@ -8135,14 +5399,6 @@
         },
         {
           "value": "Mob Psycho 100 III",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Моб Психо 100 III",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ม็อบไซโค 100 คนพลังจิต ภาค 3",
           "match": "fuzzy"
         },
         {
@@ -8194,31 +5450,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "РОК-ТИХОНЯ!",
-          "match": "fuzzy"
-        },
-        {
-          "value": "บจจิเดอะร็อก!",
-          "match": "fuzzy"
-        },
-        {
-          "value": "봇치 더 록!",
-          "match": "fuzzy"
-        },
-        {
-          "value": "외톨이 THE ROCK!",
-          "match": "fuzzy"
-        },
-        {
           "value": "ぼっち・ざ・ろっく！",
-          "match": "fuzzy"
-        },
-        {
-          "value": "孤独摇滚！",
-          "match": "fuzzy"
-        },
-        {
-          "value": "孤獨搖滾！",
           "match": "fuzzy"
         }
       ],
@@ -8262,14 +5494,6 @@
           "match": "exact"
         },
         {
-          "value": "Haikyu!!",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Haikyu!! Season 4 Part 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "HAIKYU!! TO THE TOP",
           "match": "fuzzy"
         },
@@ -8282,19 +5506,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "ไฮคิว!! คู่ตบฟ้าประทาน ภาค 4",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ไฮคิว!! คู่ตบฟ้าประทาน ภาค 4 Part 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "ハイキュー!! TO THE TOP 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "排球少年!! 第四季",
           "match": "fuzzy"
         }
       ],
@@ -8344,18 +5556,6 @@
           "match": "fuzzy"
         },
         {
-          "value": "Конец Евангелиона",
-          "match": "fuzzy"
-        },
-        {
-          "value": "אוונגליון של הסוף",
-          "match": "fuzzy"
-        },
-        {
-          "value": "הסוף של אוונגליון",
-          "match": "fuzzy"
-        },
-        {
           "value": "新世紀エヴァンゲリオン劇場版 Air/まごころを、君に",
           "match": "fuzzy"
         }
@@ -8398,18 +5598,6 @@
           "match": "exact"
         },
         {
-          "value": "AoT 4",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Attack on Titan Final Arc",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Attack on Titan Final Season Part 3 Final Arc Part 1",
-          "match": "fuzzy"
-        },
-        {
           "value": "Attack on Titan Final Season THE FINAL CHAPTERS Special 1",
           "match": "fuzzy"
         },
@@ -8418,27 +5606,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Attack on Titan The Final Season The Final Part Part 1",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Attack on Titan The Final Season The Final Part Special",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Attack on Titan The The Final Part",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Shingeki no Kyojin: The",
-          "match": "fuzzy"
-        },
-        {
           "value": "Shingeki no Kyojin: The - Kanketsu-hen Zenpen",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Shingeki no Kyojin: The Final Edition",
           "match": "fuzzy"
         },
         {
@@ -8446,39 +5614,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Shingeki no Kyojin: The Final Season Final Edition",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Shingeki no Kyojin: The Final Season Part 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "SnK 4",
-          "match": "fuzzy"
-        },
-        {
-          "value": "حمله به تایتان فصل آخر قسمت ویژه 1",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ผ่าพิภพไททัน ไฟนอล ซีซั่น",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ผ่าพิภพไททัน ไฟนอล ซีซั่น Part 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ผ่าพิภพไททัน ภาค 4",
-          "match": "fuzzy"
-        },
-        {
           "value": "進撃の巨人 The Final Season完結編 前編",
-          "match": "fuzzy"
-        },
-        {
-          "value": "進撃の巨人 The 完結編 前編",
           "match": "fuzzy"
         }
       ],
@@ -8526,19 +5662,7 @@
           "match": "exact"
         },
         {
-          "value": "JJK3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Jujutsu Kaisen",
-          "match": "fuzzy"
-        },
-        {
           "value": "JUJUTSU KAISEN : The Culling Game",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Jujutsu Kaisen 3rd Season",
           "match": "fuzzy"
         },
         {
@@ -8550,15 +5674,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "มหาเวทย์ผนึกมาร จรดลล้างบาง พาร์ต 1",
-          "match": "fuzzy"
-        },
-        {
           "value": "呪術廻戦 死滅回游 前編",
-          "match": "fuzzy"
-        },
-        {
-          "value": "呪術廻戦 第3期",
           "match": "fuzzy"
         }
       ],
@@ -8645,43 +5761,7 @@
           "match": "exact"
         },
         {
-          "value": "Chainsaw Man - Il Film: La Storia di Reze",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Chainsaw Man - La película: El arco de Reze",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Chainsaw Man – O Filme: Arco da Reze",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Chainsaw Man – The : Reze Arc",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Chainsaw Man – The Movie: Reze Arc",
-          "match": "fuzzy"
-        },
-        {
           "value": "Chainsaw Man: Reze-hen",
-          "match": "fuzzy"
-        },
-        {
-          "value": "CSM – The : Reze Arc",
-          "match": "fuzzy"
-        },
-        {
-          "value": "CSM – The Movie: Reze Arc",
-          "match": "fuzzy"
-        },
-        {
-          "value": "CSM: Reze-hen",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Человек-бензопила: Фильм – История Резе",
           "match": "fuzzy"
         },
         {
@@ -8725,27 +5805,11 @@
           "match": "exact"
         },
         {
-          "value": "Frieren: Beyond Journey’s End",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Frieren: Beyond Journey’s End Season 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "Sousou no Frieren",
           "match": "fuzzy"
         },
         {
           "value": "Sousou no Frieren 2nd Season",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Провожающая в последний путь Фрирен 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "장송의 프리렌 2기",
           "match": "fuzzy"
         },
         {
@@ -8793,15 +5857,7 @@
           "match": "exact"
         },
         {
-          "value": "BLEACH TYBW",
-          "match": "fuzzy"
-        },
-        {
           "value": "BLEACH 千年血戦篇",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Bleach: La guerre sanglante de mille ans",
           "match": "fuzzy"
         },
         {
@@ -8810,10 +5866,6 @@
         },
         {
           "value": "BLEACH: Thousand-Year Blood War",
-          "match": "fuzzy"
-        },
-        {
-          "value": "بليتش: حرب الألف سنة الدموية",
           "match": "fuzzy"
         }
       ],
@@ -8857,39 +5909,11 @@
           "match": "exact"
         },
         {
-          "value": "Atelier of Witch Hat",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Atelier spiczastych kapeluszy",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Cadı Şapkası Atölyesi",
-          "match": "fuzzy"
-        },
-        {
-          "value": "L'Atelier des Sorciers",
-          "match": "fuzzy"
-        },
-        {
           "value": "Tongari Boushi no Atelier",
           "match": "fuzzy"
         },
         {
           "value": "Witch Hat Atelier",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Xưởng Phép Thuật",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Ателье колдовских колпаков",
-          "match": "fuzzy"
-        },
-        {
-          "value": "จอมเวทฝึกหัดกับหมวกมหัศจรรย์",
           "match": "fuzzy"
         },
         {
@@ -8941,10 +5965,6 @@
           "match": "fuzzy"
         },
         {
-          "value": "Violet Evergarden : Le film",
-          "match": "fuzzy"
-        },
-        {
           "value": "Violet Evergarden Movie",
           "match": "fuzzy"
         },
@@ -8957,19 +5977,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Вайоллет Эвергарден",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Виолетта Эвергарден",
-          "match": "fuzzy"
-        },
-        {
           "value": "劇場版 ヴァイオレット・エヴァーガーデン",
-          "match": "fuzzy"
-        },
-        {
-          "value": "薇尔莉特·伊芙加登",
           "match": "fuzzy"
         }
       ],
@@ -9020,22 +6028,6 @@
           "match": "exact"
         },
         {
-          "value": "Diários de uma Apotecária 2ª Temporada",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Die Tagebücher der Apothekerin",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Die Tagebücher der Apothekerin Season 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Dược sư tự sự",
-          "match": "fuzzy"
-        },
-        {
           "value": "Kusuriya no Hitorigoto",
           "match": "fuzzy"
         },
@@ -9044,27 +6036,11 @@
           "match": "fuzzy"
         },
         {
-          "value": "Les Carnets de l'apothicaire",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Les Carnets de l'apothicaire Saison 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Los diarios de la boticaria temporada 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "The Apothecary Diaries",
           "match": "fuzzy"
         },
         {
           "value": "The Apothecary Diaries Season 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Монолог фармацевта 2",
           "match": "fuzzy"
         },
         {
@@ -9109,19 +6085,11 @@
           "match": "exact"
         },
         {
-          "value": "86 -เอทตี้ซิกซ์- พาร์ท 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "86 EIGHTY-SIX",
           "match": "fuzzy"
         },
         {
           "value": "86 EIGHTY-SIX Part 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "86－エイティシックス－ 2クール",
           "match": "fuzzy"
         },
         {
@@ -9172,15 +6140,7 @@
           "match": "exact"
         },
         {
-          "value": "Fruba",
-          "match": "fuzzy"
-        },
-        {
           "value": "Fruits Basket",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Fruits Basket (2019) 2",
           "match": "fuzzy"
         },
         {
@@ -9192,31 +6152,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Furuba",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Корзинка фруктов 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "เสน่ห์สาวข้าวปั้น ภาค 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "フルーツバスケット",
-          "match": "fuzzy"
-        },
-        {
           "value": "フルーツバスケット 2nd Season",
-          "match": "fuzzy"
-        },
-        {
-          "value": "フルバ",
-          "match": "fuzzy"
-        },
-        {
-          "value": "水果篮子 第二季",
           "match": "fuzzy"
         }
       ],
@@ -9254,15 +6190,7 @@
       ],
       "answerAliases": [
         {
-          "value": "Demon Slayer: Kimetsu no Yaiba Castelo Infinito",
-          "match": "fuzzy"
-        },
-        {
           "value": "Demon Slayer: Kimetsu no Yaiba Infinity Castle",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Demon Slayer: Kimetsu no Yaiba La Forteresse infinie",
           "match": "fuzzy"
         },
         {
@@ -9271,10 +6199,6 @@
         },
         {
           "value": "Kimetsu no Yaiba: Mugenjou-hen Movie 1 - Akaza Sairai",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Клинок, Рассекающий Демонов: Бесконечный Замок",
           "match": "fuzzy"
         },
         {
@@ -9325,18 +6249,6 @@
           "match": "exact"
         },
         {
-          "value": "Fruba",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Fruits Basket",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Fruits Basket Season 3",
-          "match": "fuzzy"
-        },
-        {
           "value": "Fruits Basket The",
           "match": "fuzzy"
         },
@@ -9349,31 +6261,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Furuba",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Корзинка фруктов: Финал",
-          "match": "fuzzy"
-        },
-        {
-          "value": "เสน่ห์สาวข้าวปั้น ภาค 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "เสน่ห์สาวข้าวปั้น ภาคสุดท้าย",
-          "match": "fuzzy"
-        },
-        {
           "value": "フルーツバスケットThe Final",
-          "match": "fuzzy"
-        },
-        {
-          "value": "フルバ",
-          "match": "fuzzy"
-        },
-        {
-          "value": "水果篮子 最终季",
           "match": "fuzzy"
         }
       ],
@@ -9424,27 +6312,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Kabukimonogatari",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Koimonogatari",
-          "match": "fuzzy"
-        },
-        {
           "value": "Monogatari Series Second Season",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Nekomonogatari White",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Onimonogatari",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Otorimonogatari",
           "match": "fuzzy"
         }
       ],
@@ -9481,23 +6349,11 @@
       ],
       "answerAliases": [
         {
-          "value": "CLICK",
-          "match": "fuzzy"
-        },
-        {
           "value": "Link Click",
           "match": "fuzzy"
         },
         {
           "value": "Shiguang Dailiren",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Time Agent",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ข้ามเวลาพิชิตภารกิจ",
           "match": "fuzzy"
         },
         {
@@ -9539,18 +6395,6 @@
       ],
       "answerAliases": [
         {
-          "value": "AoT 4",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Attack on Titan Final Arc",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Attack on Titan Final Season Part 3 Final Arc Part 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "Attack on Titan Final Season THE FINAL CHAPTERS Special 2",
           "match": "fuzzy"
         },
@@ -9559,23 +6403,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Attack on Titan: The",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Attack on Titan: The Final Season Part 4",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Shingeki no Kyojin: The",
-          "match": "fuzzy"
-        },
-        {
           "value": "Shingeki no Kyojin: The - Kanketsu-hen Kouhen",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Shingeki no Kyojin: The Final Edition",
           "match": "fuzzy"
         },
         {
@@ -9583,23 +6411,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Shingeki no Kyojin: The Final Season Final Edition",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Shingeki no Kyojin: The Final Season Part 4",
-          "match": "fuzzy"
-        },
-        {
-          "value": "SnK 4",
-          "match": "fuzzy"
-        },
-        {
           "value": "進撃の巨人 The Final Season完結編 後編",
-          "match": "fuzzy"
-        },
-        {
-          "value": "進撃の巨人 The 完結編 後編",
           "match": "fuzzy"
         }
       ],
@@ -9639,10 +6451,6 @@
         "rated"
       ],
       "answerAliases": [
-        {
-          "value": "Made in Abyss: Dawn of a Deep Soul",
-          "match": "fuzzy"
-        },
         {
           "value": "Made in Abyss: Dawn of the Deep Soul",
           "match": "fuzzy"
@@ -9695,39 +6503,11 @@
           "match": "exact"
         },
         {
-          "value": "Đến từ Vực Thẳm Mùa 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Made in Abyss",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Made in Abyss Season 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "Made in Abyss: Retsujitsu no Ougonkyou",
           "match": "fuzzy"
         },
         {
           "value": "Made in Abyss: The Golden City of the Scorching Sun",
-          "match": "fuzzy"
-        },
-        {
-          "value": "صنع في الهاوية 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "นักบุกเบิกหลุมยักษ์ ภาค 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ผ่าเหวนรก นครทองคำแห่งอาทิตย์ที่เจิดจ้า",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ผ่าเหวนรก ภาค 2",
           "match": "fuzzy"
         },
         {
@@ -9776,27 +6556,11 @@
           "match": "exact"
         },
         {
-          "value": "La Disparition de Haruhi Suzumiya",
-          "match": "fuzzy"
-        },
-        {
-          "value": "La Scomparsa di Haruhi Suzumiya",
-          "match": "fuzzy"
-        },
-        {
           "value": "Suzumiya Haruhi no Shoushitsu",
           "match": "fuzzy"
         },
         {
           "value": "The Disappearance of Haruhi Suzumiya",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Исчезновение Харухи Судзумии",
-          "match": "fuzzy"
-        },
-        {
-          "value": "스즈미야 하루히의 소실",
           "match": "fuzzy"
         },
         {
@@ -9859,10 +6623,6 @@
           "match": "fuzzy"
         },
         {
-          "value": "Wound Tale 3: Cold Blood",
-          "match": "fuzzy"
-        },
-        {
           "value": "傷物語〈Ⅲ冷血篇〉",
           "match": "fuzzy"
         }
@@ -9904,23 +6664,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Kaguya-sama: Cuộc chiến tỏ tình - Nụ hôn đầu không hồi kết",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Kaguya-sama: Love is War",
-          "match": "fuzzy"
-        },
-        {
           "value": "Kaguya-sama: Love is War -The First Kiss That Never Ends-",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Kaguya-sama: Love is War Movie",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Госпожа Кагуя: в любви как на войне. Бесконечный первый поцелуй",
           "match": "fuzzy"
         },
         {
@@ -9964,27 +6708,7 @@
           "match": "exact"
         },
         {
-          "value": "Espíritu de lucha",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Fighting Spirit",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Hajime no Ippo: A Luta!",
-          "match": "fuzzy"
-        },
-        {
           "value": "Hajime no Ippo: The Fighting!",
-          "match": "fuzzy"
-        },
-        {
-          "value": "The First Step",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Первый шаг",
           "match": "fuzzy"
         },
         {
@@ -10028,27 +6752,11 @@
           "match": "exact"
         },
         {
-          "value": "BLEACH TYBW",
-          "match": "fuzzy"
-        },
-        {
-          "value": "BLEACH 千年血戦篇 第2クール",
-          "match": "fuzzy"
-        },
-        {
           "value": "BLEACH 千年血戦篇-訣別譚-",
           "match": "fuzzy"
         },
         {
           "value": "BLEACH: Sennen Kessen-hen - Ketsubetsu-tan",
-          "match": "fuzzy"
-        },
-        {
-          "value": "BLEACH: Thousand Year Blood War",
-          "match": "fuzzy"
-        },
-        {
-          "value": "BLEACH: Thousand Year Blood War Part 2",
           "match": "fuzzy"
         },
         {
@@ -10169,14 +6877,6 @@
         {
           "value": "March comes in like a lion Season 2",
           "match": "fuzzy"
-        },
-        {
-          "value": "Sangatsu no Lion 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "מרץ מגיע כאריה 2",
-          "match": "fuzzy"
         }
       ],
       "tracks": [],
@@ -10218,15 +6918,7 @@
           "match": "exact"
         },
         {
-          "value": "BNHA 8",
-          "match": "fuzzy"
-        },
-        {
           "value": "Boku no Hero Academia",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Boku no Hero Academia 8",
           "match": "fuzzy"
         },
         {
@@ -10234,35 +6926,11 @@
           "match": "fuzzy"
         },
         {
-          "value": "MHA 8",
-          "match": "fuzzy"
-        },
-        {
           "value": "My Hero Academia",
           "match": "fuzzy"
         },
         {
-          "value": "My Hero Academia 8",
-          "match": "fuzzy"
-        },
-        {
           "value": "My Hero Academia FINAL SEASON",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Моя геройская академия 8",
-          "match": "fuzzy"
-        },
-        {
-          "value": "มายฮีโร่ อคาเดเมีย ไฟนอลซีซัน",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ヒロアカ 8",
-          "match": "fuzzy"
-        },
-        {
-          "value": "僕のヒーローアカデミア",
           "match": "fuzzy"
         },
         {
@@ -10356,15 +7024,7 @@
           "match": "exact"
         },
         {
-          "value": "End Tale",
-          "match": "fuzzy"
-        },
-        {
           "value": "Owarimonogatari (Ge)",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Owarimonogatari 2",
           "match": "fuzzy"
         },
         {
@@ -10508,23 +7168,11 @@
           "match": "fuzzy"
         },
         {
-          "value": "Re:ZERO – Жизнь с нуля в альтернативном мире 4",
-          "match": "fuzzy"
-        },
-        {
           "value": "Re:Zero kara Hajimeru Isekai Seikatsu",
           "match": "fuzzy"
         },
         {
           "value": "Re:Zero kara Hajimeru Isekai Seikatsu 4th Season",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Re:ZERO รีเซทชีวิต ฝ่าวิกฤตต่างโลก ซีซั่น 4",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Re:ゼロから始める異世界生活",
           "match": "fuzzy"
         },
         {
@@ -10567,15 +7215,7 @@
       ],
       "answerAliases": [
         {
-          "value": "Fate/HF III",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Fate/stay night [Heaven’s Feel] III. spring song",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Судьба/Ночь схватки: Прикосновение небес 3",
+          "value": "Fate/stay night [Heaven's Feel] III. spring song",
           "match": "fuzzy"
         }
       ],
@@ -10613,47 +7253,11 @@
           "match": "exact"
         },
         {
-          "value": "Chi: About the Movement of the Earth",
-          "match": "fuzzy"
-        },
-        {
           "value": "Chi. Chikyuu no Undou ni Tsuite",
           "match": "fuzzy"
         },
         {
-          "value": "Du mouvement de la Terre",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Il movimento della Terra",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Ketzer - Tödliches Wissen über die Bewegung der Erde",
-          "match": "fuzzy"
-        },
-        {
-          "value": "O ruchach Ziemi",
-          "match": "fuzzy"
-        },
-        {
           "value": "Orb: On the Movements of the Earth",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Tierra, sangre, conocimiento: Sobre el movimiento de la Tierra",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Про рух Землі",
-          "match": "fuzzy"
-        },
-        {
-          "value": "על תנועת כדור הארץ",
-          "match": "fuzzy"
-        },
-        {
-          "value": "สุริยะปราชญ์ ทฤษฎีสีเลือด",
           "match": "fuzzy"
         },
         {
@@ -10699,31 +7303,7 @@
           "match": "exact"
         },
         {
-          "value": "Evangelion 3.0+1.01 Od-nowa",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Evangelion 3.0+1.11",
-          "match": "fuzzy"
-        },
-        {
           "value": "Evangelion: 3.0+1.0 Thrice Upon a Time",
-          "match": "fuzzy"
-        },
-        {
-          "value": "EVANGELION:3.0+1.01 A ESPERANÇA",
-          "match": "fuzzy"
-        },
-        {
-          "value": "EVANGELION:3.0+1.01 THRICE UPON A TIME",
-          "match": "fuzzy"
-        },
-        {
-          "value": "EVANGELION:3.0+1.01 TRIPLE",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Rebuild of Evangelion 4.0",
           "match": "fuzzy"
         },
         {
@@ -10732,10 +7312,6 @@
         },
         {
           "value": "Shin Evangelion Movie:||",
-          "match": "fuzzy"
-        },
-        {
-          "value": "อีวานเกเลียน:3.0+1.01 สามครั้งก่อน เมื่อเนิ่นนานมาแล้ว",
           "match": "fuzzy"
         },
         {
@@ -10784,10 +7360,6 @@
           "match": "fuzzy"
         },
         {
-          "value": "Gintama (2011)",
-          "match": "fuzzy"
-        },
-        {
           "value": "Gintama Season 2",
           "match": "fuzzy"
         },
@@ -10832,27 +7404,11 @@
           "match": "exact"
         },
         {
-          "value": "BLEACH TYBW",
-          "match": "fuzzy"
-        },
-        {
-          "value": "BLEACH 千年血戦篇 第3クール",
-          "match": "fuzzy"
-        },
-        {
           "value": "BLEACH 千年血戦篇-相剋譚-",
           "match": "fuzzy"
         },
         {
           "value": "BLEACH: Sennen Kessen-hen - Soukoku-tan",
-          "match": "fuzzy"
-        },
-        {
-          "value": "BLEACH: Thousand Year Blood War",
-          "match": "fuzzy"
-        },
-        {
-          "value": "BLEACH: Thousand Year Blood War Part 3",
           "match": "fuzzy"
         },
         {
@@ -10897,15 +7453,11 @@
           "match": "exact"
         },
         {
+          "value": "[Oshi no Ko]",
+          "match": "fuzzy"
+        },
+        {
           "value": "[Oshi no Ko] 3rd Season",
-          "match": "fuzzy"
-        },
-        {
-          "value": "【OSHI NO KO】",
-          "match": "fuzzy"
-        },
-        {
-          "value": "【OSHI NO KO】Season 3",
           "match": "fuzzy"
         },
         {
@@ -10961,14 +7513,6 @@
           "match": "fuzzy"
         },
         {
-          "value": "BokuYaba 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Czarne chmury w moim sercu. Sezon 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "The Dangers in My Heart",
           "match": "fuzzy"
         },
@@ -10977,15 +7521,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "เธอผู้อันตรายต่อใจผม ภาคที่ 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "僕の心のヤバイやつ 第2期",
-          "match": "fuzzy"
-        },
-        {
-          "value": "僕ヤバ 2",
           "match": "fuzzy"
         }
       ],
@@ -11029,39 +7565,11 @@
           "match": "exact"
         },
         {
-          "value": "Haikyu!! : Decisive Battle at the Garbage Dump",
-          "match": "fuzzy"
-        },
-        {
-          "value": "HAIKYU!! La Batalla del Basurero",
-          "match": "fuzzy"
-        },
-        {
-          "value": "HAIKYU!! La Guerre des Poubelles",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Haikyu!! Movie: Decisive Battle at the Garbage Dump",
-          "match": "fuzzy"
-        },
-        {
           "value": "HAIKYU!! The Dumpster Battle",
           "match": "fuzzy"
         },
         {
-          "value": "Haikyuu!! Battle at the Garbage Dump",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Haikyuu!! FINAL",
-          "match": "fuzzy"
-        },
-        {
           "value": "Haikyuu!!: Gomi Suteba no Kessen",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ハイキュー!! FINAL",
           "match": "fuzzy"
         },
         {
@@ -11108,27 +7616,11 @@
           "match": "exact"
         },
         {
-          "value": "Gin'eiden",
-          "match": "fuzzy"
-        },
-        {
           "value": "Ginga Eiyuu Densetsu",
           "match": "fuzzy"
         },
         {
-          "value": "Heldensagen vom Kosmosinsel",
-          "match": "fuzzy"
-        },
-        {
           "value": "Legend of the Galactic Heroes",
-          "match": "fuzzy"
-        },
-        {
-          "value": "LoGH",
-          "match": "fuzzy"
-        },
-        {
-          "value": "אגדת הגיבורים הגלקטיים",
           "match": "fuzzy"
         },
         {
@@ -11181,19 +7673,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Gintama' (2012)",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Gintama' Overdrive",
-          "match": "fuzzy"
-        },
-        {
           "value": "Gintama': Enchousen",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Kintama",
           "match": "fuzzy"
         },
         {
@@ -11246,10 +7726,6 @@
           "match": "fuzzy"
         },
         {
-          "value": "Gintama. (2017)",
-          "match": "fuzzy"
-        },
-        {
           "value": "銀魂。",
           "match": "fuzzy"
         }
@@ -11293,27 +7769,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "JoJo's Bizarre Adventure: –Steel Ball Run",
-          "match": "fuzzy"
-        },
-        {
-          "value": "JoJo's Bizarre Adventure: Part 7–Steel Ball Run",
-          "match": "fuzzy"
-        },
-        {
-          "value": "SBR",
-          "match": "fuzzy"
-        },
-        {
           "value": "STEEL BALL RUN JoJo's Bizarre Adventure 1st STAGE",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ГОНКА «СТАЛЬНОЙ ШАР»: Невероятные приключения ДжоДжо",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Перегони «Сталева куля»: Химерні пригоди ДжоДжо",
           "match": "fuzzy"
         },
         {
@@ -11368,19 +7824,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Mushi-shi Zoku Shou",
-          "match": "fuzzy"
-        },
-        {
           "value": "Mushishi Zoku Shou",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Mushishi Zokushou",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Mushishi: The Next Chapter",
           "match": "fuzzy"
         },
         {
@@ -11433,19 +7877,11 @@
           "match": "fuzzy"
         },
         {
-          "value": "LINK CLICK II",
-          "match": "fuzzy"
-        },
-        {
           "value": "Link Click Season 2",
           "match": "fuzzy"
         },
         {
           "value": "Shiguang Dailiren II",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ข้ามเวลาพิชิตภารกิจ ภาค 2",
           "match": "fuzzy"
         },
         {
@@ -11487,22 +7923,6 @@
         {
           "value": "hninc",
           "match": "exact"
-        },
-        {
-          "value": "Fighting Spirit: New Challenger",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Hajime no Ippo 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Hajime no Ippo Season II",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Hajime no Ippo: A Luta! - Um Novo Desafiante",
-          "match": "fuzzy"
         },
         {
           "value": "Hajime no Ippo: New Challenger",
@@ -11658,31 +8078,11 @@
       ],
       "answerAliases": [
         {
-          "value": "Gintama. Silver Soul Arc",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Gintama. Silver Soul Arc Season 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Gintama.: Shirogane no Tamashii-hen",
-          "match": "fuzzy"
-        },
-        {
           "value": "Gintama.: Shirogane no Tamashii-hen - Kouhan-sen",
           "match": "fuzzy"
         },
         {
-          "value": "Gintama.: Shirogane no Tamashii-hen Season 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "Gintama.: Silver Soul Arc - Second Half War",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Gintama.: Silver Soul Arc 2",
           "match": "fuzzy"
         },
         {
@@ -11762,22 +8162,6 @@
       ],
       "answerAliases": [
         {
-          "value": "Gintama 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Gintama Movie 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Gintama the Final",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Gintama the Final Movie",
-          "match": "fuzzy"
-        },
-        {
           "value": "Gintama: Kanketsu-hen - Yorozuya yo Eien Nare",
           "match": "fuzzy"
         },
@@ -11847,10 +8231,6 @@
           "match": "fuzzy"
         },
         {
-          "value": "กินทามะ THE FINAL",
-          "match": "fuzzy"
-        },
-        {
           "value": "銀魂 THE FINAL",
           "match": "fuzzy"
         }
@@ -11890,18 +8270,6 @@
         },
         {
           "value": "Descending Stories: Showa Genroku Rakugo Shinju",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Le Rakugo ou la vie 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Shouwa Genroku Rakugo Shinjuu",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Shouwa Genroku Rakugo Shinjuu 2nd Season",
           "match": "fuzzy"
         },
         {
@@ -11958,18 +8326,6 @@
           "match": "exact"
         },
         {
-          "value": "Natsume Yujincho 4",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Natsume Yuujinchou 4",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Natsume Yuujinchou Four",
-          "match": "fuzzy"
-        },
-        {
           "value": "Natsume Yuujinchou Shi",
           "match": "fuzzy"
         },
@@ -12021,39 +8377,11 @@
           "match": "exact"
         },
         {
-          "value": "Diary of a Strange Land",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Different Country Diary",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Entre les lignes",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Foreign Country Diary",
-          "match": "fuzzy"
-        },
-        {
           "value": "Ikoku Nikki",
           "match": "fuzzy"
         },
         {
           "value": "Journal with Witch",
-          "match": "fuzzy"
-        },
-        {
-          "value": "مذكرات من بلد آخر",
-          "match": "fuzzy"
-        },
-        {
-          "value": "บันทึกจากวิเทศ",
-          "match": "fuzzy"
-        },
-        {
-          "value": "위국일기",
           "match": "fuzzy"
         },
         {
@@ -12103,22 +8431,6 @@
         {
           "value": "MONOGATARI Series: OFF & MONSTER Season",
           "match": "fuzzy"
-        },
-        {
-          "value": "Nademonogatari",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Orokamonogatari",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Shinobumonogatari",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Wazamonogatari",
-          "match": "fuzzy"
         }
       ],
       "tracks": [],
@@ -12158,10 +8470,6 @@
         },
         {
           "value": "ARIA The ORIGINATION",
-          "match": "fuzzy"
-        },
-        {
-          "value": "アリア ジ オリジネーション",
           "match": "fuzzy"
         }
       ],
@@ -12209,19 +8517,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Hibike! Euphonium: Kumiko 3 Nensei-hen",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Résonne ! Euphonium",
-          "match": "fuzzy"
-        },
-        {
           "value": "Sound! Euphonium 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "響け! ユーフォニアム 久美子3年生編",
           "match": "fuzzy"
         },
         {
@@ -12263,23 +8559,7 @@
           "match": "exact"
         },
         {
-          "value": "Slam Dunk",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Slam Dunk Movie",
-          "match": "fuzzy"
-        },
-        {
           "value": "THE FIRST SLAM DUNK",
-          "match": "fuzzy"
-        },
-        {
-          "value": "סלאם דאנק",
-          "match": "fuzzy"
-        },
-        {
-          "value": "ザ・ファーストスラムダンク",
           "match": "fuzzy"
         }
       ],
@@ -12316,15 +8596,7 @@
       ],
       "answerAliases": [
         {
-          "value": "Uma Musume: Pretty Derby",
-          "match": "fuzzy"
-        },
-        {
           "value": "Uma Musume: Pretty Derby - Shin Jidai no Tobira",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Uma Musume: Pretty Derby Movie",
           "match": "fuzzy"
         },
         {
@@ -12332,15 +8604,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "ウマ娘 プリティーダービー BEGINNING OF A NEW ERA",
-          "match": "fuzzy"
-        },
-        {
           "value": "ウマ娘 プリティーダービー 新時代の扉",
-          "match": "fuzzy"
-        },
-        {
-          "value": "劇場版 ウマ娘 プリティーダービー",
           "match": "fuzzy"
         }
       ],
@@ -12391,15 +8655,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "Umamusume: Cinderella Gray",
-          "match": "fuzzy"
-        },
-        {
           "value": "Umamusume: Cinderella Gray 2nd Cour",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Umamusume: Cinderella Gray Cour 2",
           "match": "fuzzy"
         },
         {
@@ -12457,14 +8713,6 @@
           "match": "fuzzy"
         },
         {
-          "value": "Царство 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "สงครามบัลลังก์ผงาดจิ๋นซี ภาค 3",
-          "match": "fuzzy"
-        },
-        {
           "value": "キングダム 第3シリーズ",
           "match": "fuzzy"
         }
@@ -12512,19 +8760,7 @@
           "match": "exact"
         },
         {
-          "value": "Grandmaster of Demonic Cultivation 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Mo Dao Zu Shi 3",
-          "match": "fuzzy"
-        },
-        {
           "value": "Modao Zushi 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "The Founder of Diabolism 3",
           "match": "fuzzy"
         },
         {
@@ -12536,19 +8772,7 @@
           "match": "fuzzy"
         },
         {
-          "value": "The Founder of Evil Magic 3",
-          "match": "fuzzy"
-        },
-        {
-          "value": "The Master of Diabolism 3",
-          "match": "fuzzy"
-        },
-        {
           "value": "魔道祖师 第三季",
-          "match": "fuzzy"
-        },
-        {
-          "value": "魔道祖师完结篇",
           "match": "fuzzy"
         }
       ],
@@ -12662,14 +8886,6 @@
           "match": "fuzzy"
         },
         {
-          "value": "Champion Joe 2",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Rocky Joe 2",
-          "match": "fuzzy"
-        },
-        {
           "value": "Tomorrow's Joe 2",
           "match": "fuzzy"
         },
@@ -12720,14 +8936,6 @@
         },
         {
           "value": "Revue Starlight: The Movie",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Shoujo☆Kageki Revue Starlight",
-          "match": "fuzzy"
-        },
-        {
-          "value": "Shoujo☆Kageki Revue Starlight Movie",
           "match": "fuzzy"
         },
         {
@@ -12785,14 +8993,6 @@
           "match": "fuzzy"
         },
         {
-          "value": "Царство 4",
-          "match": "fuzzy"
-        },
-        {
-          "value": "สงครามบัลลังก์ผงาดจิ๋นซี ภาค 4",
-          "match": "fuzzy"
-        },
-        {
           "value": "キングダム 第4シリーズ",
           "match": "fuzzy"
         }
@@ -12847,14 +9047,6 @@
           "match": "fuzzy"
         },
         {
-          "value": "Царство 5",
-          "match": "fuzzy"
-        },
-        {
-          "value": "สงครามบัลลังก์ผงาดจิ๋นซี ภาค 5",
-          "match": "fuzzy"
-        },
-        {
           "value": "キングダム 第5シリーズ",
           "match": "fuzzy"
         }
@@ -12902,10 +9094,6 @@
           "match": "exact"
         },
         {
-          "value": "City of Silver",
-          "match": "fuzzy"
-        },
-        {
           "value": "Guimi Zhi Zhu",
           "match": "fuzzy"
         },
@@ -12922,10 +9110,6 @@
           "match": "fuzzy"
         },
         {
-          "value": "The Marked Hunt",
-          "match": "fuzzy"
-        },
-        {
           "value": "诡秘之主 特别篇",
           "match": "fuzzy"
         }
@@ -12934,5 +9118,5 @@
       "canonicalTitle": "Lord of Mysteries Specials"
     }
   ],
-  "updatedAt": "2026-07-05T02:58:16.705Z"
+  "updatedAt": "2026-07-05T15:21:32.993Z"
 }
