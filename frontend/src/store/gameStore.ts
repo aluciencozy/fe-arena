@@ -38,6 +38,7 @@ export const useGameStateStore = create<GameStore>((set) => ({
   pendingDamage: {},
   currentVideoID: null,
   videoStartTime: 0,
+  currentVideoDurationSeconds: null,
   roundStartTime: null,
   countdownEndsAt: null,
   roundEndsAt: null,

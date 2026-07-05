@@ -98,6 +98,20 @@ const shufflePlaylist = (playlist: PlaylistTrack[]) => {
 const getCurrentPlaylistItem = (record: GameRecord) =>
   record.playlist[record.state.playlistIndex % record.playlist.length]!;
 
+const getVideoDurationSeconds = (track: PlaylistTrack) => {
+  const durationSeconds = track.durationSeconds;
+  return typeof durationSeconds === "number" &&
+    Number.isFinite(durationSeconds) &&
+    durationSeconds > 0
+    ? durationSeconds
+    : null;
+};
+
+const getRandomVideoStartTime = (track: PlaylistTrack) => {
+  const durationSeconds = getVideoDurationSeconds(track);
+  return durationSeconds === null ? 0 : Math.random() * durationSeconds;
+};
+
 const clearTimers = (record: GameRecord) => {
   if (record.countdownTimer) clearTimeout(record.countdownTimer);
   if (record.roundTimer) clearTimeout(record.roundTimer);
@@ -119,6 +133,7 @@ const makeInitialState = (
   pendingDamage: {},
   currentVideoID: null,
   videoStartTime: 0,
+  currentVideoDurationSeconds: null,
   roundStartTime: null,
   countdownEndsAt: null,
   roundEndsAt: null,
@@ -162,7 +177,9 @@ const startCountdown = (
   record.state.countdownEndsAt = now + COUNTDOWN_SECONDS * 1000;
   record.state.roundStartTime = null;
   record.state.roundEndsAt = null;
-  record.state.currentVideoID = getCurrentPlaylistItem(record).videoId;
+  const currentVideo = getCurrentPlaylistItem(record);
+  record.state.currentVideoID = currentVideo.videoId;
+  record.state.currentVideoDurationSeconds = getVideoDurationSeconds(currentVideo);
   record.state.revealedAnswer = null;
   record.state.guessedCorrectly = [];
   record.state.pendingDamage = {};
@@ -186,7 +203,8 @@ const startRound = (roomId: string, events: GameEvents) => {
   const currentVideo = getCurrentPlaylistItem(record);
   record.state.phase = "PLAYING";
   record.state.currentVideoID = currentVideo.videoId;
-  record.state.videoStartTime = 0;
+  record.state.videoStartTime = getRandomVideoStartTime(currentVideo);
+  record.state.currentVideoDurationSeconds = getVideoDurationSeconds(currentVideo);
   record.state.roundStartTime = now;
   record.state.roundEndsAt = now + ROUND_SECONDS * 1000;
   record.state.countdownEndsAt = null;
@@ -215,6 +233,7 @@ const advanceToNextRound = (
   record.state.playlistIndex =
     (record.state.playlistIndex + 1) % record.playlist.length;
   record.state.currentVideoID = null;
+  record.state.currentVideoDurationSeconds = null;
   record.state.roundStartTime = null;
   record.state.roundEndsAt = null;
   record.state.countdownEndsAt = null;
