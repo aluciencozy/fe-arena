@@ -38,12 +38,10 @@ const Home = () => {
   const [isQueueing, setIsQueueing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
+  const hasUsername = username.trim().length > 0;
   const canUseAnimeActions =
-    username.trim().length > 0 &&
-    selectedMode === "anime" &&
-    selectedTitleIds.length > 0 &&
-    !isQueueing;
-  const canJoinRoom = username.trim().length > 0 && roomId.trim().length > 0;
+    hasUsername && selectedMode === "anime" && selectedTitleIds.length > 0 && !isQueueing;
+  const canJoinRoom = hasUsername && roomId.trim().length > 0;
 
   const selectedTrackCount = useMemo(
     () =>
@@ -111,6 +109,12 @@ const Home = () => {
   };
 
   const handleModeSelect = (mode: GameMode) => {
+    if (!hasUsername) {
+      setSelectedMode(null);
+      setNotice("Choose a username first.");
+      return;
+    }
+
     if (mode === "video-game") {
       setSelectedMode(null);
       setNotice("Video game OST mode is under development for a future release.");
@@ -194,7 +198,10 @@ const Home = () => {
             </label>
             <Input
               value={username}
-              onChange={(event) => setUsername(event.target.value)}
+              onChange={(event) => {
+                setUsername(event.target.value);
+                if (event.target.value.trim()) setNotice("");
+              }}
               placeholder="xX_DemonSlayer_Xx"
               className="bg-input text-foreground placeholder:text-zinc-600"
               maxLength={18}
@@ -209,6 +216,7 @@ const Home = () => {
             className={`home-row group relative flex min-h-28 items-center justify-between overflow-hidden px-5 py-4 text-left transition-all hover:border-player-1/70 ${
               selectedMode === "anime" ? "player-1-border-glow" : ""
             }`}
+            aria-disabled={!hasUsername}
           >
             <div className="relative z-10 flex items-center gap-4">
               <span className="flex size-11 items-center justify-center rounded-lg border border-player-1/50 bg-player-1/10 text-player-1">
@@ -244,6 +252,7 @@ const Home = () => {
             type="button"
             onClick={() => handleModeSelect("video-game")}
             className="home-row group relative flex min-h-28 items-center justify-between overflow-hidden px-5 py-4 text-left opacity-75 transition-all hover:border-player-2/70"
+            aria-disabled={!hasUsername}
           >
             <div className="relative z-10 flex items-center gap-4">
               <span className="flex size-11 items-center justify-center rounded-lg border border-player-2/50 bg-player-2/10 text-player-2">
@@ -322,8 +331,8 @@ const Home = () => {
                             {title.name}
                           </h3>
                           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                            {title.tracks.length} OST entry
-                            {title.tracks.length === 1 ? "" : "s"}
+                            {title.tracks.length} OST{" "}
+                            {title.tracks.length === 1 ? "entry" : "entries"}
                           </p>
                         </div>
                         <span
