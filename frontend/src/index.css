@@ -66,6 +66,14 @@
   --card: #1f2833;
   --card-glass: rgba(31, 40, 51, 0.6);
   --card-foreground: #f3f4f6;
+  --home-row: #080a0f;
+  --home-row-fade: linear-gradient(
+    90deg,
+    #080a0f 0%,
+    rgba(8, 10, 15, 0.96) 34%,
+    rgba(8, 10, 15, 0.72) 62%,
+    rgba(8, 10, 15, 0.38) 100%
+  );
 
   --popover: #1f2833;
   --popover-foreground: #f3f4f6;
@@ -112,6 +120,14 @@
   --card: #1f2833;
   --card-glass: rgba(31, 40, 51, 0.6);
   --card-foreground: #f3f4f6;
+  --home-row: #080a0f;
+  --home-row-fade: linear-gradient(
+    90deg,
+    #080a0f 0%,
+    rgba(8, 10, 15, 0.96) 34%,
+    rgba(8, 10, 15, 0.72) 62%,
+    rgba(8, 10, 15, 0.38) 100%
+  );
 
   --popover: #1f2833;
   --popover-foreground: #f3f4f6;
@@ -164,6 +180,21 @@
 
 .gaming-card-glass {
   @apply border border-border/40 bg-card-glass text-foreground shadow-xl backdrop-blur-md transition-all rounded-xl;
+}
+
+.home-row {
+  background: var(--home-row);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+}
+
+.home-row::after {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  content: "";
+  background: var(--home-row-fade);
 }
 
 /* Glow effects */
