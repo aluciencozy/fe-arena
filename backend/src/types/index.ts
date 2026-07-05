@@ -31,6 +31,19 @@ export interface CatalogTitle {
   tracks: CatalogTrack[];
 }
 
+export interface RoundResult {
+  canonicalTitle: string;
+  trackTitle: string | null;
+  titleId: string;
+  romajiName: string | null;
+  nativeName: string | null;
+  damageByPlayer: Record<string, number>;
+  damageDealt: number;
+  damagedPlayer: string | null;
+  winner: string | null;
+  isTie: boolean;
+}
+
 export interface RoomMetadata {
   roomId: string;
   mode: GameMode;
@@ -60,6 +73,7 @@ export interface GameState {
   ready: Record<string, boolean>;
   winner: string | null;
   revealedAnswer: string | null;
+  roundResult: RoundResult | null;
   playlistIndex: number;
   answerOptions: AnswerOption[];
 }

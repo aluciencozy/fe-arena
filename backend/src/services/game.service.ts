@@ -1,4 +1,9 @@
-import type { AnswerAlias, AnswerOption, GameState } from "../types/index.js";
+import type {
+  AnswerAlias,
+  AnswerOption,
+  GameState,
+  RoundResult,
+} from "../types/index.js";
 import { getRoomMetadata } from "./room.service.js";
 import {
   getAnswerOptionsForTitles,
@@ -8,8 +13,8 @@ import {
 
 const COUNTDOWN_SECONDS = 3;
 const ROUND_SECONDS = 60;
-const GRACE_SECONDS = 3;
-const REVEAL_SECONDS = 3;
+const GRACE_SECONDS = 4;
+const REVEAL_SECONDS = 6;
 const STARTING_HEALTH = 5000;
 
 type TimerHandle = ReturnType<typeof setTimeout>;
@@ -112,6 +117,25 @@ const getRandomVideoStartTime = (track: PlaylistTrack) => {
   return durationSeconds === null ? 0 : Math.random() * durationSeconds;
 };
 
+const createRoundResult = (
+  track: PlaylistTrack,
+  damageByPlayer: Record<string, number>,
+  damageDealt = 0,
+  damagedPlayer: string | null = null,
+  winner: string | null = null,
+): RoundResult => ({
+  canonicalTitle: track.canonicalTitle,
+  trackTitle: track.title ?? null,
+  titleId: track.titleId,
+  romajiName: track.romajiName ?? null,
+  nativeName: track.nativeName ?? null,
+  damageByPlayer: { ...damageByPlayer },
+  damageDealt,
+  damagedPlayer,
+  winner,
+  isTie: damageDealt === 0,
+});
+
 const clearTimers = (record: GameRecord) => {
   if (record.countdownTimer) clearTimeout(record.countdownTimer);
   if (record.roundTimer) clearTimeout(record.roundTimer);
@@ -141,6 +165,7 @@ const makeInitialState = (
   ready: createReady(players),
   winner: null,
   revealedAnswer: null,
+  roundResult: null,
   playlistIndex: 0,
   answerOptions,
 });
@@ -181,6 +206,7 @@ const startCountdown = (
   record.state.currentVideoID = currentVideo.videoId;
   record.state.currentVideoDurationSeconds = getVideoDurationSeconds(currentVideo);
   record.state.revealedAnswer = null;
+  record.state.roundResult = null;
   record.state.guessedCorrectly = [];
   record.state.pendingDamage = {};
   record.state.answerOptions = getAnswerOptionsForRoom(roomId);
@@ -209,6 +235,7 @@ const startRound = (roomId: string, events: GameEvents) => {
   record.state.roundEndsAt = now + ROUND_SECONDS * 1000;
   record.state.countdownEndsAt = null;
   record.state.revealedAnswer = null;
+  record.state.roundResult = null;
   record.state.guessedCorrectly = [];
   record.state.pendingDamage = {};
   record.state.answerOptions = getAnswerOptionsForRoom(roomId);
@@ -240,6 +267,7 @@ const advanceToNextRound = (
   record.state.guessedCorrectly = [];
   record.state.pendingDamage = {};
   record.state.revealedAnswer = null;
+  record.state.roundResult = null;
 
   startCountdown(roomId, players, events);
 };
@@ -253,6 +281,7 @@ const timeoutRound = (roomId: string, events: GameEvents) => {
   const currentVideo = getCurrentPlaylistItem(record);
   record.state.phase = "REVEAL";
   record.state.revealedAnswer = currentVideo.canonicalTitle;
+  record.state.roundResult = createRoundResult(currentVideo, {});
   record.state.roundEndsAt = null;
   record.state.roundStartTime = null;
   events.emitSystemMessage(
@@ -279,6 +308,10 @@ const revealAfterGrace = (
   const currentVideo = getCurrentPlaylistItem(record);
   record.state.phase = "REVEAL";
   record.state.revealedAnswer = currentVideo.canonicalTitle;
+  record.state.roundResult ??= createRoundResult(
+    currentVideo,
+    record.state.pendingDamage,
+  );
   record.state.roundStartTime = null;
   record.state.roundEndsAt = null;
   record.state.countdownEndsAt = null;
@@ -307,11 +340,16 @@ const finishGracePeriod = (
   const [playerA, playerB] = players;
   if (!playerA || !playerB) return;
 
+  const currentVideo = getCurrentPlaylistItem(record);
   const damageA = record.state.pendingDamage[playerA] || 0;
   const damageB = record.state.pendingDamage[playerB] || 0;
   const damageDifference = damageA - damageB;
+  let damageDealt = 0;
+  let damagedPlayer: string | null = null;
 
   if (damageDifference > 0) {
+    damageDealt = damageDifference;
+    damagedPlayer = playerB;
     record.state.health[playerB] = Math.max(
       0,
       (record.state.health[playerB] || 0) - damageDifference,
@@ -320,6 +358,8 @@ const finishGracePeriod = (
       `${playerA} dealt ${damageDifference} damage to ${playerB}!`,
     );
   } else if (damageDifference < 0) {
+    damageDealt = Math.abs(damageDifference);
+    damagedPlayer = playerA;
     record.state.health[playerA] = Math.max(
       0,
       (record.state.health[playerA] || 0) + damageDifference,
@@ -337,6 +377,14 @@ const finishGracePeriod = (
     const survivingPlayer = players.find((player) => player !== winner) || null;
     record.state.phase = "GAME_OVER";
     record.state.winner = survivingPlayer;
+    record.state.revealedAnswer = currentVideo.canonicalTitle;
+    record.state.roundResult = createRoundResult(
+      currentVideo,
+      record.state.pendingDamage,
+      damageDealt,
+      damagedPlayer,
+      survivingPlayer,
+    );
     record.state.ready = createReady(players);
     record.state.roundStartTime = null;
     record.state.roundEndsAt = null;
@@ -346,6 +394,12 @@ const finishGracePeriod = (
     return;
   }
 
+  record.state.roundResult = createRoundResult(
+    currentVideo,
+    record.state.pendingDamage,
+    damageDealt,
+    damagedPlayer,
+  );
   revealAfterGrace(roomId, players, events);
 };
 

@@ -25,9 +25,11 @@ const Room = () => {
   const roundStartTime = useGameStateStore((state) => state.roundStartTime);
   const currentRound = useGameStateStore((state) => state.currentRound);
   const health = useGameStateStore((state) => state.health);
+  const pendingDamage = useGameStateStore((state) => state.pendingDamage);
   const ready = useGameStateStore((state) => state.ready);
   const winner = useGameStateStore((state) => state.winner);
   const revealedAnswer = useGameStateStore((state) => state.revealedAnswer);
+  const roundResult = useGameStateStore((state) => state.roundResult);
   const countdownEndsAt = useGameStateStore((state) => state.countdownEndsAt);
   const roundEndsAt = useGameStateStore((state) => state.roundEndsAt);
   const guessedCorrectly = useGameStateStore((state) => state.guessedCorrectly);
@@ -81,6 +83,8 @@ const Room = () => {
     answerSuggestions.length === 0
       ? 0
       : Math.min(highlightedSuggestionIndex, answerSuggestions.length - 1);
+  const showRoundResult =
+    visualPhase === "REVEAL" || visualPhase === "GAME_OVER";
 
   useEffect(() => {
     if (!dynamicRoomId || !playerName) {
@@ -231,6 +235,128 @@ const Room = () => {
     }
   };
 
+  const renderRoundResultPanel = () => {
+    if (!showRoundResult || (!roundResult && !revealedAnswer)) return null;
+
+    const damageRows = players.map((name) => ({
+      name,
+      damage: roundResult?.damageByPlayer[name] ?? pendingDamage[name] ?? 0,
+    }));
+    const [firstDamage, secondDamage] = damageRows;
+    const damageFormula =
+      firstDamage && secondDamage
+        ? `${firstDamage.damage} - ${secondDamage.damage} = ${Math.abs(
+            firstDamage.damage - secondDamage.damage,
+          )}`
+        : null;
+    const isWin = winner === playerName;
+    const resultTone =
+      winner === null ? "neutral" : isWin ? "win" : "loss";
+    const resultLabel =
+      winner === null
+        ? roundResult?.isTie
+          ? "No damage dealt"
+          : "Round result"
+        : isWin
+          ? "Victory"
+          : "Defeat";
+
+    return (
+      <section
+        className={`round-result-panel round-result-panel-${resultTone} pointer-events-auto select-none`}
+        aria-live="polite"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              {visualPhase === "GAME_OVER" ? "Game over" : "Round reveal"}
+            </p>
+            <h2 className="mt-1 text-3xl font-black uppercase leading-none tracking-wide text-foreground">
+              {resultLabel}
+            </h2>
+          </div>
+          {roundResult?.damageDealt ? (
+            <div className="damage-pop border border-player-2 bg-player-2 px-4 py-2 text-right text-background">
+              <p className="text-[9px] font-black uppercase tracking-widest">
+                Damage
+              </p>
+              <p className="text-2xl font-black leading-none">
+                {roundResult.damageDealt}
+              </p>
+            </div>
+          ) : (
+            <div className="border border-border bg-input px-4 py-2 text-right text-muted-foreground">
+              <p className="text-[9px] font-black uppercase tracking-widest">
+                Damage
+              </p>
+              <p className="text-xl font-black leading-none">0</p>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-5 border-l-2 border-player-1 pl-4">
+          <p className="text-[10px] font-black uppercase tracking-widest text-player-1">
+            Exact song title
+          </p>
+          <p className="mt-1 text-xl font-black text-foreground">
+            {roundResult?.trackTitle ?? "Unknown track title"}
+          </p>
+        </div>
+
+        <div className="mt-4 grid gap-3 border border-border bg-background/70 p-4">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              Anime title
+            </p>
+            <p className="mt-1 text-lg font-black uppercase text-foreground">
+              {roundResult?.canonicalTitle ?? revealedAnswer}
+            </p>
+          </div>
+          {(roundResult?.romajiName || roundResult?.nativeName) && (
+            <div className="grid grid-cols-2 gap-3 text-xs font-bold text-muted-foreground">
+              <span>{roundResult.romajiName ?? "No romaji title"}</span>
+              <span className="text-right">
+                {roundResult.nativeName ?? "No native title"}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 grid gap-2">
+          {damageRows.map(({ name, damage }) => {
+            const isSelf = name === playerName;
+            return (
+              <div
+                key={name}
+                className={`flex items-center justify-between border bg-input px-3 py-2 text-xs font-black uppercase tracking-wider ${
+                  isSelf
+                    ? "border-player-1/60 text-player-1"
+                    : "border-player-2/60 text-player-2"
+                }`}
+              >
+                <span>{isSelf ? `${name} / you` : name}</span>
+                <span>{damage} potential</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {damageFormula && (
+          <div className="mt-4 flex items-center justify-between border border-border bg-card px-4 py-3 text-xs font-black uppercase tracking-widest">
+            <span className="text-muted-foreground">Damage calculation</span>
+            <span className="text-foreground">{damageFormula}</span>
+          </div>
+        )}
+
+        <p className="mt-3 text-center text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+          {roundResult?.damagedPlayer
+            ? `${roundResult.damagedPlayer} took ${roundResult.damageDealt} damage`
+            : "Equal damage or no correct guesses"}
+        </p>
+      </section>
+    );
+  };
+
   // Unified Centered Core Component containing Chat log, Guess Input, and Game State headers
   const renderCenteredCore = () => {
     // Filter visible game messages using start timestamp to clear lobby logs on transition
@@ -255,8 +381,10 @@ const Room = () => {
               </div>
             )}
 
+            {renderRoundResultPanel()}
+
             {/* Scrollable Center Chat Box Container (50 Message capacity during play) */}
-            {visualPhase !== "LOBBY" && (
+            {visualPhase !== "LOBBY" && !showRoundResult && (
               <div className="h-[280px] overflow-y-auto pr-1 flex flex-col gap-3 select-none pointer-events-auto gaming-card-glass p-3 no-scrollbar border-border/40 shadow-xl">
                 {gameMessages.length === 0 ? (
                   <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 text-xs font-semibold uppercase tracking-wider">
@@ -350,19 +478,6 @@ const Room = () => {
               </div>
             )}
           </>
-        )}
-
-        {/* Overlay results / alerts inside core */}
-        {revealedAnswer && visualPhase !== "LOBBY" && (
-          <div className="border border-player-1 bg-card text-player-1 py-2 px-4 text-center font-extrabold text-xs rounded-lg shadow-[0_0_10px_var(--player-1-glow)] select-none">
-            ANSWER: {revealedAnswer.toUpperCase()}
-          </div>
-        )}
-        
-        {winner && visualPhase !== "LOBBY" && (
-          <div className="border border-player-2 bg-card text-player-2 text-center font-extrabold text-sm py-3 px-6 rounded-lg uppercase tracking-widest shadow-[0_0_12px_var(--player-2-glow)] animate-pulse mt-2 select-none">
-            WINNER: {winner.toUpperCase()}
-          </div>
         )}
 
         {/* Rematch button inside core if game is over */}

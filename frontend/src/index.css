@@ -197,6 +197,40 @@
   background: var(--home-row-fade);
 }
 
+.round-result-panel {
+  width: min(540px, calc(100vw - 2rem));
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(135deg, rgba(243, 244, 246, 0.08), transparent 34%),
+    var(--card);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  padding: 1.25rem;
+  animation: round-result-enter 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.round-result-panel-neutral {
+  border-top: 2px solid var(--player-1);
+}
+
+.round-result-panel-win {
+  border-top: 2px solid var(--player-1);
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.55),
+    0 0 26px var(--player-1-glow);
+}
+
+.round-result-panel-loss {
+  border-top: 2px solid var(--player-2);
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.55),
+    0 0 26px var(--player-2-glow);
+}
+
+.damage-pop {
+  animation: damage-pop 620ms cubic-bezier(0.16, 1, 0.3, 1) 120ms both;
+  box-shadow: 0 0 22px var(--player-2-glow);
+}
+
 /* Glow effects */
 .player-1-glow {
   box-shadow: 0 0 15px 2px var(--player-1-glow);
@@ -219,6 +253,32 @@
 }
 .text-player-2-glow {
   text-shadow: 0 0 8px var(--player-2-glow);
+}
+
+@keyframes round-result-enter {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes damage-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.88);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(0) scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* Diagonal Split-screen for Lobby */
