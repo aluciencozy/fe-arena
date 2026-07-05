@@ -502,7 +502,7 @@ const Room = () => {
                 autoFocus
               />
               {answerSuggestions.length > 0 && (
-                <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-lg border border-player-1/40 bg-card shadow-2xl shadow-black/40">
+                <div className="answer-suggestions absolute left-0 right-0 top-full z-50 mt-2 grid max-h-[360px] gap-2 overflow-y-auto rounded-lg border border-player-1/40 bg-background/95 p-2 shadow-2xl shadow-black/50 backdrop-blur-md">
                   {answerSuggestions.map((suggestion, index) => {
                     const isSelected = index === selectedSuggestionIndex;
                     return (
@@ -511,13 +511,41 @@ const Room = () => {
                         type="button"
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => submitSuggestion(suggestion)}
-                        className={`block w-full px-4 py-2.5 text-left text-xs font-extrabold uppercase tracking-wider transition-colors ${
+                        className={`answer-suggestion-row group relative min-h-20 overflow-hidden px-4 py-3 text-left transition-all ${
                           isSelected
-                            ? "bg-player-1 text-background"
-                            : "bg-card text-foreground hover:bg-input"
+                            ? "answer-suggestion-row-selected"
+                            : "hover:border-player-1/70"
                         }`}
                       >
-                        {suggestion.canonicalTitle}
+                        <div className="pointer-events-none absolute inset-y-0 right-0 w-3/5 opacity-65">
+                          <img
+                            src={suggestion.coverImageUrl}
+                            alt=""
+                            aria-hidden="true"
+                            className="ml-auto h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                        </div>
+                        <div className="relative z-10 flex min-h-14 items-center justify-between gap-3">
+                          <div className="min-w-0 max-w-[76%]">
+                            <p className="truncate text-sm font-black uppercase tracking-wide text-foreground">
+                              {suggestion.canonicalTitle}
+                            </p>
+                            <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                              {suggestion.romajiName ??
+                                suggestion.nativeName ??
+                                "Anime title"}
+                            </p>
+                          </div>
+                          <span
+                            className={`flex size-7 shrink-0 items-center justify-center rounded border text-xs font-black ${
+                              isSelected
+                                ? "border-player-1 bg-player-1 text-background"
+                                : "border-border text-muted-foreground"
+                            }`}
+                          >
+                            {isSelected ? "OK" : ""}
+                          </span>
+                        </div>
                       </button>
                     );
                   })}

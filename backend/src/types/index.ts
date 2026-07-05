@@ -9,6 +9,9 @@ export interface AnswerAlias {
 export interface AnswerOption {
   id: string;
   canonicalTitle: string;
+  romajiName: string | null;
+  nativeName: string | null;
+  coverImageUrl: string;
   searchTerms: string[];
 }
 

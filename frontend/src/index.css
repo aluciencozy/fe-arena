@@ -201,6 +201,29 @@
   background: var(--home-row-fade);
 }
 
+.answer-suggestion-row {
+  background: var(--home-row);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+}
+
+.answer-suggestion-row::after {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  content: "";
+  background: var(--home-row-fade);
+}
+
+.answer-suggestion-row-selected {
+  border-color: var(--player-1);
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.34),
+    0 0 16px var(--player-1-glow);
+  transform: translateY(-1px);
+}
+
 .round-result-panel {
   width: min(540px, calc(100vw - 2rem));
   border: 1px solid var(--border);
