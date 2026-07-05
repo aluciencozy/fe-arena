@@ -2,10 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Gamepad2,
+  ListChecks,
+  ListX,
   Loader2,
   Lock,
   Play,
   Plus,
+  Search,
   Swords,
   Users,
   X,
@@ -37,6 +40,7 @@ const Home = () => {
   const [notice, setNotice] = useState("");
   const [isQueueing, setIsQueueing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [titleSearch, setTitleSearch] = useState("");
   const [isUsernameGateOpen, setIsUsernameGateOpen] = useState(
     savedUsername.trim().length === 0,
   );
@@ -54,6 +58,28 @@ const Home = () => {
         .reduce((total, title) => total + title.tracks.length, 0),
     [selectedTitleIds],
   );
+  const filteredAnimeTitles = useMemo(() => {
+    const query = titleSearch.trim().toLowerCase();
+    if (!query) return animeTitles;
+
+    return animeTitles.filter((title) => {
+      const searchableText = [
+        title.name,
+        title.canonicalTitle,
+        title.romajiName,
+        title.nativeName,
+        ...title.answerAliases.map((alias) => alias.value),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(query);
+    });
+  }, [titleSearch]);
+  const filteredSelectedCount = filteredAnimeTitles.filter((title) =>
+    selectedTitleIds.includes(title.id),
+  ).length;
 
   useEffect(() => {
     const handleRoomCreated = (metadata: RoomMetadata) => {
@@ -148,6 +174,21 @@ const Home = () => {
     });
   };
 
+  const selectFilteredAnime = () => {
+    setSelectedTitleIds((currentIds) =>
+      Array.from(
+        new Set([...currentIds, ...filteredAnimeTitles.map((title) => title.id)]),
+      ),
+    );
+  };
+
+  const deselectFilteredAnime = () => {
+    const filteredIds = new Set(filteredAnimeTitles.map((title) => title.id));
+    setSelectedTitleIds((currentIds) =>
+      currentIds.filter((titleId) => !filteredIds.has(titleId)),
+    );
+  };
+
   const handleCreateLobby = () => {
     const trimmedUsername = persistUsername();
     if (!trimmedUsername || selectedMode !== "anime") return;
@@ -240,8 +281,8 @@ const Home = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,40,51,0.35)_0%,_rgba(11,15,25,1)_42%,_rgba(3,5,10,1)_100%)] px-4 py-8 text-foreground">
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+    <div className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(31,40,51,0.35)_0%,_rgba(11,15,25,1)_42%,_rgba(3,5,10,1)_100%)] px-4 py-6 text-foreground">
+      <main className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-5">
         <header className="flex flex-col gap-4 border-b border-border/70 pb-6 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="mb-2 text-[10px] font-extrabold uppercase tracking-widest text-player-1">
@@ -353,9 +394,9 @@ const Home = () => {
         )}
 
         {selectedMode === "anime" && (
-          <section className="grid gap-6 lg:grid-cols-[1fr_360px]">
-            <div className="space-y-4">
-              <div className="flex items-end justify-between gap-4">
+          <section className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[1fr_360px]">
+            <div className="flex min-h-0 flex-col gap-4">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                 <div>
                   <h2 className="text-xl font-black uppercase tracking-widest">
                     Anime Selection
@@ -364,11 +405,51 @@ const Home = () => {
                     {selectedTitleIds.length} selected / {selectedTrackCount}{" "}
                     playable tracks
                   </p>
+                  <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    {filteredSelectedCount} of {filteredAnimeTitles.length} shown selected
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div className="relative min-w-0 sm:w-72">
+                    <Search
+                      size={15}
+                      className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground"
+                    />
+                    <Input
+                      value={titleSearch}
+                      onChange={(event) => setTitleSearch(event.target.value)}
+                      placeholder="SEARCH ANIME"
+                      className="bg-input pl-9 text-xs font-black uppercase tracking-widest text-foreground placeholder:text-zinc-600"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={selectFilteredAnime}
+                      disabled={filteredAnimeTitles.length === 0}
+                      className="font-extrabold uppercase tracking-widest"
+                    >
+                      <ListChecks size={16} />
+                      Select All
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={deselectFilteredAnime}
+                      disabled={filteredAnimeTitles.length === 0}
+                      className="font-extrabold uppercase tracking-widest"
+                    >
+                      <ListX size={16} />
+                      Clear
+                    </Button>
+                  </div>
                 </div>
               </div>
 
-              <div className="grid gap-3">
-                {animeTitles.map((title) => {
+              <div className="min-h-0 flex-1 overflow-y-auto pr-2">
+                <div className="grid gap-3">
+                {filteredAnimeTitles.map((title) => {
                   const selected = selectedTitleIds.includes(title.id);
                   return (
                     <button
@@ -410,6 +491,12 @@ const Home = () => {
                     </button>
                   );
                 })}
+                {filteredAnimeTitles.length === 0 && (
+                  <div className="border border-border bg-input px-4 py-8 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    No anime matched your search.
+                  </div>
+                )}
+                </div>
               </div>
             </div>
 
