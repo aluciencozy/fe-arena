@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import YouTube, { type YouTubeEvent } from "react-youtube";
 import Fuse from "fuse.js";
-import { Settings, Volume2, VolumeX, Waves } from "lucide-react";
+import { CheckCircle2, Settings, Volume2, VolumeX, Waves, Zap } from "lucide-react";
 import { useGameStore, useGameStateStore } from "@/store/gameStore";
 import { useSocket } from "@/hooks/useSocket";
 import type { AnswerOption } from "@/types";
@@ -235,6 +235,41 @@ const Room = () => {
     }
   };
 
+  const opponentName = players.find((p) => p !== playerName) || null;
+  const playerReady = ready[playerName] || false;
+  const opponentReady = opponentName ? (ready[opponentName] || false) : false;
+  const correctGuessFeed = guessedCorrectly.map((name) => ({
+    name,
+    isSelf: name === playerName,
+  }));
+
+  const renderCorrectGuessFeed = () => {
+    if (correctGuessFeed.length === 0 || showRoundResult) return null;
+
+    return (
+      <div className="correct-feed" aria-live="polite">
+        {correctGuessFeed.map(({ name, isSelf }) => (
+          <div
+            key={name}
+            className={`correct-feed-item ${
+              isSelf ? "correct-feed-item-self" : "correct-feed-item-opponent"
+            }`}
+          >
+            <CheckCircle2 size={17} />
+            <div className="min-w-0">
+              <p className="truncate text-xs font-black uppercase text-foreground">
+                {isSelf ? "You locked the answer" : `${name} locked the answer`}
+              </p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                Damage will resolve after the response window
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const renderRoundResultPanel = () => {
     if (!showRoundResult || (!roundResult && !revealedAnswer)) return null;
 
@@ -260,6 +295,12 @@ const Room = () => {
         : isWin
           ? "Victory"
           : "Defeat";
+    const resultSubtitle =
+      winner === null
+        ? "Next round incoming"
+        : isWin
+          ? "You survived the duel"
+          : "Your HP hit zero";
 
     return (
       <section
@@ -274,6 +315,9 @@ const Room = () => {
             <h2 className="mt-1 text-3xl font-black uppercase leading-none tracking-wide text-foreground">
               {resultLabel}
             </h2>
+            <p className="mt-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              {resultSubtitle}
+            </p>
           </div>
           {roundResult?.damageDealt ? (
             <div className="damage-pop border border-player-2 bg-player-2 px-4 py-2 text-right text-background">
@@ -325,17 +369,23 @@ const Room = () => {
         <div className="mt-4 grid gap-2">
           {damageRows.map(({ name, damage }) => {
             const isSelf = name === playerName;
+            const wasDamaged = roundResult?.damagedPlayer === name;
             return (
               <div
                 key={name}
-                className={`flex items-center justify-between border bg-input px-3 py-2 text-xs font-black uppercase tracking-wider ${
+                className={`damage-row flex items-center justify-between border bg-input px-3 py-2 text-xs font-black uppercase tracking-wider ${
                   isSelf
                     ? "border-player-1/60 text-player-1"
                     : "border-player-2/60 text-player-2"
-                }`}
+                } ${wasDamaged ? "damage-row-hit" : ""}`}
               >
                 <span>{isSelf ? `${name} / you` : name}</span>
-                <span>{damage} potential</span>
+                <span className="flex items-center gap-2">
+                  {wasDamaged && roundResult?.damageDealt ? (
+                    <span className="text-foreground">-{roundResult.damageDealt} HP</span>
+                  ) : null}
+                  <span>{damage} potential</span>
+                </span>
               </div>
             );
           })}
@@ -365,7 +415,10 @@ const Room = () => {
       : messages;
 
     return (
-      <div className="w-[420px] pointer-events-auto flex flex-col gap-4">
+      <div
+        key={visualPhase}
+        className={`phase-shell phase-shell-${visualPhase.toLowerCase().replace("_", "-")} w-[420px] pointer-events-auto flex flex-col gap-4`}
+      >
         
         {/* Dynamic Countdown Display */}
         {visualPhase === "COUNTDOWN" ? (
@@ -381,6 +434,7 @@ const Room = () => {
               </div>
             )}
 
+            {renderCorrectGuessFeed()}
             {renderRoundResultPanel()}
 
             {/* Scrollable Center Chat Box Container (50 Message capacity during play) */}
@@ -507,15 +561,11 @@ const Room = () => {
     .filter((m) => m.type === "USER" && m.sender === playerName)
     .slice(-1)[0];
 
-  const opponentName = players.find((p) => p !== playerName) || null;
   const lastOpponentMsg = opponentName
     ? messages
         .filter((m) => m.type === "USER" && m.sender === opponentName)
         .slice(-1)[0]
     : null;
-
-  const playerReady = ready[playerName] || false;
-  const opponentReady = opponentName ? (ready[opponentName] || false) : false;
 
   if (!dynamicRoomId || !playerName) {
     return null;
@@ -726,7 +776,11 @@ const Room = () => {
       {visualPhase !== "LOBBY" && (
         <div className="absolute inset-x-8 bottom-8 flex justify-between items-end pointer-events-none select-none z-10 transition-all duration-500">
           {/* Player 1 HUD (Bottom Left) */}
-          <div className="gaming-card-glass p-4 w-80 pointer-events-auto flex flex-col gap-2.5 player-1-glow border-t-2 border-t-player-1 animate-fade-in">
+          <div
+            className={`gaming-card-glass p-4 w-80 pointer-events-auto flex flex-col gap-2.5 player-1-glow border-t-2 border-t-player-1 animate-fade-in ${
+              roundResult?.damagedPlayer === playerName ? "hud-damage-shake" : ""
+            }`}
+          >
             <div className="flex items-center justify-between">
               <span className="font-extrabold uppercase text-sm tracking-wide text-foreground">
                 PLAYER: {playerName} <span className="text-[9px] bg-player-1 text-background px-1.5 py-0.5 font-bold ml-1 rounded">YOU</span>
@@ -737,10 +791,16 @@ const Room = () => {
             </div>
             <div className="w-full h-4 border border-border bg-input/80 rounded-md relative overflow-hidden">
               <div 
-                className="h-full bg-player-1 transition-all duration-300 ease-out shadow-[0_0_8px_var(--player-1-glow)]" 
+                className="health-fill h-full bg-player-1 transition-all duration-700 ease-out shadow-[0_0_8px_var(--player-1-glow)]" 
                 style={{ width: `${Math.max(0, Math.min(100, ((health[playerName] ?? 5000) / 5000) * 100))}%` }}
               ></div>
             </div>
+            {roundResult?.damagedPlayer === playerName && roundResult.damageDealt > 0 && (
+              <span className="damage-float self-start text-player-2">
+                <Zap size={13} />
+                -{roundResult.damageDealt} HP
+              </span>
+            )}
             {guessedCorrectly.includes(playerName) && (
               <span className="text-xs font-bold uppercase text-background bg-player-1 py-1 px-3 self-start rounded-md shadow-[0_0_8px_var(--player-1-glow)] mt-1">
                 CORRECT!
@@ -753,7 +813,11 @@ const Room = () => {
             const oppName = players.find((p) => p !== playerName) || "Challenger";
             const hasOpponent = players.some((p) => p !== playerName);
             return (
-              <div className="gaming-card-glass p-4 w-80 pointer-events-auto flex flex-col gap-2.5 player-2-glow border-t-2 border-t-player-2 animate-fade-in">
+              <div
+                className={`gaming-card-glass p-4 w-80 pointer-events-auto flex flex-col gap-2.5 player-2-glow border-t-2 border-t-player-2 animate-fade-in ${
+                  roundResult?.damagedPlayer === oppName ? "hud-damage-shake" : ""
+                }`}
+              >
                 <div className="flex items-center justify-between">
                   <span className="font-extrabold uppercase text-sm tracking-wide text-foreground">
                     OPPONENT: {oppName}
@@ -764,10 +828,16 @@ const Room = () => {
                 </div>
                 <div className="w-full h-4 border border-border bg-input/80 rounded-md relative overflow-hidden">
                   <div 
-                    className="h-full bg-player-2 transition-all duration-300 ease-out shadow-[0_0_8px_var(--player-2-glow)]" 
+                    className="health-fill h-full bg-player-2 transition-all duration-700 ease-out shadow-[0_0_8px_var(--player-2-glow)]" 
                     style={{ width: `${hasOpponent ? Math.max(0, Math.min(100, ((health[oppName] ?? 5000) / 5000) * 100)) : 0}%` }}
                   ></div>
                 </div>
+                {roundResult?.damagedPlayer === oppName && roundResult.damageDealt > 0 && (
+                  <span className="damage-float self-end text-player-2">
+                    <Zap size={13} />
+                    -{roundResult.damageDealt} HP
+                  </span>
+                )}
                 {hasOpponent && guessedCorrectly.includes(oppName) && (
                   <span className="text-xs font-bold uppercase text-background bg-player-2 py-1 px-3 self-end rounded-md shadow-[0_0_8px_var(--player-2-glow)] mt-1">
                     CORRECT!
