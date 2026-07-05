@@ -10,7 +10,10 @@ import {
   handlePlayerDisconnectForGame,
   isJoinAllowedForGame,
 } from "../services/game.service.js";
-import { getTracksForMode, getTracksForTitleIds } from "../data/catalog.js";
+import {
+  getPlayableTitlesForMode,
+  getTitlesForTitleIds,
+} from "../data/catalog.js";
 import { enqueuePlayer, removeFromQueue } from "../services/queue.service.js";
 import type { GameMode } from "../types/index.js";
 
@@ -74,8 +77,8 @@ export const registerRoomHandler = (io: Server, socket: Socket) => {
         return;
       }
 
-      const playlist = getTracksForTitleIds(mode, selectedTitleIds);
-      if (playlist.length === 0) {
+      const selectedTitles = getTitlesForTitleIds(mode, selectedTitleIds);
+      if (selectedTitles.length === 0) {
         socket.emit("room:error", "The selected anime have no playable songs.");
         return;
       }
@@ -126,7 +129,7 @@ export const registerRoomHandler = (io: Server, socket: Socket) => {
         return;
       }
 
-      if (getTracksForMode(mode).length === 0) {
+      if (getPlayableTitlesForMode(mode).length === 0) {
         socket.emit("queue:error", "This mode has no playable songs yet.");
         return;
       }
