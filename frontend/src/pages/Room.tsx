@@ -138,7 +138,7 @@ const Room = () => {
 
     if (!roundStartTime) return; // Ensure round start time is set before calculating elapsed time
 
-    const elapsedTime = (Date.now() - roundStartTime) / 1000; // Calculate elapsed time in seconds
+    const elapsedTime = Math.max(0, (Date.now() - roundStartTime) / 1000);
     const rawSyncTime = videoStartTime + elapsedTime;
     const syncTime =
       currentVideoDurationSeconds && currentVideoDurationSeconds > 0
