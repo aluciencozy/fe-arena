@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import YouTube, { type YouTubeEvent } from "react-youtube";
 import Fuse from "fuse.js";
-import { CheckCircle2, Settings, Volume2, VolumeX, Waves, Zap } from "lucide-react";
+import { CheckCircle2, Settings, SkipForward, Volume2, VolumeX, Waves, Zap } from "lucide-react";
 import { useGameStore, useGameStateStore } from "@/store/gameStore";
 import { useSocket } from "@/hooks/useSocket";
 import type { AnswerOption } from "@/types";
@@ -33,10 +33,11 @@ const Room = () => {
   const countdownEndsAt = useGameStateStore((state) => state.countdownEndsAt);
   const roundEndsAt = useGameStateStore((state) => state.roundEndsAt);
   const guessedCorrectly = useGameStateStore((state) => state.guessedCorrectly);
+  const skipVotes = useGameStateStore((state) => state.skipVotes);
   const answerOptions = useGameStateStore((state) => state.answerOptions);
 
   // Use the custom hook to manage WebSocket connections and game state synchronization
-  const { players, messages, sendChatMessage, setReady } = useSocket(
+  const { players, messages, sendChatMessage, setReady, voteToSkip } = useSocket(
     roomCode,
     playerName,
   );
@@ -54,6 +55,7 @@ const Room = () => {
   const hasActiveTimer = countdownEndsAt !== null || roundEndsAt !== null;
   const playerVolume = volume === 0 ? 0 : Math.max(1, Math.round((volume / 100) ** 2 * 100));
   const alreadyGuessedCorrectly = guessedCorrectly.includes(playerName);
+  const alreadyVotedToSkip = skipVotes.includes(playerName);
   const canUseAnswerSuggestions =
     (phase === "PLAYING" || phase === "GRACE_PERIOD") &&
     !alreadyGuessedCorrectly;
@@ -238,6 +240,7 @@ const Room = () => {
   const opponentName = players.find((p) => p !== playerName) || null;
   const playerReady = ready[playerName] || false;
   const opponentReady = opponentName ? (ready[opponentName] || false) : false;
+  const canVoteToSkip = phase === "PLAYING" && players.length === 2;
   const correctGuessFeed = guessedCorrectly.map((name) => ({
     name,
     isSelf: name === playerName,
@@ -554,6 +557,20 @@ const Room = () => {
                 </div>
               )}
             </form>
+
+            {canVoteToSkip && (
+              <button
+                type="button"
+                onClick={voteToSkip}
+                disabled={alreadyVotedToSkip}
+                className="flex w-full items-center justify-center gap-2 border border-border bg-input px-4 py-2.5 text-xs font-extrabold uppercase tracking-widest text-foreground shadow-md transition-all hover:border-player-2/70 hover:text-player-2 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60 pointer-events-auto"
+              >
+                <SkipForward size={15} />
+                {alreadyVotedToSkip
+                  ? `Skip vote locked (${skipVotes.length}/2)`
+                  : `Vote to skip (${skipVotes.length}/2)`}
+              </button>
+            )}
 
             {/* Timer status indicator during active rounds */}
             {visualPhase !== "LOBBY" && (

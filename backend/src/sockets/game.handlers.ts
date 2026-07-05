@@ -4,6 +4,7 @@ import {
   ensureGameForRoom,
   handleGuess,
   setPlayerReady,
+  voteToSkipRound,
 } from "../services/game.service.js";
 
 export const registerGameHandler = (io: Server, socket: Socket) => {
@@ -46,6 +47,25 @@ export const registerGameHandler = (io: Server, socket: Socket) => {
     const { roomId, username } = session;
     const players = getPlayersInRoom(roomId);
     const result = setPlayerReady(roomId, username, players, makeEvents(roomId));
+
+    if (!result.ok) {
+      socket.emit("game:error", result.error);
+    }
+  });
+
+  socket.on("game:skip-vote", () => {
+    const session = getUserSession(socket.id);
+
+    if (!session) return;
+
+    const { roomId, username } = session;
+    const players = getPlayersInRoom(roomId);
+    const result = voteToSkipRound(
+      roomId,
+      username,
+      players,
+      makeEvents(roomId),
+    );
 
     if (!result.ok) {
       socket.emit("game:error", result.error);

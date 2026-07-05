@@ -73,6 +73,7 @@ export interface GameState {
   countdownEndsAt: number | null;
   roundEndsAt: number | null;
   guessedCorrectly: string[];
+  skipVotes: string[];
   ready: Record<string, boolean>;
   winner: string | null;
   revealedAnswer: string | null;
