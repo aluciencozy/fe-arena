@@ -224,6 +224,29 @@
   transform: translateY(-1px);
 }
 
+.anime-picker-scroll {
+  scrollbar-color: var(--player-1) rgba(255, 255, 255, 0.08);
+  scrollbar-width: thin;
+}
+
+.anime-picker-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.anime-picker-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+}
+
+.anime-picker-scroll::-webkit-scrollbar-thumb {
+  background: var(--player-1);
+  border: 2px solid var(--home-row);
+}
+
+.anime-picker-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground);
+}
+
 .round-result-panel {
   width: min(540px, calc(100vw - 2rem));
   border: 1px solid var(--border);

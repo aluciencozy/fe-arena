@@ -12,7 +12,7 @@ import {
 } from "../data/catalog.js";
 
 const COUNTDOWN_SECONDS = 3;
-const ROUND_SECONDS = 60;
+const ROUND_SECONDS = 30;
 const GRACE_SECONDS = 4;
 const REVEAL_SECONDS = 6;
 const STARTING_HEALTH = 5000;
@@ -136,6 +136,11 @@ const createRoundResult = (
   isTie: damageDealt === 0,
 });
 
+const recordRoundResult = (record: GameRecord, result: RoundResult) => {
+  record.state.roundResult = result;
+  record.state.matchHistory.push(result);
+};
+
 const clearTimers = (record: GameRecord) => {
   if (record.countdownTimer) clearTimeout(record.countdownTimer);
   if (record.roundTimer) clearTimeout(record.roundTimer);
@@ -162,10 +167,12 @@ const makeInitialState = (
   countdownEndsAt: null,
   roundEndsAt: null,
   guessedCorrectly: [],
+  skipVotes: [],
   ready: createReady(players),
   winner: null,
   revealedAnswer: null,
   roundResult: null,
+  matchHistory: [],
   playlistIndex: 0,
   answerOptions,
 });
@@ -208,6 +215,7 @@ const startCountdown = (
   record.state.revealedAnswer = null;
   record.state.roundResult = null;
   record.state.guessedCorrectly = [];
+  record.state.skipVotes = [];
   record.state.pendingDamage = {};
   record.state.answerOptions = getAnswerOptionsForRoom(roomId);
   record.state.ready = createReady(players, true);
@@ -237,6 +245,7 @@ const startRound = (roomId: string, events: GameEvents) => {
   record.state.revealedAnswer = null;
   record.state.roundResult = null;
   record.state.guessedCorrectly = [];
+  record.state.skipVotes = [];
   record.state.pendingDamage = {};
   record.state.answerOptions = getAnswerOptionsForRoom(roomId);
 
@@ -265,6 +274,7 @@ const advanceToNextRound = (
   record.state.roundEndsAt = null;
   record.state.countdownEndsAt = null;
   record.state.guessedCorrectly = [];
+  record.state.skipVotes = [];
   record.state.pendingDamage = {};
   record.state.revealedAnswer = null;
   record.state.roundResult = null;
@@ -281,9 +291,10 @@ const timeoutRound = (roomId: string, events: GameEvents) => {
   const currentVideo = getCurrentPlaylistItem(record);
   record.state.phase = "REVEAL";
   record.state.revealedAnswer = currentVideo.canonicalTitle;
-  record.state.roundResult = createRoundResult(currentVideo, {});
+  recordRoundResult(record, createRoundResult(currentVideo, {}));
   record.state.roundEndsAt = null;
   record.state.roundStartTime = null;
+  record.state.skipVotes = [];
   events.emitSystemMessage(
     `Time is up! The answer was ${currentVideo.canonicalTitle}.`,
   );
@@ -308,13 +319,16 @@ const revealAfterGrace = (
   const currentVideo = getCurrentPlaylistItem(record);
   record.state.phase = "REVEAL";
   record.state.revealedAnswer = currentVideo.canonicalTitle;
-  record.state.roundResult ??= createRoundResult(
-    currentVideo,
-    record.state.pendingDamage,
-  );
+  if (!record.state.roundResult) {
+    recordRoundResult(
+      record,
+      createRoundResult(currentVideo, record.state.pendingDamage),
+    );
+  }
   record.state.roundStartTime = null;
   record.state.roundEndsAt = null;
   record.state.countdownEndsAt = null;
+  record.state.skipVotes = [];
 
   events.emitSystemMessage(`The answer was ${currentVideo.canonicalTitle}.`);
   events.emitState(record.state);
@@ -378,27 +392,34 @@ const finishGracePeriod = (
     record.state.phase = "GAME_OVER";
     record.state.winner = survivingPlayer;
     record.state.revealedAnswer = currentVideo.canonicalTitle;
-    record.state.roundResult = createRoundResult(
-      currentVideo,
-      record.state.pendingDamage,
-      damageDealt,
-      damagedPlayer,
-      survivingPlayer,
+    recordRoundResult(
+      record,
+      createRoundResult(
+        currentVideo,
+        record.state.pendingDamage,
+        damageDealt,
+        damagedPlayer,
+        survivingPlayer,
+      ),
     );
     record.state.ready = createReady(players);
     record.state.roundStartTime = null;
     record.state.roundEndsAt = null;
     record.state.countdownEndsAt = null;
+    record.state.skipVotes = [];
     events.emitSystemMessage(`${survivingPlayer} wins!`);
     events.emitState(record.state);
     return;
   }
 
-  record.state.roundResult = createRoundResult(
-    currentVideo,
-    record.state.pendingDamage,
-    damageDealt,
-    damagedPlayer,
+  recordRoundResult(
+    record,
+    createRoundResult(
+      currentVideo,
+      record.state.pendingDamage,
+      damageDealt,
+      damagedPlayer,
+    ),
   );
   revealAfterGrace(roomId, players, events);
 };
@@ -486,6 +507,62 @@ export const setPlayerReady = (
   } else {
     events.emitState(record.state);
   }
+
+  return { ok: true, state: record.state };
+};
+
+export const voteToSkipRound = (
+  roomId: string,
+  username: string,
+  players: string[],
+  events: GameEvents,
+): { ok: true; state: GameState } | { ok: false; error: string } => {
+  const record = games.get(roomId);
+
+  if (!record || record.state.phase !== "PLAYING") {
+    return { ok: false, error: "Skip votes are only available during active play." };
+  }
+
+  if (players.length !== 2 || !players.includes(username)) {
+    return { ok: false, error: "Both players must be present to skip." };
+  }
+
+  const alreadyVoted = record.state.skipVotes.includes(username);
+  if (!alreadyVoted) record.state.skipVotes.push(username);
+
+  if (!players.every((player) => record.state.skipVotes.includes(player))) {
+    if (!alreadyVoted) {
+      events.emitSystemMessage(
+        `${username} voted to skip (${record.state.skipVotes.length}/${players.length}).`,
+      );
+    }
+    events.emitState(record.state);
+    return { ok: true, state: record.state };
+  }
+
+  clearTimers(record);
+
+  const currentVideo = getCurrentPlaylistItem(record);
+  record.state.phase = "REVEAL";
+  record.state.revealedAnswer = currentVideo.canonicalTitle;
+  recordRoundResult(record, createRoundResult(currentVideo, {}));
+  record.state.roundEndsAt = null;
+  record.state.roundStartTime = null;
+  record.state.countdownEndsAt = null;
+  record.state.pendingDamage = {};
+  record.state.skipVotes = [];
+
+  events.emitSystemMessage(
+    `Both players voted to skip. The answer was ${currentVideo.canonicalTitle}.`,
+  );
+  events.emitState(record.state);
+
+  record.revealTimer = setTimeout(() => {
+    const activeRecord = games.get(roomId);
+    if (!activeRecord || activeRecord.state.phase !== "REVEAL") return;
+
+    advanceToNextRound(roomId, players, events);
+  }, REVEAL_SECONDS * 1000);
 
   return { ok: true, state: record.state };
 };
@@ -639,6 +716,7 @@ export const handlePlayerDisconnectForGame = (
     record.state.roundStartTime = null;
     record.state.roundEndsAt = null;
     record.state.countdownEndsAt = null;
+    record.state.skipVotes = [];
     events.emitSystemMessage(`${username} left. ${winner} wins!`);
     events.emitState(record.state);
     return;

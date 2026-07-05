@@ -2,10 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Gamepad2,
+  ListChecks,
+  ListX,
   Loader2,
   Lock,
   Play,
   Plus,
+  Search,
   Swords,
   Users,
   X,
@@ -37,8 +40,13 @@ const Home = () => {
   const [notice, setNotice] = useState("");
   const [isQueueing, setIsQueueing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [titleSearch, setTitleSearch] = useState("");
+  const [isUsernameGateOpen, setIsUsernameGateOpen] = useState(
+    savedUsername.trim().length === 0,
+  );
 
-  const hasUsername = username.trim().length > 0;
+  const trimmedUsername = username.trim();
+  const hasUsername = !isUsernameGateOpen && trimmedUsername.length > 0;
   const canUseAnimeActions =
     hasUsername && selectedMode === "anime" && selectedTitleIds.length > 0 && !isQueueing;
   const canJoinRoom = hasUsername && roomId.trim().length > 0;
@@ -50,6 +58,28 @@ const Home = () => {
         .reduce((total, title) => total + title.tracks.length, 0),
     [selectedTitleIds],
   );
+  const filteredAnimeTitles = useMemo(() => {
+    const query = titleSearch.trim().toLowerCase();
+    if (!query) return animeTitles;
+
+    return animeTitles.filter((title) => {
+      const searchableText = [
+        title.name,
+        title.canonicalTitle,
+        title.romajiName,
+        title.nativeName,
+        ...title.answerAliases.map((alias) => alias.value),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(query);
+    });
+  }, [titleSearch]);
+  const filteredSelectedCount = filteredAnimeTitles.filter((title) =>
+    selectedTitleIds.includes(title.id),
+  ).length;
 
   useEffect(() => {
     const handleRoomCreated = (metadata: RoomMetadata) => {
@@ -98,7 +128,6 @@ const Home = () => {
   }, [navigate, setPlayerName, username]);
 
   const persistUsername = () => {
-    const trimmedUsername = username.trim();
     if (!trimmedUsername) {
       setNotice("Choose a username first.");
       return null;
@@ -106,6 +135,16 @@ const Home = () => {
 
     setPlayerName(trimmedUsername);
     return trimmedUsername;
+  };
+
+  const handleUsernameSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const persistedUsername = persistUsername();
+    if (!persistedUsername) return;
+
+    setUsername(persistedUsername);
+    setIsUsernameGateOpen(false);
+    setNotice("");
   };
 
   const handleModeSelect = (mode: GameMode) => {
@@ -133,6 +172,21 @@ const Home = () => {
 
       return [...currentIds, titleId];
     });
+  };
+
+  const selectFilteredAnime = () => {
+    setSelectedTitleIds((currentIds) =>
+      Array.from(
+        new Set([...currentIds, ...filteredAnimeTitles.map((title) => title.id)]),
+      ),
+    );
+  };
+
+  const deselectFilteredAnime = () => {
+    const filteredIds = new Set(filteredAnimeTitles.map((title) => title.id));
+    setSelectedTitleIds((currentIds) =>
+      currentIds.filter((titleId) => !filteredIds.has(titleId)),
+    );
   };
 
   const handleCreateLobby = () => {
@@ -180,9 +234,55 @@ const Home = () => {
     socket.emit("queue:cancel");
   };
 
+  if (isUsernameGateOpen) {
+    return (
+      <div className="flex h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(31,40,51,0.35)_0%,_rgba(11,15,25,1)_42%,_rgba(3,5,10,1)_100%)] px-4 py-8 text-foreground">
+        <main className="mx-auto flex w-full max-w-md flex-col justify-center">
+          <form
+            onSubmit={handleUsernameSubmit}
+            className="gaming-card p-6 shadow-2xl"
+          >
+            <p className="mb-2 text-[10px] font-extrabold uppercase tracking-widest text-player-1">
+              Real-time OST battles
+            </p>
+            <h1 className="mb-6 text-4xl font-black uppercase tracking-widest text-foreground">
+              Guess The OST
+            </h1>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Username
+            </label>
+            <Input
+              autoFocus
+              value={username}
+              onChange={(event) => {
+                setUsername(event.target.value);
+                if (event.target.value.trim()) setNotice("");
+              }}
+              placeholder="xX_DemonSlayer_Xx"
+              className="mb-4 bg-input text-foreground placeholder:text-zinc-600"
+              maxLength={18}
+            />
+            <Button
+              type="submit"
+              disabled={trimmedUsername.length === 0}
+              className="w-full bg-player-1 font-extrabold uppercase tracking-widest text-background hover:bg-player-1/90"
+            >
+              Continue
+            </Button>
+            {notice && (
+              <div className="mt-4 border border-border bg-input px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                {notice}
+              </div>
+            )}
+          </form>
+        </main>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,40,51,0.35)_0%,_rgba(11,15,25,1)_42%,_rgba(3,5,10,1)_100%)] px-4 py-8 text-foreground">
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+    <div className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(31,40,51,0.35)_0%,_rgba(11,15,25,1)_42%,_rgba(3,5,10,1)_100%)] px-4 py-6 text-foreground">
+      <main className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-5">
         <header className="flex flex-col gap-4 border-b border-border/70 pb-6 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="mb-2 text-[10px] font-extrabold uppercase tracking-widest text-player-1">
@@ -192,20 +292,25 @@ const Home = () => {
               Guess The OST
             </h1>
           </div>
-          <div className="w-full max-w-sm space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Username
-            </label>
-            <Input
-              value={username}
-              onChange={(event) => {
-                setUsername(event.target.value);
-                if (event.target.value.trim()) setNotice("");
-              }}
-              placeholder="xX_DemonSlayer_Xx"
-              className="bg-input text-foreground placeholder:text-zinc-600"
-              maxLength={18}
-            />
+          <div className="flex w-full max-w-sm items-center justify-between gap-3 border border-border bg-card/70 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Username
+              </p>
+              <p className="truncate text-sm font-black uppercase tracking-widest text-foreground">
+                {trimmedUsername}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsUsernameGateOpen(true)}
+              disabled={isQueueing || isCreating}
+              className="font-extrabold uppercase tracking-widest"
+            >
+              Change
+            </Button>
           </div>
         </header>
 
@@ -289,22 +394,64 @@ const Home = () => {
         )}
 
         {selectedMode === "anime" && (
-          <section className="grid gap-6 lg:grid-cols-[1fr_360px]">
-            <div className="space-y-4">
-              <div className="flex items-end justify-between gap-4">
-                <div>
-                  <h2 className="text-xl font-black uppercase tracking-widest">
+          <section className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[1fr_360px]">
+            <div className="flex min-h-0 flex-col gap-4">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+                <div className="min-w-0">
+                  <h2 className="whitespace-nowrap text-xl font-black uppercase tracking-widest">
                     Anime Selection
                   </h2>
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  <p className="whitespace-nowrap text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     {selectedTitleIds.length} selected / {selectedTrackCount}{" "}
                     playable tracks
                   </p>
+                  <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    {filteredSelectedCount} of {filteredAnimeTitles.length} shown selected
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div className="relative min-w-0 sm:w-64">
+                    <Search
+                      size={13}
+                      className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground"
+                    />
+                    <Input
+                      value={titleSearch}
+                      onChange={(event) => setTitleSearch(event.target.value)}
+                      placeholder="SEARCH ANIME"
+                      className="h-8 bg-input pl-8 text-[10px] font-black uppercase tracking-widest text-foreground placeholder:text-zinc-600"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={selectFilteredAnime}
+                      disabled={filteredAnimeTitles.length === 0}
+                      size="sm"
+                      className="h-8 px-2 text-[10px] font-extrabold uppercase tracking-wider"
+                    >
+                      <ListChecks size={13} />
+                      Select All
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={deselectFilteredAnime}
+                      disabled={filteredAnimeTitles.length === 0}
+                      size="sm"
+                      className="h-8 px-2 text-[10px] font-extrabold uppercase tracking-wider"
+                    >
+                      <ListX size={13} />
+                      Clear
+                    </Button>
+                  </div>
                 </div>
               </div>
 
-              <div className="grid gap-3">
-                {animeTitles.map((title) => {
+              <div className="anime-picker-scroll min-h-0 flex-1 overflow-y-auto pr-2">
+                <div className="grid gap-3">
+                {filteredAnimeTitles.map((title) => {
                   const selected = selectedTitleIds.includes(title.id);
                   return (
                     <button
@@ -346,6 +493,12 @@ const Home = () => {
                     </button>
                   );
                 })}
+                {filteredAnimeTitles.length === 0 && (
+                  <div className="border border-border bg-input px-4 py-8 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    No anime matched your search.
+                  </div>
+                )}
+                </div>
               </div>
             </div>
 

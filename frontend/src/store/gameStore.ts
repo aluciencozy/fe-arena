@@ -43,10 +43,12 @@ export const useGameStateStore = create<GameStore>((set) => ({
   countdownEndsAt: null,
   roundEndsAt: null,
   guessedCorrectly: [],
+  skipVotes: [],
   ready: {},
   winner: null,
   revealedAnswer: null,
   roundResult: null,
+  matchHistory: [],
   playlistIndex: 0,
   answerOptions: [],
   setGameState: (newState: Partial<GameState>) =>

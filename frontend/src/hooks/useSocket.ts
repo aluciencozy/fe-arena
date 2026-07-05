@@ -108,5 +108,9 @@ export const useSocket = (roomCode: string, playerName: string) => {
     socket.emit("game:ready");
   };
 
-  return { players, messages, sendChatMessage, setReady };
+  const voteToSkip = () => {
+    socket.emit("game:skip-vote");
+  };
+
+  return { players, messages, sendChatMessage, setReady, voteToSkip };
 };

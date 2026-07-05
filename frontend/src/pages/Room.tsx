@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import YouTube, { type YouTubeEvent } from "react-youtube";
 import Fuse from "fuse.js";
-import { CheckCircle2, Settings, Volume2, VolumeX, Waves, Zap } from "lucide-react";
+import { CheckCircle2, Settings, SkipForward, Volume2, VolumeX, Waves, Zap } from "lucide-react";
 import { useGameStore, useGameStateStore } from "@/store/gameStore";
 import { useSocket } from "@/hooks/useSocket";
 import type { AnswerOption } from "@/types";
@@ -30,13 +30,15 @@ const Room = () => {
   const winner = useGameStateStore((state) => state.winner);
   const revealedAnswer = useGameStateStore((state) => state.revealedAnswer);
   const roundResult = useGameStateStore((state) => state.roundResult);
+  const matchHistory = useGameStateStore((state) => state.matchHistory);
   const countdownEndsAt = useGameStateStore((state) => state.countdownEndsAt);
   const roundEndsAt = useGameStateStore((state) => state.roundEndsAt);
   const guessedCorrectly = useGameStateStore((state) => state.guessedCorrectly);
+  const skipVotes = useGameStateStore((state) => state.skipVotes);
   const answerOptions = useGameStateStore((state) => state.answerOptions);
 
   // Use the custom hook to manage WebSocket connections and game state synchronization
-  const { players, messages, sendChatMessage, setReady } = useSocket(
+  const { players, messages, sendChatMessage, setReady, voteToSkip } = useSocket(
     roomCode,
     playerName,
   );
@@ -54,6 +56,7 @@ const Room = () => {
   const hasActiveTimer = countdownEndsAt !== null || roundEndsAt !== null;
   const playerVolume = volume === 0 ? 0 : Math.max(1, Math.round((volume / 100) ** 2 * 100));
   const alreadyGuessedCorrectly = guessedCorrectly.includes(playerName);
+  const alreadyVotedToSkip = skipVotes.includes(playerName);
   const canUseAnswerSuggestions =
     (phase === "PLAYING" || phase === "GRACE_PERIOD") &&
     !alreadyGuessedCorrectly;
@@ -238,6 +241,7 @@ const Room = () => {
   const opponentName = players.find((p) => p !== playerName) || null;
   const playerReady = ready[playerName] || false;
   const opponentReady = opponentName ? (ready[opponentName] || false) : false;
+  const canVoteToSkip = phase === "PLAYING" && players.length === 2;
   const correctGuessFeed = guessedCorrectly.map((name) => ({
     name,
     isSelf: name === playerName,
@@ -409,6 +413,87 @@ const Room = () => {
     );
   };
 
+  const renderMatchHistoryPanel = () => {
+    if (phase !== "GAME_OVER" || matchHistory.length === 0) return null;
+
+    return (
+      <section className="max-h-[260px] overflow-y-auto border border-border bg-card/95 p-4 shadow-xl pointer-events-auto">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              Match history
+            </p>
+            <h3 className="text-lg font-black uppercase tracking-wider text-foreground">
+              Rounds played
+            </h3>
+          </div>
+          <span className="border border-border bg-input px-2 py-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            {matchHistory.length}
+          </span>
+        </div>
+
+        <div className="grid gap-3">
+          {matchHistory.map((result, index) => {
+            const scoreRows = players.map((name) => ({
+              name,
+              points: result.damageByPlayer[name] ?? 0,
+              damageTaken:
+                result.damagedPlayer === name ? result.damageDealt : 0,
+            }));
+
+            return (
+              <article
+                key={`${result.titleId}-${index}`}
+                className="border border-border bg-background/80 p-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                      Round {index + 1}
+                    </p>
+                    <p className="mt-1 truncate text-sm font-black uppercase tracking-wide text-foreground">
+                      {result.canonicalTitle}
+                    </p>
+                    <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      {result.trackTitle ?? "Unknown track title"}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-right text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                    {result.damageDealt > 0 ? `${result.damageDealt} dmg` : "No dmg"}
+                  </span>
+                </div>
+
+                <div className="mt-3 grid gap-2">
+                  {scoreRows.map(({ name, points, damageTaken }) => {
+                    const isSelf = name === playerName;
+
+                    return (
+                      <div
+                        key={name}
+                        className={`flex items-center justify-between border bg-input px-3 py-2 text-[10px] font-black uppercase tracking-wider ${
+                          isSelf
+                            ? "border-player-1/60 text-player-1"
+                            : "border-player-2/60 text-player-2"
+                        }`}
+                      >
+                        <span className="truncate">
+                          {isSelf ? `${name} / you` : name}
+                        </span>
+                        <span className="shrink-0 text-muted-foreground">
+                          {points} pts {damageTaken > 0 ? `/ -${damageTaken} HP` : ""}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    );
+  };
+
   // Unified Centered Core Component containing Chat log, Guess Input, and Game State headers
   const renderCenteredCore = () => {
     // Filter visible game messages using start timestamp to clear lobby logs on transition
@@ -555,6 +640,20 @@ const Room = () => {
               )}
             </form>
 
+            {canVoteToSkip && (
+              <button
+                type="button"
+                onClick={voteToSkip}
+                disabled={alreadyVotedToSkip}
+                className="flex w-full items-center justify-center gap-2 border border-border bg-input px-4 py-2.5 text-xs font-extrabold uppercase tracking-widest text-foreground shadow-md transition-all hover:border-player-2/70 hover:text-player-2 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60 pointer-events-auto"
+              >
+                <SkipForward size={15} />
+                {alreadyVotedToSkip
+                  ? `Skip vote locked (${skipVotes.length}/2)`
+                  : `Vote to skip (${skipVotes.length}/2)`}
+              </button>
+            )}
+
             {/* Timer status indicator during active rounds */}
             {visualPhase !== "LOBBY" && (
               <div className="text-center font-bold text-[10px] uppercase tracking-widest text-zinc-400 bg-input/80 px-3 py-1.5 select-none self-center border border-border rounded-md shadow-sm">
@@ -566,20 +665,23 @@ const Room = () => {
 
         {/* Rematch button inside core if game is over */}
         {phase === "GAME_OVER" && (
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => navigate("/")}
-              className="w-full font-extrabold text-xs uppercase tracking-widest py-3 border border-border bg-input hover:bg-muted text-foreground rounded-lg transition-all cursor-pointer active:translate-y-px pointer-events-auto"
-            >
-              BACK HOME
-            </button>
-            <button
-              onClick={() => setReady()}
-              className="w-full font-extrabold text-xs uppercase tracking-widest py-3 border border-player-1 bg-player-1/10 hover:bg-player-1/25 text-player-1 rounded-lg transition-all shadow-[0_0_15px_rgba(77,255,188,0.2)] hover:shadow-[0_0_25px_rgba(77,255,188,0.4)] cursor-pointer active:translate-y-px pointer-events-auto"
-            >
-              REMATCH
-            </button>
-          </div>
+          <>
+            {renderMatchHistoryPanel()}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => navigate("/")}
+                className="w-full font-extrabold text-xs uppercase tracking-widest py-3 border border-border bg-input hover:bg-muted text-foreground rounded-lg transition-all cursor-pointer active:translate-y-px pointer-events-auto"
+              >
+                BACK HOME
+              </button>
+              <button
+                onClick={() => setReady()}
+                className="w-full font-extrabold text-xs uppercase tracking-widest py-3 border border-player-1 bg-player-1/10 hover:bg-player-1/25 text-player-1 rounded-lg transition-all shadow-[0_0_15px_rgba(77,255,188,0.2)] hover:shadow-[0_0_25px_rgba(77,255,188,0.4)] cursor-pointer active:translate-y-px pointer-events-auto"
+              >
+                REMATCH
+              </button>
+            </div>
+          </>
         )}
 
       </div>
