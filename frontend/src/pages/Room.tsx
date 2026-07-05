@@ -3,16 +3,11 @@ import { useParams, useNavigate } from "react-router-dom";
 import YouTube, { type YouTubeEvent } from "react-youtube";
 import { useGameStore, useGameStateStore } from "@/store/gameStore";
 import { useSocket } from "@/hooks/useSocket";
-import { GameStartSequence } from "@/components/GameStartSequence";
 
 const Room = () => {
   const { id: dynamicRoomId } = useParams(); // Get the room ID from the URL
   const navigate = useNavigate(); // Hook to programmatically navigate between routes
-
-  if (!dynamicRoomId) {
-    navigate("/"); // Redirect to home if no room ID is present
-    return null; // Render nothing while redirecting
-  }
+  const roomCode = dynamicRoomId ?? "";
 
   // Access player name and game state from the global stores
   const playerName = useGameStore((state) => state.playerName);
@@ -31,39 +26,36 @@ const Room = () => {
 
   // Use the custom hook to manage WebSocket connections and game state synchronization
   const { players, messages, sendChatMessage, setReady } = useSocket(
-    dynamicRoomId,
+    roomCode,
     playerName,
   );
   
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(0);
   const [guessValue, setGuessValue] = useState("");
   const [gameStartTime, setGameStartTime] = useState<number | null>(null);
-  const [visualPhase, setVisualPhase] = useState(phase);
+  const visualPhase = phase;
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasActiveTimer = countdownEndsAt !== null || roundEndsAt !== null;
 
+  useEffect(() => {
+    if (!dynamicRoomId || !playerName) {
+      navigate("/", { replace: true });
+    }
+  }, [dynamicRoomId, navigate, playerName]);
+
   // Clear chat / capture timestamp when active game starts
   useEffect(() => {
-    if (phase === "INTRO_ANIMATION" || phase === "COUNTDOWN" || phase === "PLAYING") {
-      setGameStartTime(Date.now());
-    } else if (phase === "LOBBY") {
-      setGameStartTime(null);
+    if (phase === "COUNTDOWN" || phase === "PLAYING") {
+      const timer = window.setTimeout(() => setGameStartTime(Date.now()), 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    if (phase === "LOBBY") {
+      const timer = window.setTimeout(() => setGameStartTime(null), 0);
+      return () => window.clearTimeout(timer);
     }
   }, [phase]);
-
-  // Sync visualPhase with phase, delaying the transition from LOBBY to COUNTDOWN
-  // until the overlay settled state finishes and the screen starts fading back to the game (4.8s delay)
-  useEffect(() => {
-    if (phase === "INTRO_ANIMATION" && visualPhase === "LOBBY") {
-      const timer = setTimeout(() => {
-        setVisualPhase("COUNTDOWN");
-      }, 4800);
-      return () => clearTimeout(timer);
-    } else if (phase !== "INTRO_ANIMATION") {
-      setVisualPhase(phase);
-    }
-  }, [phase, visualPhase]);
 
   // Auto scroll to the bottom of the log when new messages arrive or game starts
   useEffect(() => {
@@ -73,9 +65,12 @@ const Room = () => {
   useEffect(() => {
     if (!hasActiveTimer) return;
 
-    setNow(Date.now());
+    const immediateTimer = window.setTimeout(() => setNow(Date.now()), 0);
     const timer = window.setInterval(() => setNow(Date.now()), 250);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearTimeout(immediateTimer);
+      window.clearInterval(timer);
+    };
   }, [hasActiveTimer]);
 
   const countdownSeconds = countdownEndsAt
@@ -147,7 +142,7 @@ const Room = () => {
                             </span>
                             <div className={`relative border bg-card px-4 py-2.5 text-xs font-bold rounded-lg shadow-md ${isSelf ? 'border-player-1/60 border-l-4 border-l-player-1 text-player-1 shadow-[0_0_10px_var(--player-1-glow)]' : 'border-player-2/60 border-r-4 border-r-player-2 text-player-2 shadow-[0_0_10px_var(--player-2-glow)]'}`}>
                               <p className="break-all whitespace-pre-wrap">
-                                {isSelf ? "CORRECT! YOU GUESSED IT!" : "CORRECT ANSWER DETECTED: [████████]"}
+                                {isSelf ? "CORRECT! YOU GUESSED IT!" : "CORRECT ANSWER DETECTED: [HIDDEN]"}
                               </p>
                             </div>
                           </div>
@@ -242,15 +237,12 @@ const Room = () => {
   const playerReady = ready[playerName] || false;
   const opponentReady = opponentName ? (ready[opponentName] || false) : false;
 
+  if (!dynamicRoomId || !playerName) {
+    return null;
+  }
+
   return (
     <div className="relative w-screen h-screen overflow-hidden text-foreground bg-background bg-[radial-gradient(circle_at_center,_rgba(31,40,51,0.15)_0%,_rgba(11,15,25,1)_100%)] transition-colors duration-500">
-      
-      {/* Game start animation overlay */}
-      <GameStartSequence 
-        playerName={playerName} 
-        opponentName={opponentName} 
-      />
-      
       {/* BACKGROUND LAYER 1: Lobby Split-Slash (LOBBY phase only) */}
       {/* ---------------------------------------------------- */}
       {visualPhase === "LOBBY" && (
@@ -377,7 +369,15 @@ const Room = () => {
         
         {/* Lobby warning labels at the bottom (No overlay ready up button here anymore) */}
         {visualPhase === "LOBBY" && (
-          <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 z-30 pointer-events-auto select-none">
+          <div className="absolute bottom-12 left-1/2 z-30 flex -translate-x-1/2 transform flex-col items-center gap-3 pointer-events-auto select-none">
+            <div className="border border-player-1/60 bg-card px-5 py-2 text-center shadow-[0_0_12px_var(--player-1-glow)]">
+              <p className="text-[9px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                Room Code
+              </p>
+              <p className="text-xl font-black uppercase tracking-[0.35em] text-player-1">
+                {roomCode}
+              </p>
+            </div>
             {players.length < 2 && (
               <div className="text-sm font-extrabold uppercase tracking-widest text-center text-zinc-500 bg-input/80 border border-border/80 px-6 py-3 rounded-lg shadow-lg animate-pulse">
                 Waiting for challenger to join...
