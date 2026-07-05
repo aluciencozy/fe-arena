@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { io, Socket } from "socket.io-client";
 import type { UnifiedMessage, GameState } from "../types/";
 import { useGameStateStore } from "@/store/gameStore";
+import { connectSocket, scheduleSocketDisconnect, socket } from "@/lib/socket";
 
 const MAX_MESSAGE_CAPACITY = 100; // Maximum number of messages to keep in state
-
-// Create a Socket.io client instance with autoConnect set to false
-const socket: Socket = io("http://localhost:3001", { autoConnect: false });
 
 export const useSocket = (roomCode: string, playerName: string) => {
   const [players, setPlayers] = useState<string[]>([]); // State to hold the current players in room
@@ -15,7 +12,9 @@ export const useSocket = (roomCode: string, playerName: string) => {
   const navigate = useNavigate(); // Hook to programmatically navigate between routes
 
   useEffect(() => {
-    socket.connect(); // Manually connect the socket
+    if (!roomCode || !playerName) return;
+
+    connectSocket(); // Manually connect the socket
 
     // Immediately emit the 'room:join' event to join the specified room with the player's name
     socket.emit("room:join", roomCode, playerName);
@@ -85,7 +84,9 @@ export const useSocket = (roomCode: string, playerName: string) => {
     socket.on("game:state", handleGameState);
     socket.on("game:error", handleGameError);
 
-    // Remove event listeners and disconnect the socket
+    // Remove event listeners and disconnect after a short grace period.
+    // React StrictMode remounts effects in development; delaying prevents
+    // deleting a freshly matched room between the probe unmount/remount.
     return () => {
       socket.off("room:notification", handleRoomNotification);
       socket.off("room:state", handleRoomState);
@@ -93,9 +94,9 @@ export const useSocket = (roomCode: string, playerName: string) => {
       socket.off("chat:broadcast", handleChatBroadcast);
       socket.off("game:state", handleGameState);
       socket.off("game:error", handleGameError);
-      socket.disconnect();
+      scheduleSocketDisconnect();
     };
-  }, [roomCode, playerName]); // Re-run effect if roomCode or playerName changes
+  }, [navigate, roomCode, playerName]); // Re-run effect if roomCode or playerName changes
 
   const sendChatMessage = (message: string) => {
     const trimmedMessage = message.trim();

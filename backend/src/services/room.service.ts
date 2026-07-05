@@ -1,14 +1,62 @@
+import type { GameMode, RoomMetadata, RoomSource } from "../types/index.js";
+
 // Hold the rooms and the players in them
 const rooms = new Map<string, string[]>();
+const roomMetadata = new Map<string, RoomMetadata>();
 
 // Hold the user sessions to track which socket is in which room and their username
 const userSessions = new Map<string, { roomId: string; username: string }>();
 
 // Utility functions to manage rooms and user sessions
 export const getUserSession = (socketId: string) => userSessions.get(socketId);
+export const getRoomMetadata = (roomId: string) =>
+  roomMetadata.get(roomId.trim().toUpperCase());
 
 // Get the list of players in a room, or an empty array if the room doesn't exist
 export const getPlayersInRoom = (roomId: string) => rooms.get(roomId) || [];
+
+const makeRoomCode = () => {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+
+  for (let index = 0; index < 6; index += 1) {
+    code += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+
+  return code;
+};
+
+export const generateUniqueRoomId = () => {
+  let roomId = makeRoomCode();
+
+  while (rooms.has(roomId) || roomMetadata.has(roomId)) {
+    roomId = makeRoomCode();
+  }
+
+  return roomId;
+};
+
+export const createRoom = ({
+  mode,
+  source,
+  selectedTitleIds,
+}: {
+  mode: GameMode;
+  source: RoomSource;
+  selectedTitleIds: string[];
+}) => {
+  const roomId = generateUniqueRoomId();
+
+  rooms.set(roomId, []);
+  roomMetadata.set(roomId, {
+    roomId,
+    mode,
+    source,
+    selectedTitleIds,
+  });
+
+  return roomMetadata.get(roomId) as RoomMetadata;
+};
 
 export const addPlayerToRoom = (
   roomId: string,
@@ -30,19 +78,8 @@ export const addPlayerToRoom = (
     };
   }
 
-  // If the room doesn't exist, create it and add the player to it
   if (!rooms.has(normalizedRoomId)) {
-    userSessions.set(socketId, {
-      roomId: normalizedRoomId,
-      username: normalizedUsername,
-    });
-    return {
-      ok: true,
-      currentPlayers: rooms
-        .set(normalizedRoomId, [normalizedUsername])
-        .get(normalizedRoomId) as string[],
-      isNewPlayer: true,
-    };
+    return { ok: false, error: "That room code was not found." };
   }
 
   // If the room exists, add the player to it if they are not already in it
@@ -84,6 +121,7 @@ export const removePlayerFromRoom = (
   // If the room is empty after removing the player, delete the room, otherwise update the room with the new list of players
   if (updatedPlayers.length === 0) {
     rooms.delete(roomId);
+    roomMetadata.delete(roomId);
   } else {
     rooms.set(roomId, updatedPlayers);
   }

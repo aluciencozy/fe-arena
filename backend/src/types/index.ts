@@ -1,7 +1,30 @@
+export type GameMode = "anime" | "video-game";
+export type RoomSource = "private" | "queue";
+
+export interface CatalogTrack {
+  id: string;
+  videoId: string;
+  answer: string;
+}
+
+export interface CatalogTitle {
+  id: string;
+  mode: GameMode;
+  name: string;
+  coverImageUrl: string;
+  tracks: CatalogTrack[];
+}
+
+export interface RoomMetadata {
+  roomId: string;
+  mode: GameMode;
+  source: RoomSource;
+  selectedTitleIds: string[];
+}
+
 export interface GameState {
   phase:
     | "LOBBY"
-    | "INTRO_ANIMATION"
     | "COUNTDOWN"
     | "PLAYING"
     | "ROUND_END"
