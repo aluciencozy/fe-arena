@@ -21,6 +21,12 @@ const Home = () => {
   const navigate = useNavigate();
   const savedUsername = useGameStore((state) => state.playerName);
   const setPlayerName = useGameStore((state) => state.setPlayerName);
+  const animeModeImages = animeTitles
+    .slice(0, 3)
+    .map((title) => title.coverImageUrl);
+  const videoGameModeImages = [
+    "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=900&q=80",
+  ];
 
   const [username, setUsername] = useState(savedUsername);
   const [selectedMode, setSelectedMode] = useState<GameMode | null>(null);
@@ -32,12 +38,10 @@ const Home = () => {
   const [isQueueing, setIsQueueing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
+  const hasUsername = username.trim().length > 0;
   const canUseAnimeActions =
-    username.trim().length > 0 &&
-    selectedMode === "anime" &&
-    selectedTitleIds.length > 0 &&
-    !isQueueing;
-  const canJoinRoom = username.trim().length > 0 && roomId.trim().length > 0;
+    hasUsername && selectedMode === "anime" && selectedTitleIds.length > 0 && !isQueueing;
+  const canJoinRoom = hasUsername && roomId.trim().length > 0;
 
   const selectedTrackCount = useMemo(
     () =>
@@ -105,6 +109,12 @@ const Home = () => {
   };
 
   const handleModeSelect = (mode: GameMode) => {
+    if (!hasUsername) {
+      setSelectedMode(null);
+      setNotice("Choose a username first.");
+      return;
+    }
+
     if (mode === "video-game") {
       setSelectedMode(null);
       setNotice("Video game OST mode is under development for a future release.");
@@ -188,7 +198,10 @@ const Home = () => {
             </label>
             <Input
               value={username}
-              onChange={(event) => setUsername(event.target.value)}
+              onChange={(event) => {
+                setUsername(event.target.value);
+                if (event.target.value.trim()) setNotice("");
+              }}
               placeholder="xX_DemonSlayer_Xx"
               className="bg-input text-foreground placeholder:text-zinc-600"
               maxLength={18}
@@ -196,44 +209,55 @@ const Home = () => {
           </div>
         </header>
 
-        <section className="grid gap-4 md:grid-cols-2">
+        <section className="grid gap-3">
           <button
             type="button"
             onClick={() => handleModeSelect("anime")}
-            className={`gaming-card group flex min-h-44 flex-col items-start justify-between p-5 text-left transition-all hover:border-player-1/70 ${
+            className={`home-row group relative flex min-h-28 items-center justify-between overflow-hidden px-5 py-4 text-left transition-all hover:border-player-1/70 ${
               selectedMode === "anime" ? "player-1-border-glow" : ""
             }`}
           >
-            <div className="flex items-center gap-3">
+            <div className="relative z-10 flex items-center gap-4">
               <span className="flex size-11 items-center justify-center rounded-lg border border-player-1/50 bg-player-1/10 text-player-1">
                 <Swords size={22} />
               </span>
               <div>
-                <h2 className="text-2xl font-black uppercase tracking-widest">
+                <h2 className="text-2xl font-black uppercase tracking-widest text-foreground md:text-3xl">
                   Anime
                 </h2>
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Available now
+                  Available now / full catalog queue
                 </p>
               </div>
             </div>
-            <p className="mt-6 text-sm font-semibold text-zinc-300">
-              Choose anime titles for private rooms or queue into the full anime
-              OST pool.
+            <p className="relative z-10 hidden max-w-sm text-right text-sm font-semibold text-zinc-300 md:block">
+              Choose title pools for private rooms or queue into the full anime OST set.
             </p>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex w-3/5 justify-end opacity-70">
+              {animeModeImages.map((imageUrl, index) => (
+                <img
+                  key={imageUrl}
+                  src={imageUrl}
+                  alt=""
+                  aria-hidden="true"
+                  className="h-full w-32 object-cover opacity-80 transition-transform duration-500 group-hover:scale-105 md:w-44"
+                  style={{ transform: `translateX(${index * 18}px)` }}
+                />
+              ))}
+            </div>
           </button>
 
           <button
             type="button"
             onClick={() => handleModeSelect("video-game")}
-            className="gaming-card group flex min-h-44 flex-col items-start justify-between p-5 text-left opacity-75 transition-all hover:border-player-2/70"
+            className="home-row group relative flex min-h-28 items-center justify-between overflow-hidden px-5 py-4 text-left opacity-75 transition-all hover:border-player-2/70"
           >
-            <div className="flex items-center gap-3">
+            <div className="relative z-10 flex items-center gap-4">
               <span className="flex size-11 items-center justify-center rounded-lg border border-player-2/50 bg-player-2/10 text-player-2">
                 <Gamepad2 size={22} />
               </span>
               <div>
-                <h2 className="text-2xl font-black uppercase tracking-widest">
+                <h2 className="text-2xl font-black uppercase tracking-widest text-foreground md:text-3xl">
                   Video Game
                 </h2>
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -241,9 +265,20 @@ const Home = () => {
                 </p>
               </div>
             </div>
-            <p className="mt-6 flex items-center gap-2 text-sm font-semibold text-zinc-400">
+            <p className="relative z-10 hidden items-center gap-2 text-sm font-semibold text-zinc-400 md:flex">
               <Lock size={16} /> This section is under development.
             </p>
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-3/5 opacity-55">
+              {videoGameModeImages.map((imageUrl) => (
+                <img
+                  key={imageUrl}
+                  src={imageUrl}
+                  alt=""
+                  aria-hidden="true"
+                  className="ml-auto h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+              ))}
+            </div>
           </button>
         </section>
 
@@ -268,7 +303,7 @@ const Home = () => {
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-3">
                 {animeTitles.map((title) => {
                   const selected = selectedTitleIds.includes(title.id);
                   return (
@@ -276,27 +311,26 @@ const Home = () => {
                       key={title.id}
                       type="button"
                       onClick={() => toggleAnime(title.id)}
-                      className={`group overflow-hidden border bg-card text-left shadow-xl transition-all hover:border-player-1/70 ${
-                        selected
-                          ? "border-player-1 shadow-[0_0_18px_var(--player-1-glow)]"
-                          : "border-border"
+                      className={`home-row group relative min-h-24 overflow-hidden px-4 py-3 text-left transition-all hover:border-player-1/70 ${
+                        selected ? "player-1-border-glow" : ""
                       }`}
                     >
-                      <div className="aspect-[16/9] w-full overflow-hidden bg-input">
+                      <div className="pointer-events-none absolute inset-y-0 right-0 w-3/5 opacity-65">
                         <img
                           src={title.coverImageUrl}
-                          alt={`${title.name} cover art`}
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          alt=""
+                          aria-hidden="true"
+                          className="ml-auto h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                         />
                       </div>
-                      <div className="flex items-center justify-between gap-3 p-4">
-                        <div>
-                          <h3 className="text-lg font-black uppercase tracking-wide">
+                      <div className="relative z-10 flex min-h-16 items-center justify-between gap-3">
+                        <div className="max-w-[72%]">
+                          <h3 className="text-base font-black uppercase tracking-wide text-foreground md:text-lg">
                             {title.name}
                           </h3>
                           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                            {title.tracks.length} OST entry
-                            {title.tracks.length === 1 ? "" : "s"}
+                            {title.tracks.length} OST{" "}
+                            {title.tracks.length === 1 ? "entry" : "entries"}
                           </p>
                         </div>
                         <span
@@ -306,7 +340,7 @@ const Home = () => {
                               : "border-border text-muted-foreground"
                           }`}
                         >
-                          {selected ? "ON" : ""}
+                          {selected ? "ON" : " "}
                         </span>
                       </div>
                     </button>

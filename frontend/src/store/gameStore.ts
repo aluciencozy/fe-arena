@@ -46,6 +46,7 @@ export const useGameStateStore = create<GameStore>((set) => ({
   ready: {},
   winner: null,
   revealedAnswer: null,
+  roundResult: null,
   playlistIndex: 0,
   answerOptions: [],
   setGameState: (newState: Partial<GameState>) =>

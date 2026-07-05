@@ -42,6 +42,9 @@ export const getAnswerOptionsForTitles = (
   titles.map((title) => ({
     id: title.id,
     canonicalTitle: title.canonicalTitle,
+    romajiName: title.romajiName ?? null,
+    nativeName: title.nativeName ?? null,
+    coverImageUrl: title.coverImageUrl,
     searchTerms: [
       title.canonicalTitle,
       title.romajiName,

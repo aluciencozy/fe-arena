@@ -9,6 +9,9 @@ export interface AnswerAlias {
 export interface AnswerOption {
   id: string;
   canonicalTitle: string;
+  romajiName: string | null;
+  nativeName: string | null;
+  coverImageUrl: string;
   searchTerms: string[];
 }
 
@@ -29,6 +32,19 @@ export interface CatalogTitle {
   coverImageUrl: string;
   answerAliases: AnswerAlias[];
   tracks: CatalogTrack[];
+}
+
+export interface RoundResult {
+  canonicalTitle: string;
+  trackTitle: string | null;
+  titleId: string;
+  romajiName: string | null;
+  nativeName: string | null;
+  damageByPlayer: Record<string, number>;
+  damageDealt: number;
+  damagedPlayer: string | null;
+  winner: string | null;
+  isTie: boolean;
 }
 
 export interface RoomMetadata {
@@ -60,6 +76,7 @@ export interface GameState {
   ready: Record<string, boolean>;
   winner: string | null;
   revealedAnswer: string | null;
+  roundResult: RoundResult | null;
   playlistIndex: number;
   answerOptions: AnswerOption[];
 }
