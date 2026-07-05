@@ -37,8 +37,12 @@ const Home = () => {
   const [notice, setNotice] = useState("");
   const [isQueueing, setIsQueueing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isUsernameGateOpen, setIsUsernameGateOpen] = useState(
+    savedUsername.trim().length === 0,
+  );
 
-  const hasUsername = username.trim().length > 0;
+  const trimmedUsername = username.trim();
+  const hasUsername = !isUsernameGateOpen && trimmedUsername.length > 0;
   const canUseAnimeActions =
     hasUsername && selectedMode === "anime" && selectedTitleIds.length > 0 && !isQueueing;
   const canJoinRoom = hasUsername && roomId.trim().length > 0;
@@ -98,7 +102,6 @@ const Home = () => {
   }, [navigate, setPlayerName, username]);
 
   const persistUsername = () => {
-    const trimmedUsername = username.trim();
     if (!trimmedUsername) {
       setNotice("Choose a username first.");
       return null;
@@ -106,6 +109,16 @@ const Home = () => {
 
     setPlayerName(trimmedUsername);
     return trimmedUsername;
+  };
+
+  const handleUsernameSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const persistedUsername = persistUsername();
+    if (!persistedUsername) return;
+
+    setUsername(persistedUsername);
+    setIsUsernameGateOpen(false);
+    setNotice("");
   };
 
   const handleModeSelect = (mode: GameMode) => {
@@ -180,6 +193,52 @@ const Home = () => {
     socket.emit("queue:cancel");
   };
 
+  if (isUsernameGateOpen) {
+    return (
+      <div className="flex h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(31,40,51,0.35)_0%,_rgba(11,15,25,1)_42%,_rgba(3,5,10,1)_100%)] px-4 py-8 text-foreground">
+        <main className="mx-auto flex w-full max-w-md flex-col justify-center">
+          <form
+            onSubmit={handleUsernameSubmit}
+            className="gaming-card p-6 shadow-2xl"
+          >
+            <p className="mb-2 text-[10px] font-extrabold uppercase tracking-widest text-player-1">
+              Real-time OST battles
+            </p>
+            <h1 className="mb-6 text-4xl font-black uppercase tracking-widest text-foreground">
+              Guess The OST
+            </h1>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Username
+            </label>
+            <Input
+              autoFocus
+              value={username}
+              onChange={(event) => {
+                setUsername(event.target.value);
+                if (event.target.value.trim()) setNotice("");
+              }}
+              placeholder="xX_DemonSlayer_Xx"
+              className="mb-4 bg-input text-foreground placeholder:text-zinc-600"
+              maxLength={18}
+            />
+            <Button
+              type="submit"
+              disabled={trimmedUsername.length === 0}
+              className="w-full bg-player-1 font-extrabold uppercase tracking-widest text-background hover:bg-player-1/90"
+            >
+              Continue
+            </Button>
+            {notice && (
+              <div className="mt-4 border border-border bg-input px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                {notice}
+              </div>
+            )}
+          </form>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(31,40,51,0.35)_0%,_rgba(11,15,25,1)_42%,_rgba(3,5,10,1)_100%)] px-4 py-8 text-foreground">
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-6">
@@ -192,20 +251,25 @@ const Home = () => {
               Guess The OST
             </h1>
           </div>
-          <div className="w-full max-w-sm space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Username
-            </label>
-            <Input
-              value={username}
-              onChange={(event) => {
-                setUsername(event.target.value);
-                if (event.target.value.trim()) setNotice("");
-              }}
-              placeholder="xX_DemonSlayer_Xx"
-              className="bg-input text-foreground placeholder:text-zinc-600"
-              maxLength={18}
-            />
+          <div className="flex w-full max-w-sm items-center justify-between gap-3 border border-border bg-card/70 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Username
+              </p>
+              <p className="truncate text-sm font-black uppercase tracking-widest text-foreground">
+                {trimmedUsername}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsUsernameGateOpen(true)}
+              disabled={isQueueing || isCreating}
+              className="font-extrabold uppercase tracking-widest"
+            >
+              Change
+            </Button>
           </div>
         </header>
 
