@@ -136,6 +136,11 @@ const createRoundResult = (
   isTie: damageDealt === 0,
 });
 
+const recordRoundResult = (record: GameRecord, result: RoundResult) => {
+  record.state.roundResult = result;
+  record.state.matchHistory = [...record.state.matchHistory, result];
+};
+
 const clearTimers = (record: GameRecord) => {
   if (record.countdownTimer) clearTimeout(record.countdownTimer);
   if (record.roundTimer) clearTimeout(record.roundTimer);
@@ -167,6 +172,7 @@ const makeInitialState = (
   winner: null,
   revealedAnswer: null,
   roundResult: null,
+  matchHistory: [],
   playlistIndex: 0,
   answerOptions,
 });
@@ -285,7 +291,7 @@ const timeoutRound = (roomId: string, events: GameEvents) => {
   const currentVideo = getCurrentPlaylistItem(record);
   record.state.phase = "REVEAL";
   record.state.revealedAnswer = currentVideo.canonicalTitle;
-  record.state.roundResult = createRoundResult(currentVideo, {});
+  recordRoundResult(record, createRoundResult(currentVideo, {}));
   record.state.roundEndsAt = null;
   record.state.roundStartTime = null;
   record.state.skipVotes = [];
@@ -313,10 +319,12 @@ const revealAfterGrace = (
   const currentVideo = getCurrentPlaylistItem(record);
   record.state.phase = "REVEAL";
   record.state.revealedAnswer = currentVideo.canonicalTitle;
-  record.state.roundResult ??= createRoundResult(
-    currentVideo,
-    record.state.pendingDamage,
-  );
+  if (!record.state.roundResult) {
+    recordRoundResult(
+      record,
+      createRoundResult(currentVideo, record.state.pendingDamage),
+    );
+  }
   record.state.roundStartTime = null;
   record.state.roundEndsAt = null;
   record.state.countdownEndsAt = null;
@@ -384,12 +392,15 @@ const finishGracePeriod = (
     record.state.phase = "GAME_OVER";
     record.state.winner = survivingPlayer;
     record.state.revealedAnswer = currentVideo.canonicalTitle;
-    record.state.roundResult = createRoundResult(
-      currentVideo,
-      record.state.pendingDamage,
-      damageDealt,
-      damagedPlayer,
-      survivingPlayer,
+    recordRoundResult(
+      record,
+      createRoundResult(
+        currentVideo,
+        record.state.pendingDamage,
+        damageDealt,
+        damagedPlayer,
+        survivingPlayer,
+      ),
     );
     record.state.ready = createReady(players);
     record.state.roundStartTime = null;
@@ -401,11 +412,14 @@ const finishGracePeriod = (
     return;
   }
 
-  record.state.roundResult = createRoundResult(
-    currentVideo,
-    record.state.pendingDamage,
-    damageDealt,
-    damagedPlayer,
+  recordRoundResult(
+    record,
+    createRoundResult(
+      currentVideo,
+      record.state.pendingDamage,
+      damageDealt,
+      damagedPlayer,
+    ),
   );
   revealAfterGrace(roomId, players, events);
 };
@@ -531,7 +545,7 @@ export const voteToSkipRound = (
   const currentVideo = getCurrentPlaylistItem(record);
   record.state.phase = "REVEAL";
   record.state.revealedAnswer = currentVideo.canonicalTitle;
-  record.state.roundResult = createRoundResult(currentVideo, {});
+  recordRoundResult(record, createRoundResult(currentVideo, {}));
   record.state.roundEndsAt = null;
   record.state.roundStartTime = null;
   record.state.countdownEndsAt = null;

@@ -78,6 +78,7 @@ export interface GameState {
   winner: string | null;
   revealedAnswer: string | null;
   roundResult: RoundResult | null;
+  matchHistory: RoundResult[];
   playlistIndex: number;
   answerOptions: AnswerOption[];
 }
