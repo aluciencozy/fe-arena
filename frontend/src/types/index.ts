@@ -67,6 +67,7 @@ export interface GameState {
   pendingDamage: Record<string, number>;
   currentVideoID: string | null;
   videoStartTime: number;
+  currentVideoDurationSeconds: number | null;
   roundStartTime: number | null;
   countdownEndsAt: number | null;
   roundEndsAt: number | null;

@@ -19,6 +19,9 @@ const Room = () => {
   const phase = useGameStateStore((state) => state.phase);
   const currentVideoId = useGameStateStore((state) => state.currentVideoID);
   const videoStartTime = useGameStateStore((state) => state.videoStartTime);
+  const currentVideoDurationSeconds = useGameStateStore(
+    (state) => state.currentVideoDurationSeconds,
+  );
   const roundStartTime = useGameStateStore((state) => state.roundStartTime);
   const currentRound = useGameStateStore((state) => state.currentRound);
   const health = useGameStateStore((state) => state.health);
@@ -135,11 +138,22 @@ const Room = () => {
 
     if (!roundStartTime) return; // Ensure round start time is set before calculating elapsed time
 
-    const elapsedTime = (Date.now() - roundStartTime) / 1000; // Calculate elapsed time in seconds
-    const syncTime = videoStartTime + elapsedTime; // Calculate the time to sync the video to
+    const elapsedTime = Math.max(0, (Date.now() - roundStartTime) / 1000);
+    const rawSyncTime = videoStartTime + elapsedTime;
+    const syncTime =
+      currentVideoDurationSeconds && currentVideoDurationSeconds > 0
+        ? rawSyncTime % currentVideoDurationSeconds
+        : rawSyncTime;
 
     event.target.seekTo(syncTime, true); // Seek the video to the calculated sync time
     event.target.playVideo(); // Start playing the video
+  };
+
+  const handlePlayerEnd = (event: YouTubeEvent) => {
+    if (phase !== "PLAYING" && phase !== "GRACE_PERIOD") return;
+
+    event.target.seekTo(0, true);
+    event.target.playVideo();
   };
 
   const handleVolumeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -558,6 +572,7 @@ const Room = () => {
               }
             }}
             onReady={handlePlayerReady}
+            onEnd={handlePlayerEnd}
           />
         )}
       </div>
