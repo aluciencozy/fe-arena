@@ -12,7 +12,7 @@ import {
 } from "../data/catalog.js";
 
 const COUNTDOWN_SECONDS = 3;
-const ROUND_SECONDS = 60;
+const ROUND_SECONDS = 30;
 const GRACE_SECONDS = 4;
 const REVEAL_SECONDS = 6;
 const STARTING_HEALTH = 5000;
