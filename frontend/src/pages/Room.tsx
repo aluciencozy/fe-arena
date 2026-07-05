@@ -271,7 +271,9 @@ const Room = () => {
   };
 
   const renderRoundResultPanel = () => {
-    if (!showRoundResult || (!roundResult && !revealedAnswer)) return null;
+    if (!showRoundResult || (!roundResult && !revealedAnswer && !winner)) {
+      return null;
+    }
 
     const damageRows = players.map((name) => ({
       name,
@@ -353,7 +355,7 @@ const Room = () => {
               Anime title
             </p>
             <p className="mt-1 text-lg font-black uppercase text-foreground">
-              {roundResult?.canonicalTitle ?? revealedAnswer}
+              {roundResult?.canonicalTitle ?? revealedAnswer ?? "Result unavailable"}
             </p>
           </div>
           {(roundResult?.romajiName || roundResult?.nativeName) && (

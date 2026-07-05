@@ -216,7 +216,6 @@ const Home = () => {
             className={`home-row group relative flex min-h-28 items-center justify-between overflow-hidden px-5 py-4 text-left transition-all hover:border-player-1/70 ${
               selectedMode === "anime" ? "player-1-border-glow" : ""
             }`}
-            aria-disabled={!hasUsername}
           >
             <div className="relative z-10 flex items-center gap-4">
               <span className="flex size-11 items-center justify-center rounded-lg border border-player-1/50 bg-player-1/10 text-player-1">
@@ -252,7 +251,6 @@ const Home = () => {
             type="button"
             onClick={() => handleModeSelect("video-game")}
             className="home-row group relative flex min-h-28 items-center justify-between overflow-hidden px-5 py-4 text-left opacity-75 transition-all hover:border-player-2/70"
-            aria-disabled={!hasUsername}
           >
             <div className="relative z-10 flex items-center gap-4">
               <span className="flex size-11 items-center justify-center rounded-lg border border-player-2/50 bg-player-2/10 text-player-2">
