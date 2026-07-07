@@ -137,6 +137,9 @@ const Home = () => {
     return trimmedUsername;
   };
 
+  const normalizeRoomCodeInput = (value: string) =>
+    value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+
   const handleUsernameSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const persistedUsername = persistUsername();
@@ -211,10 +214,11 @@ const Home = () => {
   const handleJoinRoom = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmedUsername = persistUsername();
-    if (!trimmedUsername || !roomId.trim()) return;
+    const normalizedRoomId = normalizeRoomCodeInput(roomId);
+    if (!trimmedUsername || !normalizedRoomId) return;
 
     setNotice("");
-    navigate(`/room/${roomId.trim().toUpperCase()}`);
+    navigate(`/room/${normalizedRoomId}`);
   };
 
   const handleQueue = () => {
@@ -578,7 +582,9 @@ const Home = () => {
                 </div>
                 <Input
                   value={roomId}
-                  onChange={(event) => setRoomId(event.target.value)}
+                  onChange={(event) =>
+                    setRoomId(normalizeRoomCodeInput(event.target.value))
+                  }
                   placeholder="ROOM CODE"
                   className="mb-3 bg-input text-center font-black uppercase tracking-widest text-foreground placeholder:text-zinc-600"
                   maxLength={6}
