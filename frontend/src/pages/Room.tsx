@@ -58,7 +58,10 @@ const Room = () => {
     useState(0);
   const [gameStartTime, setGameStartTime] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [copyNotice, setCopyNotice] = useState("");
+  const [copyNotice, setCopyNotice] = useState<{
+    roomCode: string;
+    message: string;
+  } | null>(null);
   const visualPhase = phase;
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -216,16 +219,22 @@ const Room = () => {
 
     try {
       await navigator.clipboard.writeText(roomCode);
-      setCopyNotice("Room code copied.");
+      setCopyNotice({ roomCode, message: "Room code copied." });
     } catch {
-      setCopyNotice("Copy failed. Select the code manually.");
+      setCopyNotice({
+        roomCode,
+        message: "Copy failed. Select the code manually.",
+      });
     }
   };
+
+  const copyNoticeMessage =
+    copyNotice?.roomCode === roomCode ? copyNotice.message : "";
 
   useEffect(() => {
     if (!copyNotice) return;
 
-    const timer = window.setTimeout(() => setCopyNotice(""), 2500);
+    const timer = window.setTimeout(() => setCopyNotice(null), 2500);
     return () => window.clearTimeout(timer);
   }, [copyNotice]);
 
@@ -967,18 +976,24 @@ const Room = () => {
               <button
                 type="button"
                 onClick={handleCopyRoomCode}
+                disabled={!roomCode}
+                aria-label={`Copy room code ${roomCode}`}
+                aria-describedby={
+                  copyNoticeMessage ? "room-code-copy-notice" : undefined
+                }
                 className="mt-2 inline-flex items-center justify-center gap-2 border border-player-1/50 bg-player-1/10 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-widest text-player-1 transition-all hover:bg-player-1/20 active:translate-y-px"
               >
                 <Clipboard size={13} />
                 Copy Code
               </button>
-              {copyNotice && (
+              {copyNoticeMessage && (
                 <p
+                  id="room-code-copy-notice"
                   role="status"
                   aria-live="polite"
                   className="mt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
                 >
-                  {copyNotice}
+                  {copyNoticeMessage}
                 </p>
               )}
             </div>
