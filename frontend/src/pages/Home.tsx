@@ -222,6 +222,8 @@ const Home = () => {
   };
 
   const handleQueue = () => {
+    if (isCreating || isQueueing) return;
+
     const trimmedUsername = persistUsername();
     if (!trimmedUsername || selectedMode !== "anime") return;
 
@@ -650,7 +652,9 @@ const Home = () => {
                     type="button"
                     onClick={handleQueue}
                     disabled={
-                      username.trim().length === 0 || selectedMode !== "anime"
+                      username.trim().length === 0 ||
+                      selectedMode !== "anime" ||
+                      isCreating
                     }
                     className="w-full bg-player-2 font-extrabold uppercase tracking-widest text-background hover:bg-player-2/90"
                   >
