@@ -49,10 +49,8 @@ const Room = () => {
   const answerOptions = useGameStateStore((state) => state.answerOptions);
 
   // Use the custom hook to manage WebSocket connections and game state synchronization
-  const { players, messages, sendChatMessage, setReady, voteToSkip } = useSocket(
-    roomCode,
-    playerName,
-  );
+  const { players, messages, errorNotice, sendChatMessage, setReady, voteToSkip } =
+    useSocket(roomCode, playerName);
   
   const [now, setNow] = useState<number | null>(null);
   const [guessValue, setGuessValue] = useState("");
@@ -559,6 +557,15 @@ const Room = () => {
 
             {renderCorrectGuessFeed()}
             {renderRoundResultPanel()}
+            {errorNotice && (
+              <div
+                role="status"
+                aria-live="polite"
+                className="border border-player-2/70 bg-player-2/10 px-4 py-3 text-center text-xs font-black uppercase tracking-widest text-player-2 shadow-lg"
+              >
+                {errorNotice}
+              </div>
+            )}
 
             {/* Scrollable Center Chat Box Container (50 Message capacity during play) */}
             {visualPhase !== "LOBBY" && !showRoundResult && (

@@ -9,6 +9,7 @@ const MAX_MESSAGE_CAPACITY = 100; // Maximum number of messages to keep in state
 export const useSocket = (roomCode: string, playerName: string) => {
   const [players, setPlayers] = useState<string[]>([]); // State to hold the current players in room
   const [messages, setMessages] = useState<UnifiedMessage[]>([]); // State to hold chat messages
+  const [errorNotice, setErrorNotice] = useState("");
   const navigate = useNavigate(); // Hook to programmatically navigate between routes
 
   useEffect(() => {
@@ -34,13 +35,14 @@ export const useSocket = (roomCode: string, playerName: string) => {
 
     // Handler function to update players state when a 'room:state' event is received
     const handleRoomState = (roomPlayers: string[]) => {
+      setErrorNotice("");
       setPlayers(roomPlayers);
     };
 
     // Handler function to handle room errors, such as when joining fails
     const handleRoomError = (errorMessage: string) => {
-      alert(`Error: ${errorMessage}`);
-      navigate("/"); // Redirect to home page on error
+      setErrorNotice(errorMessage);
+      navigate("/", { state: { notice: errorMessage } }); // Redirect to home page on error
     };
 
     // Handler function to update chatMessages state when a 'chat:broadcast' event is received
@@ -73,7 +75,7 @@ export const useSocket = (roomCode: string, playerName: string) => {
     };
 
     const handleGameError = (errorMessage: string) => {
-      alert(`Game Error: ${errorMessage}`);
+      setErrorNotice(errorMessage);
     };
 
     // Listen for relevant events from the server
@@ -112,5 +114,12 @@ export const useSocket = (roomCode: string, playerName: string) => {
     socket.emit("game:skip-vote");
   };
 
-  return { players, messages, sendChatMessage, setReady, voteToSkip };
+  return {
+    players,
+    messages,
+    errorNotice,
+    sendChatMessage,
+    setReady,
+    voteToSkip,
+  };
 };

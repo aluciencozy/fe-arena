@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Gamepad2,
   ListChecks,
@@ -22,6 +22,9 @@ import type { GameMode, RoomMetadata } from "@/types";
 
 const Home = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const navigationNotice =
+    (location.state as { notice?: string } | null)?.notice ?? "";
   const savedUsername = useGameStore((state) => state.playerName);
   const setPlayerName = useGameStore((state) => state.setPlayerName);
   const animeModeImages = animeTitles
@@ -37,13 +40,19 @@ const Home = () => {
     animeTitles[0]?.id ?? "",
   ].filter(Boolean));
   const [roomId, setRoomId] = useState("");
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState(navigationNotice);
   const [isQueueing, setIsQueueing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [titleSearch, setTitleSearch] = useState("");
   const [isUsernameGateOpen, setIsUsernameGateOpen] = useState(
     savedUsername.trim().length === 0,
   );
+
+  useEffect(() => {
+    if (!navigationNotice) return;
+
+    navigate(".", { replace: true, state: null });
+  }, [navigate, navigationNotice]);
 
   const trimmedUsername = username.trim();
   const hasUsername = !isUsernameGateOpen && trimmedUsername.length > 0;
