@@ -2,7 +2,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import YouTube, { type YouTubeEvent } from "react-youtube";
 import Fuse from "fuse.js";
-import { CheckCircle2, Settings, SkipForward, Volume2, VolumeX, Waves, Zap } from "lucide-react";
+import {
+  CheckCircle2,
+  Clipboard,
+  Settings,
+  SkipForward,
+  Volume2,
+  VolumeX,
+  Waves,
+  Zap,
+} from "lucide-react";
 import { useGameStore, useGameStateStore } from "@/store/gameStore";
 import { useSocket } from "@/hooks/useSocket";
 import type { AnswerOption } from "@/types";
@@ -10,7 +19,9 @@ import type { AnswerOption } from "@/types";
 const Room = () => {
   const { id: dynamicRoomId } = useParams(); // Get the room ID from the URL
   const navigate = useNavigate(); // Hook to programmatically navigate between routes
-  const roomCode = dynamicRoomId ?? "";
+  const normalizeRoomCode = (value: string) =>
+    value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+  const roomCode = normalizeRoomCode(dynamicRoomId ?? "");
 
   // Access player name and game state from the global stores
   const playerName = useGameStore((state) => state.playerName);
@@ -38,10 +49,8 @@ const Room = () => {
   const answerOptions = useGameStateStore((state) => state.answerOptions);
 
   // Use the custom hook to manage WebSocket connections and game state synchronization
-  const { players, messages, sendChatMessage, setReady, voteToSkip } = useSocket(
-    roomCode,
-    playerName,
-  );
+  const { players, messages, errorNotice, sendChatMessage, setReady, voteToSkip } =
+    useSocket(roomCode, playerName);
   
   const [now, setNow] = useState<number | null>(null);
   const [guessValue, setGuessValue] = useState("");
@@ -49,6 +58,10 @@ const Room = () => {
     useState(0);
   const [gameStartTime, setGameStartTime] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [copyNotice, setCopyNotice] = useState<{
+    roomCode: string;
+    message: string;
+  } | null>(null);
   const visualPhase = phase;
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -86,14 +99,20 @@ const Room = () => {
     answerSuggestions.length === 0
       ? 0
       : Math.min(highlightedSuggestionIndex, answerSuggestions.length - 1);
+  const selectedSuggestion = answerSuggestions[selectedSuggestionIndex];
   const showRoundResult =
     visualPhase === "REVEAL" || visualPhase === "GAME_OVER";
 
   useEffect(() => {
-    if (!dynamicRoomId || !playerName) {
+    if (!roomCode || !playerName) {
       navigate("/", { replace: true });
+      return;
     }
-  }, [dynamicRoomId, navigate, playerName]);
+
+    if (dynamicRoomId !== roomCode) {
+      navigate(`/room/${roomCode}`, { replace: true });
+    }
+  }, [dynamicRoomId, navigate, playerName, roomCode]);
 
   // Clear chat / capture timestamp when active game starts
   useEffect(() => {
@@ -194,6 +213,30 @@ const Room = () => {
     oscillator.stop(nowTime + 0.35);
     oscillator.addEventListener("ended", () => void audioContext.close());
   };
+
+  const handleCopyRoomCode = async () => {
+    if (!roomCode) return;
+
+    try {
+      await navigator.clipboard.writeText(roomCode);
+      setCopyNotice({ roomCode, message: "Room code copied." });
+    } catch {
+      setCopyNotice({
+        roomCode,
+        message: "Copy failed. Select the code manually.",
+      });
+    }
+  };
+
+  const copyNoticeMessage =
+    copyNotice?.roomCode === roomCode ? copyNotice.message : "";
+
+  useEffect(() => {
+    if (!copyNotice) return;
+
+    const timer = window.setTimeout(() => setCopyNotice(null), 2500);
+    return () => window.clearTimeout(timer);
+  }, [copyNotice]);
 
   const handleGuessChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setGuessValue(event.target.value);
@@ -523,6 +566,15 @@ const Room = () => {
 
             {renderCorrectGuessFeed()}
             {renderRoundResultPanel()}
+            {errorNotice && (
+              <div
+                role="status"
+                aria-live="polite"
+                className="border border-player-2/70 bg-player-2/10 px-4 py-3 text-center text-xs font-black uppercase tracking-widest text-player-2 shadow-lg"
+              >
+                {errorNotice}
+              </div>
+            )}
 
             {/* Scrollable Center Chat Box Container (50 Message capacity during play) */}
             {visualPhase !== "LOBBY" && !showRoundResult && (
@@ -578,7 +630,13 @@ const Room = () => {
 
             {/* Central Guess/Chat Input Form */}
             <form onSubmit={handleGuessSubmit} className="relative flex flex-col gap-2 pointer-events-auto">
+              <label htmlFor="room-guess-chat-input" className="sr-only">
+                {visualPhase === "LOBBY"
+                  ? "Lobby message"
+                  : "Guess the OST answer"}
+              </label>
               <input
+                id="room-guess-chat-input"
                 value={guessValue}
                 onChange={handleGuessChange}
                 onKeyDown={handleGuessKeyDown}
@@ -586,15 +644,33 @@ const Room = () => {
                 disabled={isGuessInputDisabled}
                 className="w-full text-center bg-input border border-border text-foreground px-4 py-3 rounded-lg font-bold text-xs uppercase placeholder-zinc-600 shadow-md focus:outline-none focus:border-player-1 focus:ring-1 focus:ring-player-1/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 autoComplete="off"
+                role={canUseAnswerSuggestions ? "combobox" : undefined}
+                aria-autocomplete={canUseAnswerSuggestions ? "list" : undefined}
+                aria-expanded={canUseAnswerSuggestions ? answerSuggestions.length > 0 : undefined}
+                aria-controls={
+                  answerSuggestions.length > 0 ? "answer-suggestions-list" : undefined
+                }
+                aria-activedescendant={
+                  selectedSuggestion
+                    ? `answer-suggestion-${selectedSuggestion.id}`
+                    : undefined
+                }
                 autoFocus
               />
               {answerSuggestions.length > 0 && (
-                <div className="answer-suggestions absolute left-0 right-0 top-full z-50 mt-2 grid max-h-[360px] gap-2 overflow-y-auto rounded-lg border border-player-1/40 bg-background/95 p-2 shadow-2xl shadow-black/50 backdrop-blur-md">
+                <div
+                  id="answer-suggestions-list"
+                  role="listbox"
+                  className="answer-suggestions absolute left-0 right-0 top-full z-50 mt-2 grid max-h-[360px] gap-2 overflow-y-auto rounded-lg border border-player-1/40 bg-background/95 p-2 shadow-2xl shadow-black/50 backdrop-blur-md"
+                >
                   {answerSuggestions.map((suggestion, index) => {
                     const isSelected = index === selectedSuggestionIndex;
                     return (
                       <button
                         key={suggestion.id}
+                        id={`answer-suggestion-${suggestion.id}`}
+                        role="option"
+                        aria-selected={isSelected}
                         type="button"
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => submitSuggestion(suggestion)}
@@ -699,7 +775,7 @@ const Room = () => {
         .slice(-1)[0]
     : null;
 
-  if (!dynamicRoomId || !playerName) {
+  if (!roomCode || !playerName) {
     return null;
   }
 
@@ -709,14 +785,19 @@ const Room = () => {
         <button
           type="button"
           onClick={() => setSettingsOpen((open) => !open)}
-          aria-label="Open settings"
+          aria-label={settingsOpen ? "Close settings" : "Open settings"}
+          aria-expanded={settingsOpen}
+          aria-controls="room-settings-panel"
           className="flex size-10 items-center justify-center border border-border bg-card/90 text-foreground shadow-lg backdrop-blur transition-all hover:border-player-1 hover:text-player-1 active:translate-y-px"
         >
           <Settings size={18} />
         </button>
 
         {settingsOpen && (
-          <div className="absolute right-0 mt-3 w-72 border border-border bg-card p-4 shadow-2xl">
+          <div
+            id="room-settings-panel"
+            className="absolute right-0 mt-3 w-72 border border-border bg-card p-4 shadow-2xl"
+          >
             <div className="mb-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 {volume === 0 ? (
@@ -892,6 +973,29 @@ const Room = () => {
               <p className="text-xl font-black uppercase tracking-[0.35em] text-player-1">
                 {roomCode}
               </p>
+              <button
+                type="button"
+                onClick={handleCopyRoomCode}
+                disabled={!roomCode}
+                aria-label={`Copy room code ${roomCode}`}
+                aria-describedby={
+                  copyNoticeMessage ? "room-code-copy-notice" : undefined
+                }
+                className="mt-2 inline-flex items-center justify-center gap-2 border border-player-1/50 bg-player-1/10 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-widest text-player-1 transition-all hover:bg-player-1/20 active:translate-y-px"
+              >
+                <Clipboard size={13} />
+                Copy Code
+              </button>
+              {copyNoticeMessage && (
+                <p
+                  id="room-code-copy-notice"
+                  role="status"
+                  aria-live="polite"
+                  className="mt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+                >
+                  {copyNoticeMessage}
+                </p>
+              )}
             </div>
             {players.length < 2 && (
               <div className="text-sm font-extrabold uppercase tracking-widest text-center text-zinc-500 bg-input/80 border border-border/80 px-6 py-3 rounded-lg shadow-lg animate-pulse">

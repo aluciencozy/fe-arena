@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Gamepad2,
   ListChecks,
@@ -22,6 +22,9 @@ import type { GameMode, RoomMetadata } from "@/types";
 
 const Home = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const navigationNotice =
+    (location.state as { notice?: string } | null)?.notice ?? "";
   const savedUsername = useGameStore((state) => state.playerName);
   const setPlayerName = useGameStore((state) => state.setPlayerName);
   const animeModeImages = animeTitles
@@ -37,7 +40,7 @@ const Home = () => {
     animeTitles[0]?.id ?? "",
   ].filter(Boolean));
   const [roomId, setRoomId] = useState("");
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState(navigationNotice);
   const [isQueueing, setIsQueueing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [titleSearch, setTitleSearch] = useState("");
@@ -45,11 +48,18 @@ const Home = () => {
     savedUsername.trim().length === 0,
   );
 
+  useEffect(() => {
+    if (!navigationNotice) return;
+
+    navigate(".", { replace: true, state: null });
+  }, [navigate, navigationNotice]);
+
   const trimmedUsername = username.trim();
   const hasUsername = !isUsernameGateOpen && trimmedUsername.length > 0;
   const canUseAnimeActions =
     hasUsername && selectedMode === "anime" && selectedTitleIds.length > 0 && !isQueueing;
-  const canJoinRoom = hasUsername && roomId.trim().length > 0;
+  const canJoinRoom =
+    hasUsername && roomId.trim().length > 0 && !isQueueing && !isCreating;
 
   const selectedTrackCount = useMemo(
     () =>
@@ -80,6 +90,10 @@ const Home = () => {
   const filteredSelectedCount = filteredAnimeTitles.filter((title) =>
     selectedTitleIds.includes(title.id),
   ).length;
+  const canSelectFiltered =
+    filteredAnimeTitles.length > 0 &&
+    filteredSelectedCount < filteredAnimeTitles.length;
+  const canDeselectFiltered = filteredSelectedCount > 0;
 
   useEffect(() => {
     const handleRoomCreated = (metadata: RoomMetadata) => {
@@ -137,6 +151,9 @@ const Home = () => {
     return trimmedUsername;
   };
 
+  const normalizeRoomCodeInput = (value: string) =>
+    value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+
   const handleUsernameSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const persistedUsername = persistUsername();
@@ -175,6 +192,8 @@ const Home = () => {
   };
 
   const selectFilteredAnime = () => {
+    if (!canSelectFiltered) return;
+
     setSelectedTitleIds((currentIds) =>
       Array.from(
         new Set([...currentIds, ...filteredAnimeTitles.map((title) => title.id)]),
@@ -183,6 +202,8 @@ const Home = () => {
   };
 
   const deselectFilteredAnime = () => {
+    if (!canDeselectFiltered) return;
+
     const filteredIds = new Set(filteredAnimeTitles.map((title) => title.id));
     setSelectedTitleIds((currentIds) =>
       currentIds.filter((titleId) => !filteredIds.has(titleId)),
@@ -210,14 +231,19 @@ const Home = () => {
 
   const handleJoinRoom = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isCreating || isQueueing) return;
+
     const trimmedUsername = persistUsername();
-    if (!trimmedUsername || !roomId.trim()) return;
+    const normalizedRoomId = normalizeRoomCodeInput(roomId);
+    if (!trimmedUsername || !normalizedRoomId) return;
 
     setNotice("");
-    navigate(`/room/${roomId.trim().toUpperCase()}`);
+    navigate(`/room/${normalizedRoomId}`);
   };
 
   const handleQueue = () => {
+    if (isCreating || isQueueing) return;
+
     const trimmedUsername = persistUsername();
     if (!trimmedUsername || selectedMode !== "anime") return;
 
@@ -236,22 +262,65 @@ const Home = () => {
 
   if (isUsernameGateOpen) {
     return (
-      <div className="flex h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(31,40,51,0.35)_0%,_rgba(11,15,25,1)_42%,_rgba(3,5,10,1)_100%)] px-4 py-8 text-foreground">
-        <main className="mx-auto flex w-full max-w-md flex-col justify-center">
+      <div className="relative flex min-h-screen overflow-x-hidden bg-[#05070d] px-4 py-6 text-foreground">
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,_transparent_1px)] bg-[length:100%_4px]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,_rgba(77,255,188,0.24),_transparent_28%),radial-gradient(circle_at_84%_22%,_rgba(255,77,77,0.2),_transparent_30%),linear-gradient(135deg,_rgba(77,255,188,0.08),_transparent_32%,_rgba(255,77,77,0.08))]" />
+        <main className="relative z-10 mx-auto grid w-full max-w-5xl items-center gap-8 py-4 md:grid-cols-[1fr_380px]">
+          <section className="space-y-6">
+            <div className="inline-flex items-center gap-2 border border-player-1/50 bg-player-1/10 px-3 py-2 text-[10px] font-extrabold uppercase tracking-widest text-player-1">
+              <Swords size={14} />
+              Player login
+            </div>
+            <div>
+              <p className="mb-3 text-xs font-extrabold uppercase tracking-[0.35em] text-player-2">
+                Real-time OST battles
+              </p>
+              <h1 className="max-w-3xl text-5xl font-black uppercase tracking-widest text-foreground text-player-1-glow sm:text-7xl lg:text-8xl">
+                Guess The OST
+              </h1>
+            </div>
+            <div className="grid max-w-2xl grid-cols-3 border border-border bg-card/50 text-center">
+              {["Anime", "Versus", "Speed"].map((label) => (
+                <div
+                  key={label}
+                  className="border-r border-border px-3 py-4 last:border-r-0"
+                >
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                    Mode
+                  </p>
+                  <p className="mt-1 text-sm font-black uppercase tracking-widest text-foreground">
+                    {label}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
           <form
             onSubmit={handleUsernameSubmit}
-            className="gaming-card p-6 shadow-2xl"
+            className="gaming-card relative overflow-hidden border-player-1/50 bg-[#080a0f]/95 p-6 shadow-2xl shadow-player-1/10"
           >
-            <p className="mb-2 text-[10px] font-extrabold uppercase tracking-widest text-player-1">
-              Real-time OST battles
-            </p>
-            <h1 className="mb-6 text-4xl font-black uppercase tracking-widest text-foreground">
-              Guess The OST
-            </h1>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-player-1 via-foreground to-player-2" />
+            <div className="mb-6 flex items-center justify-between gap-4 border-b border-border pb-4">
+              <div>
+                <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                  New challenger
+                </p>
+                <h2 className="mt-1 text-2xl font-black uppercase tracking-widest">
+                  Enter Name
+                </h2>
+              </div>
+              <span className="flex size-11 items-center justify-center rounded-lg border border-player-1/50 bg-player-1/10 text-player-1">
+                <Gamepad2 size={22} />
+              </span>
+            </div>
+            <label
+              htmlFor="startup-username"
+              className="mb-2 block text-xs font-bold uppercase tracking-wider text-muted-foreground"
+            >
               Username
             </label>
             <Input
+              id="startup-username"
               autoFocus
               value={username}
               onChange={(event) => {
@@ -259,18 +328,25 @@ const Home = () => {
                 if (event.target.value.trim()) setNotice("");
               }}
               placeholder="xX_DemonSlayer_Xx"
-              className="mb-4 bg-input text-foreground placeholder:text-zinc-600"
+              className="mb-4 h-12 border-player-1/40 bg-input text-lg font-black uppercase tracking-widest text-foreground placeholder:text-zinc-600"
               maxLength={18}
+              aria-describedby={notice ? "startup-username-notice" : undefined}
             />
             <Button
               type="submit"
               disabled={trimmedUsername.length === 0}
-              className="w-full bg-player-1 font-extrabold uppercase tracking-widest text-background hover:bg-player-1/90"
+              className="h-11 w-full bg-player-1 font-extrabold uppercase tracking-widest text-background hover:bg-player-1/90"
             >
-              Continue
+              <Play size={16} />
+              Press Enter
             </Button>
             {notice && (
-              <div className="mt-4 border border-border bg-input px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              <div
+                id="startup-username-notice"
+                role="status"
+                aria-live="polite"
+                className="mt-4 border border-border bg-input px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground"
+              >
                 {notice}
               </div>
             )}
@@ -281,8 +357,8 @@ const Home = () => {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(31,40,51,0.35)_0%,_rgba(11,15,25,1)_42%,_rgba(3,5,10,1)_100%)] px-4 py-6 text-foreground">
-      <main className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-5">
+    <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(31,40,51,0.35)_0%,_rgba(11,15,25,1)_42%,_rgba(3,5,10,1)_100%)] px-4 py-6 text-foreground lg:h-screen lg:overflow-hidden">
+      <main className="mx-auto flex min-h-0 w-full max-w-6xl flex-col gap-5 lg:h-full">
         <header className="flex flex-col gap-4 border-b border-border/70 pb-6 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="mb-2 text-[10px] font-extrabold uppercase tracking-widest text-player-1">
@@ -318,6 +394,7 @@ const Home = () => {
           <button
             type="button"
             onClick={() => handleModeSelect("anime")}
+            aria-pressed={selectedMode === "anime"}
             className={`home-row group relative flex min-h-28 items-center justify-between overflow-hidden px-5 py-4 text-left transition-all hover:border-player-1/70 ${
               selectedMode === "anime" ? "player-1-border-glow" : ""
             }`}
@@ -355,6 +432,7 @@ const Home = () => {
           <button
             type="button"
             onClick={() => handleModeSelect("video-game")}
+            aria-pressed={selectedMode === "video-game"}
             className="home-row group relative flex min-h-28 items-center justify-between overflow-hidden px-5 py-4 text-left opacity-75 transition-all hover:border-player-2/70"
           >
             <div className="relative z-10 flex items-center gap-4">
@@ -388,7 +466,11 @@ const Home = () => {
         </section>
 
         {notice && (
-          <div className="border border-border bg-input px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">
+          <div
+            role="status"
+            aria-live="polite"
+            className="border border-border bg-input px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground"
+          >
             {notice}
           </div>
         )}
@@ -411,11 +493,15 @@ const Home = () => {
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <div className="relative min-w-0 sm:w-64">
+                    <label htmlFor="anime-title-search" className="sr-only">
+                      Search anime titles
+                    </label>
                     <Search
                       size={13}
                       className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground"
                     />
                     <Input
+                      id="anime-title-search"
                       value={titleSearch}
                       onChange={(event) => setTitleSearch(event.target.value)}
                       placeholder="SEARCH ANIME"
@@ -427,7 +513,7 @@ const Home = () => {
                       type="button"
                       variant="outline"
                       onClick={selectFilteredAnime}
-                      disabled={filteredAnimeTitles.length === 0}
+                      disabled={!canSelectFiltered}
                       size="sm"
                       className="h-8 px-2 text-[10px] font-extrabold uppercase tracking-wider"
                     >
@@ -438,7 +524,7 @@ const Home = () => {
                       type="button"
                       variant="outline"
                       onClick={deselectFilteredAnime}
-                      disabled={filteredAnimeTitles.length === 0}
+                      disabled={!canDeselectFiltered}
                       size="sm"
                       className="h-8 px-2 text-[10px] font-extrabold uppercase tracking-wider"
                     >
@@ -458,6 +544,7 @@ const Home = () => {
                       key={title.id}
                       type="button"
                       onClick={() => toggleAnime(title.id)}
+                      aria-pressed={selected}
                       className={`home-row group relative min-h-24 overflow-hidden px-4 py-3 text-left transition-all hover:border-player-1/70 ${
                         selected ? "player-1-border-glow" : ""
                       }`}
@@ -536,16 +623,22 @@ const Home = () => {
                     Join Friend
                   </h2>
                 </div>
+                <label htmlFor="room-code" className="sr-only">
+                  Room code
+                </label>
                 <Input
+                  id="room-code"
                   value={roomId}
-                  onChange={(event) => setRoomId(event.target.value)}
+                  onChange={(event) =>
+                    setRoomId(normalizeRoomCodeInput(event.target.value))
+                  }
                   placeholder="ROOM CODE"
                   className="mb-3 bg-input text-center font-black uppercase tracking-widest text-foreground placeholder:text-zinc-600"
                   maxLength={6}
                 />
                 <Button
                   type="submit"
-                  disabled={!canJoinRoom || isQueueing}
+                  disabled={!canJoinRoom}
                   variant="outline"
                   className="w-full font-extrabold uppercase tracking-widest"
                 >
@@ -579,7 +672,9 @@ const Home = () => {
                     type="button"
                     onClick={handleQueue}
                     disabled={
-                      username.trim().length === 0 || selectedMode !== "anime"
+                      username.trim().length === 0 ||
+                      selectedMode !== "anime" ||
+                      isCreating
                     }
                     className="w-full bg-player-2 font-extrabold uppercase tracking-widest text-background hover:bg-player-2/90"
                   >
