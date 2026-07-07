@@ -19,17 +19,28 @@ const getStoredVolume = () => {
 
 const getStoredUsername = () => {
   if (typeof window === "undefined") return "";
-  return window.localStorage.getItem(USERNAME_STORAGE_KEY) ?? "";
+  const storedUsername = window.localStorage.getItem(USERNAME_STORAGE_KEY);
+  if (storedUsername === null) return "";
+
+  const normalizedUsername = storedUsername.trim().slice(0, 18);
+  if (normalizedUsername !== storedUsername) {
+    window.localStorage.setItem(USERNAME_STORAGE_KEY, normalizedUsername);
+  }
+
+  return normalizedUsername;
 };
+
+const normalizeUsername = (name: string) => name.trim().slice(0, 18);
 
 export const useGameStore = create<PlayerState>((set) => ({
   playerName: getStoredUsername(),
   volume: getStoredVolume(),
   setPlayerName: (name: string) => {
+    const normalizedUsername = normalizeUsername(name);
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(USERNAME_STORAGE_KEY, name);
+      window.localStorage.setItem(USERNAME_STORAGE_KEY, normalizedUsername);
     }
-    set({ playerName: name });
+    set({ playerName: normalizedUsername });
   },
   setVolume: (volume: number) => {
     const clampedVolume = clampVolume(volume);
