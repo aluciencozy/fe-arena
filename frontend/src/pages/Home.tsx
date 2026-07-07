@@ -236,18 +236,57 @@ const Home = () => {
 
   if (isUsernameGateOpen) {
     return (
-      <div className="flex h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(31,40,51,0.35)_0%,_rgba(11,15,25,1)_42%,_rgba(3,5,10,1)_100%)] px-4 py-8 text-foreground">
-        <main className="mx-auto flex w-full max-w-md flex-col justify-center">
+      <div className="relative flex h-screen overflow-hidden bg-[#05070d] px-4 py-6 text-foreground">
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,_transparent_1px)] bg-[length:100%_4px]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,_rgba(77,255,188,0.24),_transparent_28%),radial-gradient(circle_at_84%_22%,_rgba(255,77,77,0.2),_transparent_30%),linear-gradient(135deg,_rgba(77,255,188,0.08),_transparent_32%,_rgba(255,77,77,0.08))]" />
+        <main className="relative z-10 mx-auto grid w-full max-w-5xl items-center gap-8 md:grid-cols-[1fr_380px]">
+          <section className="space-y-6">
+            <div className="inline-flex items-center gap-2 border border-player-1/50 bg-player-1/10 px-3 py-2 text-[10px] font-extrabold uppercase tracking-widest text-player-1">
+              <Swords size={14} />
+              Player login
+            </div>
+            <div>
+              <p className="mb-3 text-xs font-extrabold uppercase tracking-[0.35em] text-player-2">
+                Real-time OST battles
+              </p>
+              <h1 className="max-w-3xl text-5xl font-black uppercase tracking-widest text-foreground text-player-1-glow sm:text-7xl lg:text-8xl">
+                Guess The OST
+              </h1>
+            </div>
+            <div className="grid max-w-2xl grid-cols-3 border border-border bg-card/50 text-center">
+              {["Anime", "Versus", "Speed"].map((label) => (
+                <div
+                  key={label}
+                  className="border-r border-border px-3 py-4 last:border-r-0"
+                >
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                    Mode
+                  </p>
+                  <p className="mt-1 text-sm font-black uppercase tracking-widest text-foreground">
+                    {label}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
           <form
             onSubmit={handleUsernameSubmit}
-            className="gaming-card p-6 shadow-2xl"
+            className="gaming-card relative overflow-hidden border-player-1/50 bg-[#080a0f]/95 p-6 shadow-2xl shadow-player-1/10"
           >
-            <p className="mb-2 text-[10px] font-extrabold uppercase tracking-widest text-player-1">
-              Real-time OST battles
-            </p>
-            <h1 className="mb-6 text-4xl font-black uppercase tracking-widest text-foreground">
-              Guess The OST
-            </h1>
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-player-1 via-foreground to-player-2" />
+            <div className="mb-6 flex items-center justify-between gap-4 border-b border-border pb-4">
+              <div>
+                <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                  New challenger
+                </p>
+                <h2 className="mt-1 text-2xl font-black uppercase tracking-widest">
+                  Enter Name
+                </h2>
+              </div>
+              <span className="flex size-11 items-center justify-center rounded-lg border border-player-1/50 bg-player-1/10 text-player-1">
+                <Gamepad2 size={22} />
+              </span>
+            </div>
             <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Username
             </label>
@@ -259,15 +298,16 @@ const Home = () => {
                 if (event.target.value.trim()) setNotice("");
               }}
               placeholder="xX_DemonSlayer_Xx"
-              className="mb-4 bg-input text-foreground placeholder:text-zinc-600"
+              className="mb-4 h-12 border-player-1/40 bg-input text-lg font-black uppercase tracking-widest text-foreground placeholder:text-zinc-600"
               maxLength={18}
             />
             <Button
               type="submit"
               disabled={trimmedUsername.length === 0}
-              className="w-full bg-player-1 font-extrabold uppercase tracking-widest text-background hover:bg-player-1/90"
+              className="h-11 w-full bg-player-1 font-extrabold uppercase tracking-widest text-background hover:bg-player-1/90"
             >
-              Continue
+              <Play size={16} />
+              Press Enter
             </Button>
             {notice && (
               <div className="mt-4 border border-border bg-input px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">
