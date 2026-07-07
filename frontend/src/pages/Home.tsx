@@ -463,11 +463,15 @@ const Home = () => {
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <div className="relative min-w-0 sm:w-64">
+                    <label htmlFor="anime-title-search" className="sr-only">
+                      Search anime titles
+                    </label>
                     <Search
                       size={13}
                       className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground"
                     />
                     <Input
+                      id="anime-title-search"
                       value={titleSearch}
                       onChange={(event) => setTitleSearch(event.target.value)}
                       placeholder="SEARCH ANIME"
@@ -588,7 +592,11 @@ const Home = () => {
                     Join Friend
                   </h2>
                 </div>
+                <label htmlFor="room-code" className="sr-only">
+                  Room code
+                </label>
                 <Input
+                  id="room-code"
                   value={roomId}
                   onChange={(event) =>
                     setRoomId(normalizeRoomCodeInput(event.target.value))
