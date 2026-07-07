@@ -321,6 +321,8 @@ const Home = () => {
             {notice && (
               <div
                 id="startup-username-notice"
+                role="status"
+                aria-live="polite"
                 className="mt-4 border border-border bg-input px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground"
               >
                 {notice}
@@ -442,7 +444,11 @@ const Home = () => {
         </section>
 
         {notice && (
-          <div className="border border-border bg-input px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">
+          <div
+            role="status"
+            aria-live="polite"
+            className="border border-border bg-input px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground"
+          >
             {notice}
           </div>
         )}
