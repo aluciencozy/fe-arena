@@ -335,8 +335,8 @@ const Home = () => {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(31,40,51,0.35)_0%,_rgba(11,15,25,1)_42%,_rgba(3,5,10,1)_100%)] px-4 py-6 text-foreground">
-      <main className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-5">
+    <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(31,40,51,0.35)_0%,_rgba(11,15,25,1)_42%,_rgba(3,5,10,1)_100%)] px-4 py-6 text-foreground lg:h-screen lg:overflow-hidden">
+      <main className="mx-auto flex min-h-0 w-full max-w-6xl flex-col gap-5 lg:h-full">
         <header className="flex flex-col gap-4 border-b border-border/70 pb-6 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="mb-2 text-[10px] font-extrabold uppercase tracking-widest text-player-1">
