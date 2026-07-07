@@ -3,6 +3,7 @@ import type { PlayerState, GameStore, GameState } from "../types";
 
 const DEFAULT_VOLUME = 35;
 const VOLUME_STORAGE_KEY = "guess-the-ost-volume";
+const USERNAME_STORAGE_KEY = "guess-the-ost-username";
 
 const clampVolume = (volume: number) => {
   if (!Number.isFinite(volume)) return DEFAULT_VOLUME;
@@ -16,12 +17,20 @@ const getStoredVolume = () => {
   return clampVolume(Number(storedVolume));
 };
 
-// Create a global store using Zustand to manage player information across the app
+const getStoredUsername = () => {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(USERNAME_STORAGE_KEY) ?? "";
+};
+
 export const useGameStore = create<PlayerState>((set) => ({
-  // Initial state for the player's name and a function to update it
-  playerName: "",
+  playerName: getStoredUsername(),
   volume: getStoredVolume(),
-  setPlayerName: (name: string) => set({ playerName: name }),
+  setPlayerName: (name: string) => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(USERNAME_STORAGE_KEY, name);
+    }
+    set({ playerName: name });
+  },
   setVolume: (volume: number) => {
     const clampedVolume = clampVolume(volume);
     if (typeof window !== "undefined") {
