@@ -291,10 +291,14 @@ const Home = () => {
                 <Gamepad2 size={22} />
               </span>
             </div>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            <label
+              htmlFor="startup-username"
+              className="mb-2 block text-xs font-bold uppercase tracking-wider text-muted-foreground"
+            >
               Username
             </label>
             <Input
+              id="startup-username"
               autoFocus
               value={username}
               onChange={(event) => {
@@ -304,6 +308,7 @@ const Home = () => {
               placeholder="xX_DemonSlayer_Xx"
               className="mb-4 h-12 border-player-1/40 bg-input text-lg font-black uppercase tracking-widest text-foreground placeholder:text-zinc-600"
               maxLength={18}
+              aria-describedby={notice ? "startup-username-notice" : undefined}
             />
             <Button
               type="submit"
@@ -314,7 +319,10 @@ const Home = () => {
               Press Enter
             </Button>
             {notice && (
-              <div className="mt-4 border border-border bg-input px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              <div
+                id="startup-username-notice"
+                className="mt-4 border border-border bg-input px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground"
+              >
                 {notice}
               </div>
             )}
