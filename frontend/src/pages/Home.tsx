@@ -49,7 +49,8 @@ const Home = () => {
   const hasUsername = !isUsernameGateOpen && trimmedUsername.length > 0;
   const canUseAnimeActions =
     hasUsername && selectedMode === "anime" && selectedTitleIds.length > 0 && !isQueueing;
-  const canJoinRoom = hasUsername && roomId.trim().length > 0;
+  const canJoinRoom =
+    hasUsername && roomId.trim().length > 0 && !isQueueing && !isCreating;
 
   const selectedTrackCount = useMemo(
     () =>
@@ -213,6 +214,8 @@ const Home = () => {
 
   const handleJoinRoom = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isCreating || isQueueing) return;
+
     const trimmedUsername = persistUsername();
     const normalizedRoomId = normalizeRoomCodeInput(roomId);
     if (!trimmedUsername || !normalizedRoomId) return;
@@ -618,7 +621,7 @@ const Home = () => {
                 />
                 <Button
                   type="submit"
-                  disabled={!canJoinRoom || isQueueing}
+                  disabled={!canJoinRoom}
                   variant="outline"
                   className="w-full font-extrabold uppercase tracking-widest"
                 >
