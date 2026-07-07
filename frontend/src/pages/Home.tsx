@@ -370,6 +370,7 @@ const Home = () => {
           <button
             type="button"
             onClick={() => handleModeSelect("anime")}
+            aria-pressed={selectedMode === "anime"}
             className={`home-row group relative flex min-h-28 items-center justify-between overflow-hidden px-5 py-4 text-left transition-all hover:border-player-1/70 ${
               selectedMode === "anime" ? "player-1-border-glow" : ""
             }`}
@@ -407,6 +408,7 @@ const Home = () => {
           <button
             type="button"
             onClick={() => handleModeSelect("video-game")}
+            aria-pressed={selectedMode === "video-game"}
             className="home-row group relative flex min-h-28 items-center justify-between overflow-hidden px-5 py-4 text-left opacity-75 transition-all hover:border-player-2/70"
           >
             <div className="relative z-10 flex items-center gap-4">
@@ -514,6 +516,7 @@ const Home = () => {
                       key={title.id}
                       type="button"
                       onClick={() => toggleAnime(title.id)}
+                      aria-pressed={selected}
                       className={`home-row group relative min-h-24 overflow-hidden px-4 py-3 text-left transition-all hover:border-player-1/70 ${
                         selected ? "player-1-border-glow" : ""
                       }`}
