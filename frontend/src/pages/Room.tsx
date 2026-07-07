@@ -578,7 +578,13 @@ const Room = () => {
 
             {/* Central Guess/Chat Input Form */}
             <form onSubmit={handleGuessSubmit} className="relative flex flex-col gap-2 pointer-events-auto">
+              <label htmlFor="room-guess-chat-input" className="sr-only">
+                {visualPhase === "LOBBY"
+                  ? "Lobby message"
+                  : "Guess the OST answer"}
+              </label>
               <input
+                id="room-guess-chat-input"
                 value={guessValue}
                 onChange={handleGuessChange}
                 onKeyDown={handleGuessKeyDown}
