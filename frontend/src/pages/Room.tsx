@@ -86,6 +86,7 @@ const Room = () => {
     answerSuggestions.length === 0
       ? 0
       : Math.min(highlightedSuggestionIndex, answerSuggestions.length - 1);
+  const selectedSuggestion = answerSuggestions[selectedSuggestionIndex];
   const showRoundResult =
     visualPhase === "REVEAL" || visualPhase === "GAME_OVER";
 
@@ -592,15 +593,33 @@ const Room = () => {
                 disabled={isGuessInputDisabled}
                 className="w-full text-center bg-input border border-border text-foreground px-4 py-3 rounded-lg font-bold text-xs uppercase placeholder-zinc-600 shadow-md focus:outline-none focus:border-player-1 focus:ring-1 focus:ring-player-1/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 autoComplete="off"
+                role={canUseAnswerSuggestions ? "combobox" : undefined}
+                aria-autocomplete={canUseAnswerSuggestions ? "list" : undefined}
+                aria-expanded={canUseAnswerSuggestions ? answerSuggestions.length > 0 : undefined}
+                aria-controls={
+                  answerSuggestions.length > 0 ? "answer-suggestions-list" : undefined
+                }
+                aria-activedescendant={
+                  selectedSuggestion
+                    ? `answer-suggestion-${selectedSuggestion.id}`
+                    : undefined
+                }
                 autoFocus
               />
               {answerSuggestions.length > 0 && (
-                <div className="answer-suggestions absolute left-0 right-0 top-full z-50 mt-2 grid max-h-[360px] gap-2 overflow-y-auto rounded-lg border border-player-1/40 bg-background/95 p-2 shadow-2xl shadow-black/50 backdrop-blur-md">
+                <div
+                  id="answer-suggestions-list"
+                  role="listbox"
+                  className="answer-suggestions absolute left-0 right-0 top-full z-50 mt-2 grid max-h-[360px] gap-2 overflow-y-auto rounded-lg border border-player-1/40 bg-background/95 p-2 shadow-2xl shadow-black/50 backdrop-blur-md"
+                >
                   {answerSuggestions.map((suggestion, index) => {
                     const isSelected = index === selectedSuggestionIndex;
                     return (
                       <button
                         key={suggestion.id}
+                        id={`answer-suggestion-${suggestion.id}`}
+                        role="option"
+                        aria-selected={isSelected}
                         type="button"
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => submitSuggestion(suggestion)}
