@@ -2,7 +2,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import YouTube, { type YouTubeEvent } from "react-youtube";
 import Fuse from "fuse.js";
-import { CheckCircle2, Settings, SkipForward, Volume2, VolumeX, Waves, Zap } from "lucide-react";
+import {
+  CheckCircle2,
+  Clipboard,
+  Settings,
+  SkipForward,
+  Volume2,
+  VolumeX,
+  Waves,
+  Zap,
+} from "lucide-react";
 import { useGameStore, useGameStateStore } from "@/store/gameStore";
 import { useSocket } from "@/hooks/useSocket";
 import type { AnswerOption } from "@/types";
@@ -49,6 +58,7 @@ const Room = () => {
     useState(0);
   const [gameStartTime, setGameStartTime] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [copyNotice, setCopyNotice] = useState("");
   const visualPhase = phase;
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -195,6 +205,24 @@ const Room = () => {
     oscillator.stop(nowTime + 0.35);
     oscillator.addEventListener("ended", () => void audioContext.close());
   };
+
+  const handleCopyRoomCode = async () => {
+    if (!roomCode) return;
+
+    try {
+      await navigator.clipboard.writeText(roomCode);
+      setCopyNotice("Room code copied.");
+    } catch {
+      setCopyNotice("Copy failed. Select the code manually.");
+    }
+  };
+
+  useEffect(() => {
+    if (!copyNotice) return;
+
+    const timer = window.setTimeout(() => setCopyNotice(""), 2500);
+    return () => window.clearTimeout(timer);
+  }, [copyNotice]);
 
   const handleGuessChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setGuessValue(event.target.value);
@@ -922,6 +950,23 @@ const Room = () => {
               <p className="text-xl font-black uppercase tracking-[0.35em] text-player-1">
                 {roomCode}
               </p>
+              <button
+                type="button"
+                onClick={handleCopyRoomCode}
+                className="mt-2 inline-flex items-center justify-center gap-2 border border-player-1/50 bg-player-1/10 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-widest text-player-1 transition-all hover:bg-player-1/20 active:translate-y-px"
+              >
+                <Clipboard size={13} />
+                Copy Code
+              </button>
+              {copyNotice && (
+                <p
+                  role="status"
+                  aria-live="polite"
+                  className="mt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+                >
+                  {copyNotice}
+                </p>
+              )}
             </div>
             {players.length < 2 && (
               <div className="text-sm font-extrabold uppercase tracking-widest text-center text-zinc-500 bg-input/80 border border-border/80 px-6 py-3 rounded-lg shadow-lg animate-pulse">
