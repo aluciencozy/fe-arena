@@ -81,6 +81,10 @@ const Home = () => {
   const filteredSelectedCount = filteredAnimeTitles.filter((title) =>
     selectedTitleIds.includes(title.id),
   ).length;
+  const canSelectFiltered =
+    filteredAnimeTitles.length > 0 &&
+    filteredSelectedCount < filteredAnimeTitles.length;
+  const canDeselectFiltered = filteredSelectedCount > 0;
 
   useEffect(() => {
     const handleRoomCreated = (metadata: RoomMetadata) => {
@@ -179,6 +183,8 @@ const Home = () => {
   };
 
   const selectFilteredAnime = () => {
+    if (!canSelectFiltered) return;
+
     setSelectedTitleIds((currentIds) =>
       Array.from(
         new Set([...currentIds, ...filteredAnimeTitles.map((title) => title.id)]),
@@ -187,6 +193,8 @@ const Home = () => {
   };
 
   const deselectFilteredAnime = () => {
+    if (!canDeselectFiltered) return;
+
     const filteredIds = new Set(filteredAnimeTitles.map((title) => title.id));
     setSelectedTitleIds((currentIds) =>
       currentIds.filter((titleId) => !filteredIds.has(titleId)),
@@ -496,7 +504,7 @@ const Home = () => {
                       type="button"
                       variant="outline"
                       onClick={selectFilteredAnime}
-                      disabled={filteredAnimeTitles.length === 0}
+                      disabled={!canSelectFiltered}
                       size="sm"
                       className="h-8 px-2 text-[10px] font-extrabold uppercase tracking-wider"
                     >
@@ -507,7 +515,7 @@ const Home = () => {
                       type="button"
                       variant="outline"
                       onClick={deselectFilteredAnime}
-                      disabled={filteredAnimeTitles.length === 0}
+                      disabled={!canDeselectFiltered}
                       size="sm"
                       className="h-8 px-2 text-[10px] font-extrabold uppercase tracking-wider"
                     >
