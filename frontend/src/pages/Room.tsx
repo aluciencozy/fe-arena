@@ -709,14 +709,19 @@ const Room = () => {
         <button
           type="button"
           onClick={() => setSettingsOpen((open) => !open)}
-          aria-label="Open settings"
+          aria-label={settingsOpen ? "Close settings" : "Open settings"}
+          aria-expanded={settingsOpen}
+          aria-controls="room-settings-panel"
           className="flex size-10 items-center justify-center border border-border bg-card/90 text-foreground shadow-lg backdrop-blur transition-all hover:border-player-1 hover:text-player-1 active:translate-y-px"
         >
           <Settings size={18} />
         </button>
 
         {settingsOpen && (
-          <div className="absolute right-0 mt-3 w-72 border border-border bg-card p-4 shadow-2xl">
+          <div
+            id="room-settings-panel"
+            className="absolute right-0 mt-3 w-72 border border-border bg-card p-4 shadow-2xl"
+          >
             <div className="mb-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 {volume === 0 ? (
