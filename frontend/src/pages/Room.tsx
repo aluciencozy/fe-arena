@@ -19,7 +19,9 @@ import type { AnswerOption } from "@/types";
 const Room = () => {
   const { id: dynamicRoomId } = useParams(); // Get the room ID from the URL
   const navigate = useNavigate(); // Hook to programmatically navigate between routes
-  const roomCode = dynamicRoomId ?? "";
+  const normalizeRoomCode = (value: string) =>
+    value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+  const roomCode = normalizeRoomCode(dynamicRoomId ?? "");
 
   // Access player name and game state from the global stores
   const playerName = useGameStore((state) => state.playerName);
@@ -101,10 +103,15 @@ const Room = () => {
     visualPhase === "REVEAL" || visualPhase === "GAME_OVER";
 
   useEffect(() => {
-    if (!dynamicRoomId || !playerName) {
+    if (!roomCode || !playerName) {
       navigate("/", { replace: true });
+      return;
     }
-  }, [dynamicRoomId, navigate, playerName]);
+
+    if (dynamicRoomId !== roomCode) {
+      navigate(`/room/${roomCode}`, { replace: true });
+    }
+  }, [dynamicRoomId, navigate, playerName, roomCode]);
 
   // Clear chat / capture timestamp when active game starts
   useEffect(() => {
@@ -752,7 +759,7 @@ const Room = () => {
         .slice(-1)[0]
     : null;
 
-  if (!dynamicRoomId || !playerName) {
+  if (!roomCode || !playerName) {
     return null;
   }
 
