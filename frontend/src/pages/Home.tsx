@@ -240,10 +240,10 @@ const Home = () => {
 
   if (isUsernameGateOpen) {
     return (
-      <div className="relative flex h-screen overflow-hidden bg-[#05070d] px-4 py-6 text-foreground">
+      <div className="relative flex min-h-screen overflow-x-hidden bg-[#05070d] px-4 py-6 text-foreground">
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,_transparent_1px)] bg-[length:100%_4px]" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,_rgba(77,255,188,0.24),_transparent_28%),radial-gradient(circle_at_84%_22%,_rgba(255,77,77,0.2),_transparent_30%),linear-gradient(135deg,_rgba(77,255,188,0.08),_transparent_32%,_rgba(255,77,77,0.08))]" />
-        <main className="relative z-10 mx-auto grid w-full max-w-5xl items-center gap-8 md:grid-cols-[1fr_380px]">
+        <main className="relative z-10 mx-auto grid w-full max-w-5xl items-center gap-8 py-4 md:grid-cols-[1fr_380px]">
           <section className="space-y-6">
             <div className="inline-flex items-center gap-2 border border-player-1/50 bg-player-1/10 px-3 py-2 text-[10px] font-extrabold uppercase tracking-widest text-player-1">
               <Swords size={14} />
