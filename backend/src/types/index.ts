@@ -37,6 +37,7 @@ export interface CatalogTitle {
 export interface RoundResult {
   canonicalTitle: string;
   trackTitle: string | null;
+  videoUrl: string;
   titleId: string;
   romajiName: string | null;
   nativeName: string | null;

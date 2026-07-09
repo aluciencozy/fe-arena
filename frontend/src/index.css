@@ -351,6 +351,163 @@
   animation: damage-float 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+.round-impact-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  pointer-events: auto;
+  isolation: isolate;
+  animation: round-impact-shell 7s linear both;
+}
+
+.round-impact-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.025) 0,
+      rgba(255, 255, 255, 0.025) 1px,
+      transparent 1px,
+      transparent 4px
+    ),
+    rgba(3, 6, 12, 0.88);
+  backdrop-filter: blur(3px) saturate(0.7);
+}
+
+.round-impact-content {
+  width: min(980px, calc(100vw - 3rem));
+  display: grid;
+  gap: 2rem;
+  text-align: center;
+}
+
+.round-impact-answer {
+  animation: impact-answer-enter 700ms steps(6, end) 180ms both;
+}
+
+.round-impact-answer h2 {
+  margin-top: 0.45rem;
+  color: var(--foreground);
+  font-size: clamp(1.75rem, 4vw, 3.75rem);
+  font-weight: 950;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+  text-shadow: 3px 2px 0 rgba(255, 77, 77, 0.28);
+}
+
+.round-impact-answer a {
+  margin-top: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--player-1);
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: color 150ms ease;
+}
+
+.round-impact-answer a:hover {
+  color: var(--player-1);
+}
+
+.damage-clash {
+  position: relative;
+  min-height: 270px;
+  display: grid;
+  place-items: center;
+}
+
+.damage-clash-number {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  gap: 0.2rem;
+  width: 12rem;
+  translate: 0 -50%;
+  text-transform: uppercase;
+  will-change: transform, opacity;
+}
+
+.damage-clash-number span,
+.damage-clash-result span {
+  color: var(--muted-foreground);
+  font-size: 0.65rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+}
+
+.damage-clash-number strong {
+  color: var(--foreground);
+  font-size: clamp(4rem, 10vw, 8.5rem);
+  font-weight: 950;
+  line-height: 0.8;
+  text-shadow:
+    5px 3px 0 rgba(0, 0, 0, 0.9),
+    -2px 0 0 currentColor;
+}
+
+.damage-clash-number-left {
+  left: 0;
+  color: var(--player-1);
+  animation: damage-smash-left 2.1s steps(16, end) 1.05s both;
+}
+
+.damage-clash-number-right {
+  right: 0;
+  color: var(--player-2);
+  animation: damage-smash-right 2.1s steps(16, end) 1.05s both;
+}
+
+.damage-clash-burst {
+  position: absolute;
+  color: var(--foreground);
+  font-size: 7rem;
+  font-weight: 950;
+  opacity: 0;
+  text-shadow:
+    0 0 30px var(--player-1-glow),
+    0 0 45px var(--player-2-glow);
+  animation: damage-collision-burst 900ms steps(7, end) 2.72s both;
+}
+
+.damage-clash-result {
+  position: absolute;
+  display: grid;
+  gap: 0.65rem;
+  opacity: 0;
+  text-transform: uppercase;
+  animation: damage-result-impact 3.2s steps(18, end) 3.25s both;
+}
+
+.damage-clash-result strong {
+  font-size: clamp(5rem, 14vw, 11rem);
+  font-weight: 950;
+  line-height: 0.75;
+}
+
+.damage-clash-result-win {
+  color: var(--player-1);
+  text-shadow: 0 0 34px var(--player-1-glow);
+}
+
+.damage-clash-result-loss {
+  color: var(--player-2);
+  text-shadow: 0 0 34px var(--player-2-glow);
+}
+
+.damage-clash-result-tie {
+  color: var(--muted-foreground);
+}
+
 /* Glow effects */
 .player-1-glow {
   box-shadow: 0 0 15px 2px var(--player-1-glow);
@@ -452,6 +609,153 @@
   100% {
     opacity: 0;
     transform: translateY(-8px);
+  }
+}
+
+@keyframes round-impact-shell {
+  0% {
+    opacity: 0;
+  }
+  6%,
+  91% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes impact-answer-enter {
+  0% {
+    opacity: 0;
+    transform: translate(8px, -12px) skewX(-4deg);
+  }
+  45% {
+    opacity: 1;
+    transform: translate(-5px, 3px) skewX(2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(0) skewX(0);
+  }
+}
+
+@keyframes damage-smash-left {
+  0% {
+    opacity: 0;
+    transform: translateX(-42vw) rotate(-7deg) scale(0.7);
+  }
+  18% {
+    opacity: 1;
+  }
+  72% {
+    opacity: 1;
+    transform: translateX(calc(50vw - 17rem)) rotate(3deg) scale(1.12);
+  }
+  80% {
+    transform: translateX(calc(50vw - 19rem)) rotate(-2deg) scale(0.94);
+  }
+  88% {
+    opacity: 1;
+    transform: translateX(calc(50vw - 17.5rem)) rotate(1deg) scale(1.04);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(calc(50vw - 18rem)) scale(0.15);
+  }
+}
+
+@keyframes damage-smash-right {
+  0% {
+    opacity: 0;
+    transform: translateX(42vw) rotate(7deg) scale(0.7);
+  }
+  18% {
+    opacity: 1;
+  }
+  72% {
+    opacity: 1;
+    transform: translateX(calc(-50vw + 17rem)) rotate(-3deg) scale(1.12);
+  }
+  80% {
+    transform: translateX(calc(-50vw + 19rem)) rotate(2deg) scale(0.94);
+  }
+  88% {
+    opacity: 1;
+    transform: translateX(calc(-50vw + 17.5rem)) rotate(-1deg) scale(1.04);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(calc(-50vw + 18rem)) scale(0.15);
+  }
+}
+
+@keyframes damage-collision-burst {
+  0% {
+    opacity: 0;
+    transform: rotate(-12deg) scale(0.15);
+  }
+  24% {
+    opacity: 1;
+    transform: translate(-7px, 4px) rotate(7deg) scale(1.4);
+  }
+  55% {
+    opacity: 1;
+    transform: translate(5px, -3px) rotate(-4deg) scale(0.9);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.1);
+  }
+}
+
+@keyframes damage-result-impact {
+  0% {
+    opacity: 0;
+    transform: translate(10px, -5px) rotate(4deg) scale(2.4);
+  }
+  12% {
+    opacity: 1;
+    transform: translate(-8px, 6px) rotate(-3deg) scale(0.82);
+  }
+  24% {
+    transform: translate(5px, -3px) rotate(2deg) scale(1.12);
+  }
+  36% {
+    transform: translate(-3px, 2px) rotate(-1deg) scale(0.97);
+  }
+  52%,
+  84% {
+    opacity: 1;
+    transform: translate(0) rotate(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px) scale(1.02);
+  }
+}
+
+@media (max-width: 700px) {
+  .round-impact-content {
+    width: calc(100vw - 1.5rem);
+  }
+
+  .damage-clash-number {
+    width: 7rem;
+  }
+
+  .damage-clash-number strong {
+    font-size: 3.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .round-impact-overlay,
+  .round-impact-answer,
+  .damage-clash-number,
+  .damage-clash-burst,
+  .damage-clash-result {
+    animation-timing-function: linear;
   }
 }
 

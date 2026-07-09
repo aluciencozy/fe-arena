@@ -5,6 +5,7 @@ import Fuse from "fuse.js";
 import {
   CheckCircle2,
   Clipboard,
+  ExternalLink,
   Settings,
   SkipForward,
   Volume2,
@@ -74,6 +75,7 @@ const Room = () => {
     (phase === "PLAYING" || phase === "GRACE_PERIOD") &&
     !alreadyGuessedCorrectly;
   const isGuessInputDisabled =
+    phase === "ROUND_END" ||
     phase === "REVEAL" ||
     phase === "GAME_OVER" ||
     (phase !== "LOBBY" && alreadyGuessedCorrectly);
@@ -102,6 +104,8 @@ const Room = () => {
   const selectedSuggestion = answerSuggestions[selectedSuggestionIndex];
   const showRoundResult =
     visualPhase === "REVEAL" || visualPhase === "GAME_OVER";
+  const showDamageImpact =
+    visualPhase === "ROUND_END" && roundResult !== null;
 
   useEffect(() => {
     if (!roomCode || !playerName) {
@@ -391,9 +395,21 @@ const Room = () => {
           <p className="text-[10px] font-black uppercase tracking-widest text-player-1">
             Exact song title
           </p>
-          <p className="mt-1 text-xl font-black text-foreground">
-            {roundResult?.trackTitle ?? "Unknown track title"}
-          </p>
+          {roundResult ? (
+            <a
+              href={roundResult.videoUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 inline-flex items-center gap-2 text-xl font-black text-foreground transition-colors hover:text-player-1"
+            >
+              {roundResult.trackTitle ?? "Open song"}
+              <ExternalLink size={16} />
+            </a>
+          ) : (
+            <p className="mt-1 text-xl font-black text-foreground">
+              Unknown track title
+            </p>
+          )}
         </div>
 
         <div className="mt-4 grid gap-3 border border-border bg-background/70 p-4">
@@ -456,6 +472,68 @@ const Room = () => {
     );
   };
 
+  const renderDamageImpact = () => {
+    if (!showDamageImpact || !roundResult) return null;
+
+    const opponent = players.find((name) => name !== playerName) ?? "Opponent";
+    const selfDamage = roundResult.damageByPlayer[playerName] ?? 0;
+    const opponentDamage = roundResult.damageByPlayer[opponent] ?? 0;
+    const resultTone =
+      roundResult.damagedPlayer === playerName
+        ? "loss"
+        : roundResult.damagedPlayer
+          ? "win"
+          : "tie";
+
+    return (
+      <section
+        className="round-impact-overlay"
+        aria-live="assertive"
+        aria-label="Round damage result"
+      >
+        <div className="round-impact-backdrop" />
+        <div className="round-impact-content">
+          <div className="round-impact-answer">
+            <p className="text-[10px] font-black uppercase tracking-[0.32em] text-player-1">
+              Answer locked
+            </p>
+            <h2>{roundResult.canonicalTitle}</h2>
+            <a
+              href={roundResult.videoUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <span>{roundResult.trackTitle ?? "Open song"}</span>
+              <ExternalLink size={16} />
+            </a>
+          </div>
+
+          <div className="damage-clash" aria-label={`${selfDamage} versus ${opponentDamage}`}>
+            <div className="damage-clash-number damage-clash-number-left">
+              <span>{playerName}</span>
+              <strong>{selfDamage}</strong>
+            </div>
+            <div className="damage-clash-burst" aria-hidden="true">×</div>
+            <div className="damage-clash-number damage-clash-number-right">
+              <span>{opponent}</span>
+              <strong>{opponentDamage}</strong>
+            </div>
+            <div className={`damage-clash-result damage-clash-result-${resultTone}`}>
+              <strong>{roundResult.damageDealt}</strong>
+              <span>
+                {resultTone === "loss"
+                  ? "Incoming damage"
+                  : resultTone === "win"
+                    ? "Damage dealt"
+                    : "No damage"}
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  };
+
   const renderMatchHistoryPanel = () => {
     if (phase !== "GAME_OVER" || matchHistory.length === 0) return null;
 
@@ -497,9 +575,15 @@ const Room = () => {
                     <p className="mt-1 truncate text-sm font-black uppercase tracking-wide text-foreground">
                       {result.canonicalTitle}
                     </p>
-                    <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <a
+                      href={result.videoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-1 inline-flex max-w-full items-center gap-1 truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:text-player-1"
+                    >
                       {result.trackTitle ?? "Unknown track title"}
-                    </p>
+                      <ExternalLink className="shrink-0" size={11} />
+                    </a>
                   </div>
                   <span className="shrink-0 text-right text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                     {result.damageDealt > 0 ? `${result.damageDealt} dmg` : "No dmg"}
@@ -781,6 +865,7 @@ const Room = () => {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden text-foreground bg-background bg-[radial-gradient(circle_at_center,_rgba(31,40,51,0.15)_0%,_rgba(11,15,25,1)_100%)] transition-colors duration-500">
+      {renderDamageImpact()}
       <div className="absolute right-5 top-5 z-[60] pointer-events-auto">
         <button
           type="button"

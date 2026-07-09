@@ -15,6 +15,7 @@ const COUNTDOWN_SECONDS = 3;
 const ROUND_SECONDS = 30;
 const GRACE_SECONDS = 4;
 const REVEAL_SECONDS = 6;
+const DAMAGE_REVEAL_SECONDS = 7;
 const STARTING_HEALTH = 5000;
 
 type TimerHandle = ReturnType<typeof setTimeout>;
@@ -126,6 +127,7 @@ const createRoundResult = (
 ): RoundResult => ({
   canonicalTitle: track.canonicalTitle,
   trackTitle: track.title ?? null,
+  videoUrl: `https://www.youtube.com/watch?v=${track.videoId}`,
   titleId: track.titleId,
   romajiName: track.romajiName ?? null,
   nativeName: track.nativeName ?? null,
@@ -308,39 +310,6 @@ const timeoutRound = (roomId: string, events: GameEvents) => {
   }, REVEAL_SECONDS * 1000);
 };
 
-const revealAfterGrace = (
-  roomId: string,
-  players: string[],
-  events: GameEvents,
-) => {
-  const record = games.get(roomId);
-  if (!record) return;
-
-  const currentVideo = getCurrentPlaylistItem(record);
-  record.state.phase = "REVEAL";
-  record.state.revealedAnswer = currentVideo.canonicalTitle;
-  if (!record.state.roundResult) {
-    recordRoundResult(
-      record,
-      createRoundResult(currentVideo, record.state.pendingDamage),
-    );
-  }
-  record.state.roundStartTime = null;
-  record.state.roundEndsAt = null;
-  record.state.countdownEndsAt = null;
-  record.state.skipVotes = [];
-
-  events.emitSystemMessage(`The answer was ${currentVideo.canonicalTitle}.`);
-  events.emitState(record.state);
-
-  record.revealTimer = setTimeout(() => {
-    const activeRecord = games.get(roomId);
-    if (!activeRecord || activeRecord.state.phase !== "REVEAL") return;
-
-    advanceToNextRound(roomId, players, events);
-  }, REVEAL_SECONDS * 1000);
-};
-
 const finishGracePeriod = (
   roomId: string,
   players: string[],
@@ -364,54 +333,13 @@ const finishGracePeriod = (
   if (damageDifference > 0) {
     damageDealt = damageDifference;
     damagedPlayer = playerB;
-    record.state.health[playerB] = Math.max(
-      0,
-      (record.state.health[playerB] || 0) - damageDifference,
-    );
-    events.emitSystemMessage(
-      `${playerA} dealt ${damageDifference} damage to ${playerB}!`,
-    );
   } else if (damageDifference < 0) {
     damageDealt = Math.abs(damageDifference);
     damagedPlayer = playerA;
-    record.state.health[playerA] = Math.max(
-      0,
-      (record.state.health[playerA] || 0) + damageDifference,
-    );
-    events.emitSystemMessage(
-      `${playerB} dealt ${Math.abs(damageDifference)} damage to ${playerA}!`,
-    );
-  } else {
-    events.emitSystemMessage("It was a tie! No damage dealt!");
   }
 
-  const winner = players.find((player) => record.state.health[player] === 0);
-
-  if (winner) {
-    const survivingPlayer = players.find((player) => player !== winner) || null;
-    record.state.phase = "GAME_OVER";
-    record.state.winner = survivingPlayer;
-    record.state.revealedAnswer = currentVideo.canonicalTitle;
-    recordRoundResult(
-      record,
-      createRoundResult(
-        currentVideo,
-        record.state.pendingDamage,
-        damageDealt,
-        damagedPlayer,
-        survivingPlayer,
-      ),
-    );
-    record.state.ready = createReady(players);
-    record.state.roundStartTime = null;
-    record.state.roundEndsAt = null;
-    record.state.countdownEndsAt = null;
-    record.state.skipVotes = [];
-    events.emitSystemMessage(`${survivingPlayer} wins!`);
-    events.emitState(record.state);
-    return;
-  }
-
+  record.state.phase = "ROUND_END";
+  record.state.revealedAnswer = currentVideo.canonicalTitle;
   recordRoundResult(
     record,
     createRoundResult(
@@ -421,7 +349,47 @@ const finishGracePeriod = (
       damagedPlayer,
     ),
   );
-  revealAfterGrace(roomId, players, events);
+  record.state.roundStartTime = null;
+  record.state.roundEndsAt = null;
+  record.state.countdownEndsAt = null;
+  record.state.skipVotes = [];
+  events.emitState(record.state);
+
+  record.revealTimer = setTimeout(() => {
+    const activeRecord = games.get(roomId);
+    if (!activeRecord || activeRecord.state.phase !== "ROUND_END") return;
+
+    if (damagedPlayer && damageDealt > 0) {
+      activeRecord.state.health[damagedPlayer] = Math.max(
+        0,
+        (activeRecord.state.health[damagedPlayer] || 0) - damageDealt,
+      );
+      const attackingPlayer =
+        players.find((player) => player !== damagedPlayer) ?? null;
+      events.emitSystemMessage(
+        `${attackingPlayer} dealt ${damageDealt} damage to ${damagedPlayer}!`,
+      );
+    } else {
+      events.emitSystemMessage("It was a tie! No damage dealt!");
+    }
+
+    const defeatedPlayer = players.find(
+      (player) => activeRecord.state.health[player] === 0,
+    );
+    if (defeatedPlayer) {
+      const survivingPlayer =
+        players.find((player) => player !== defeatedPlayer) || null;
+      activeRecord.state.phase = "GAME_OVER";
+      activeRecord.state.winner = survivingPlayer;
+      activeRecord.state.roundResult!.winner = survivingPlayer;
+      activeRecord.state.ready = createReady(players);
+      events.emitSystemMessage(`${survivingPlayer} wins!`);
+      events.emitState(activeRecord.state);
+      return;
+    }
+
+    advanceToNextRound(roomId, players, events);
+  }, DAMAGE_REVEAL_SECONDS * 1000);
 };
 
 export const getGameState = (roomId: string): GameState | undefined => {
@@ -706,7 +674,13 @@ export const handlePlayerDisconnectForGame = (
     return;
   }
 
-  const activePhases = new Set(["COUNTDOWN", "PLAYING", "GRACE_PERIOD", "REVEAL"]);
+  const activePhases = new Set([
+    "COUNTDOWN",
+    "PLAYING",
+    "GRACE_PERIOD",
+    "ROUND_END",
+    "REVEAL",
+  ]);
   if (activePhases.has(record.state.phase)) {
     clearTimers(record);
     const winner = updatedPlayers[0] || null;
