@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import YouTube, { type YouTubeEvent } from "react-youtube";
 import Fuse from "fuse.js";
+import { motion } from "motion/react";
 import {
   CheckCircle2,
   Clipboard,
@@ -486,14 +487,36 @@ const Room = () => {
           : "tie";
 
     return (
-      <section
+      <motion.section
         className="round-impact-overlay"
         aria-live="assertive"
         aria-label="Round damage result"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: [0, 1, 1, 0] }}
+        transition={{
+          duration: 7,
+          times: [0, 0.06, 0.91, 1],
+          ease: "linear",
+        }}
       >
-        <div className="round-impact-backdrop" />
+        <motion.div
+          className="round-impact-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.35, ease: "easeOut" }}
+        />
         <div className="round-impact-content">
-          <div className="round-impact-answer">
+          <motion.div
+            className="round-impact-answer"
+            initial={{ opacity: 0, y: -18, skewX: -4 }}
+            animate={{ opacity: 1, y: 0, skewX: 0 }}
+            transition={{
+              delay: 0.18,
+              type: "spring",
+              stiffness: 260,
+              damping: 20,
+            }}
+          >
             <p className="text-[10px] font-black uppercase tracking-[0.32em] text-player-1">
               Answer locked
             </p>
@@ -506,19 +529,112 @@ const Room = () => {
               <span>{roundResult.trackTitle ?? "Open song"}</span>
               <ExternalLink size={16} />
             </a>
-          </div>
+          </motion.div>
 
           <div className="damage-clash" aria-label={`${selfDamage} versus ${opponentDamage}`}>
-            <div className="damage-clash-number damage-clash-number-left">
+            <motion.div
+              className="damage-clash-number damage-clash-number-left"
+              initial={{
+                x: "-42vw",
+                rotate: -7,
+                scale: 0.7,
+                opacity: 0,
+              }}
+              animate={{
+                x: [
+                  "-42vw",
+                  "calc(50vw - 17rem)",
+                  "calc(50vw - 19rem)",
+                  "calc(50vw - 17.5rem)",
+                  "calc(50vw - 18rem)",
+                ],
+                rotate: [-7, 3, -2, 1, 0],
+                scale: [0.7, 1.12, 0.94, 1.04, 0.15],
+                opacity: [0, 1, 1, 1, 0],
+              }}
+              transition={{
+                delay: 1.05,
+                duration: 2.1,
+                times: [0, 0.72, 0.8, 0.88, 1],
+                ease: [0.22, 1, 0.36, 1],
+              }}
+            >
               <span>{playerName}</span>
               <strong>{selfDamage}</strong>
-            </div>
-            <div className="damage-clash-burst" aria-hidden="true">×</div>
-            <div className="damage-clash-number damage-clash-number-right">
+            </motion.div>
+            <motion.div
+              className="damage-clash-burst"
+              aria-hidden="true"
+              initial={{ opacity: 0, rotate: -12, scale: 0.15 }}
+              animate={{
+                opacity: [0, 1, 1, 0],
+                x: [0, -7, 5, 0],
+                y: [0, 4, -3, 0],
+                rotate: [-12, 7, -4, 0],
+                scale: [0.15, 1.4, 0.9, 2.1],
+              }}
+              transition={{
+                delay: 2.72,
+                duration: 0.9,
+                times: [0, 0.24, 0.55, 1],
+                ease: "easeOut",
+              }}
+            >
+              ×
+            </motion.div>
+            <motion.div
+              className="damage-clash-number damage-clash-number-right"
+              initial={{
+                x: "42vw",
+                rotate: 7,
+                scale: 0.7,
+                opacity: 0,
+              }}
+              animate={{
+                x: [
+                  "42vw",
+                  "calc(-50vw + 17rem)",
+                  "calc(-50vw + 19rem)",
+                  "calc(-50vw + 17.5rem)",
+                  "calc(-50vw + 18rem)",
+                ],
+                rotate: [7, -3, 2, -1, 0],
+                scale: [0.7, 1.12, 0.94, 1.04, 0.15],
+                opacity: [0, 1, 1, 1, 0],
+              }}
+              transition={{
+                delay: 1.05,
+                duration: 2.1,
+                times: [0, 0.72, 0.8, 0.88, 1],
+                ease: [0.22, 1, 0.36, 1],
+              }}
+            >
               <span>{opponent}</span>
               <strong>{opponentDamage}</strong>
-            </div>
-            <div className={`damage-clash-result damage-clash-result-${resultTone}`}>
+            </motion.div>
+            <motion.div
+              className={`damage-clash-result damage-clash-result-${resultTone}`}
+              initial={{
+                opacity: 0,
+                x: 10,
+                y: -5,
+                rotate: 4,
+                scale: 2.4,
+              }}
+              animate={{
+                opacity: [0, 1, 1, 1, 0],
+                x: [10, -8, 5, 0, 0],
+                y: [-5, 6, -3, 0, -4],
+                rotate: [4, -3, 2, 0, 0],
+                scale: [2.4, 0.82, 1.12, 1, 1.02],
+              }}
+              transition={{
+                delay: 3.25,
+                duration: 3.2,
+                times: [0, 0.12, 0.24, 0.52, 1],
+                ease: [0.16, 1, 0.3, 1],
+              }}
+            >
               <strong>{roundResult.damageDealt}</strong>
               <span>
                 {resultTone === "loss"
@@ -527,10 +643,10 @@ const Room = () => {
                     ? "Damage dealt"
                     : "No damage"}
               </span>
-            </div>
+            </motion.div>
           </div>
         </div>
-      </section>
+      </motion.section>
     );
   };
 
