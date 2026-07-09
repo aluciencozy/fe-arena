@@ -2,12 +2,14 @@ import { Server, Socket } from "socket.io";
 import { getUserSession, getPlayersInRoom } from "../services/room.service.js";
 import {
   ensureGameForRoom,
+  getGameState,
   handleGuess,
   setPlayerReady,
   voteToSkipRound,
 } from "../services/game.service.js";
 
 export const registerGameHandler = (io: Server, socket: Socket) => {
+  let nextGuessAllowedAt = 0;
   const makeEvents = (roomId: string) => ({
     emitState: (state: ReturnType<typeof ensureGameForRoom>) =>
       io.to(roomId).emit("game:state", state),
@@ -26,6 +28,19 @@ export const registerGameHandler = (io: Server, socket: Socket) => {
 
     const { roomId, username } = session;
     const players = getPlayersInRoom(roomId);
+    const gameState = getGameState(roomId);
+    const isGuessing =
+      gameState?.phase === "PLAYING" || gameState?.phase === "GRACE_PERIOD";
+
+    if (isGuessing && Date.now() < nextGuessAllowedAt) {
+      socket.emit("guess:cooldown", nextGuessAllowedAt);
+      return;
+    }
+
+    if (isGuessing) {
+      nextGuessAllowedAt = Date.now() + 2500;
+      socket.emit("guess:cooldown", nextGuessAllowedAt);
+    }
     const handledAsGuess = handleGuess(
       roomId,
       username,

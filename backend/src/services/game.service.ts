@@ -13,7 +13,7 @@ import {
 
 const COUNTDOWN_SECONDS = 3;
 const ROUND_SECONDS = 30;
-const GRACE_SECONDS = 4;
+const GRACE_SECONDS = 5;
 const REVEAL_SECONDS = 6;
 const STARTING_HEALTH = 5000;
 
@@ -56,6 +56,12 @@ const createReady = (players: string[], readyValue = false) =>
   players.reduce<Record<string, boolean>>((ready, player) => {
     ready[player] = readyValue;
     return ready;
+  }, {});
+
+const createStreaks = (players: string[]) =>
+  players.reduce<Record<string, number>>((streaks, player) => {
+    streaks[player] = 0;
+    return streaks;
   }, {});
 
 const getTitlesForRoom = (roomId: string) => {
@@ -167,6 +173,7 @@ const makeInitialState = (
   countdownEndsAt: null,
   roundEndsAt: null,
   guessedCorrectly: [],
+  firstGuessStreaks: createStreaks(players),
   skipVotes: [],
   ready: createReady(players),
   winner: null,
@@ -291,6 +298,9 @@ const timeoutRound = (roomId: string, events: GameEvents) => {
   const currentVideo = getCurrentPlaylistItem(record);
   record.state.phase = "REVEAL";
   record.state.revealedAnswer = currentVideo.canonicalTitle;
+  record.state.firstGuessStreaks = createStreaks(
+    Object.keys(record.state.health),
+  );
   recordRoundResult(record, createRoundResult(currentVideo, {}));
   record.state.roundEndsAt = null;
   record.state.roundStartTime = null;
@@ -545,6 +555,7 @@ export const voteToSkipRound = (
   const currentVideo = getCurrentPlaylistItem(record);
   record.state.phase = "REVEAL";
   record.state.revealedAnswer = currentVideo.canonicalTitle;
+  record.state.firstGuessStreaks = createStreaks(players);
   recordRoundResult(record, createRoundResult(currentVideo, {}));
   record.state.roundEndsAt = null;
   record.state.roundStartTime = null;
@@ -639,6 +650,22 @@ const getLevenshteinDistance = (a: string, b: string): number => {
   return tmp[a.length]![b.length]!;
 };
 
+export const calculateGuessDamage = (
+  elapsedSeconds: number,
+  firstGuessStreak: number,
+) => {
+  const safeElapsedSeconds = Math.max(0, elapsedSeconds);
+  const baseDamage = Math.max(
+    100,
+    Math.round(1000 * Math.pow(0.9, safeElapsedSeconds)),
+  );
+  const streakMultiplier = Math.pow(
+    1.5,
+    Math.max(0, firstGuessStreak - 1),
+  );
+  return Math.round(baseDamage * streakMultiplier);
+};
+
 export const handleGuess = (
   roomId: string,
   username: string,
@@ -665,14 +692,25 @@ export const handleGuess = (
   if (record.roundTimer) clearTimeout(record.roundTimer);
   record.roundTimer = undefined;
 
-  const elapsedSeconds = Math.floor(
+  const elapsedSeconds = Math.max(
+    0,
     (Date.now() - record.state.roundStartTime) / 1000,
   );
-  const baseDamage = Math.max(100, Math.min(1000, 1000 - elapsedSeconds));
+  const isFirstCorrectGuess = record.state.guessedCorrectly.length === 0;
 
-  // Exponential scaling based on currentRound (1.2 ^ currentRound)
-  const roundMultiplier = Math.pow(1.2, record.state.currentRound);
-  const damage = Math.round(baseDamage * roundMultiplier);
+  if (isFirstCorrectGuess) {
+    for (const player of players) {
+      record.state.firstGuessStreaks[player] =
+        player === username
+          ? (record.state.firstGuessStreaks[player] ?? 0) + 1
+          : 0;
+    }
+  }
+
+  const streak = isFirstCorrectGuess
+    ? record.state.firstGuessStreaks[username] ?? 1
+    : 1;
+  const damage = calculateGuessDamage(elapsedSeconds, streak);
 
   record.state.pendingDamage[username] = damage;
   record.state.guessedCorrectly.push(username);

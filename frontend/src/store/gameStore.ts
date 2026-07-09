@@ -63,6 +63,7 @@ export const useGameStateStore = create<GameStore>((set) => ({
   countdownEndsAt: null,
   roundEndsAt: null,
   guessedCorrectly: [],
+  firstGuessStreaks: {},
   skipVotes: [],
   ready: {},
   winner: null,
