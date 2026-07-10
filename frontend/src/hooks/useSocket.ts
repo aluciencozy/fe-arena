@@ -10,6 +10,7 @@ export const useSocket = (roomCode: string, playerName: string) => {
   const [players, setPlayers] = useState<string[]>([]); // State to hold the current players in room
   const [messages, setMessages] = useState<UnifiedMessage[]>([]); // State to hold chat messages
   const [errorNotice, setErrorNotice] = useState("");
+  const [guessCooldownEndsAt, setGuessCooldownEndsAt] = useState(0);
   const navigate = useNavigate(); // Hook to programmatically navigate between routes
 
   useEffect(() => {
@@ -77,6 +78,9 @@ export const useSocket = (roomCode: string, playerName: string) => {
     const handleGameError = (errorMessage: string) => {
       setErrorNotice(errorMessage);
     };
+    const handleGuessCooldown = (endsAt: number) => {
+      setGuessCooldownEndsAt(endsAt);
+    };
 
     // Listen for relevant events from the server
     socket.on("room:notification", handleRoomNotification);
@@ -85,6 +89,7 @@ export const useSocket = (roomCode: string, playerName: string) => {
     socket.on("chat:broadcast", handleChatBroadcast);
     socket.on("game:state", handleGameState);
     socket.on("game:error", handleGameError);
+    socket.on("guess:cooldown", handleGuessCooldown);
 
     // Remove event listeners and disconnect after a short grace period.
     // React StrictMode remounts effects in development; delaying prevents
@@ -96,14 +101,22 @@ export const useSocket = (roomCode: string, playerName: string) => {
       socket.off("chat:broadcast", handleChatBroadcast);
       socket.off("game:state", handleGameState);
       socket.off("game:error", handleGameError);
+      socket.off("guess:cooldown", handleGuessCooldown);
       scheduleSocketDisconnect();
     };
   }, [navigate, roomCode, playerName]); // Re-run effect if roomCode or playerName changes
 
-  const sendChatMessage = (message: string) => {
+  const sendChatMessage = (message: string, enforceGuessCooldown = false) => {
     const trimmedMessage = message.trim();
-    if (!trimmedMessage) return; // Do not send empty messages
+    if (
+      !trimmedMessage ||
+      (enforceGuessCooldown && Date.now() < guessCooldownEndsAt)
+    ) {
+      return false;
+    }
     socket.emit("chat:message", trimmedMessage);
+    if (enforceGuessCooldown) setGuessCooldownEndsAt(Date.now() + 2500);
+    return true;
   };
 
   const setReady = () => {
@@ -118,6 +131,7 @@ export const useSocket = (roomCode: string, playerName: string) => {
     players,
     messages,
     errorNotice,
+    guessCooldownEndsAt,
     sendChatMessage,
     setReady,
     voteToSkip,

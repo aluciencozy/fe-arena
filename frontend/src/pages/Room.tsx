@@ -49,10 +49,10 @@ const Room = () => {
   const answerOptions = useGameStateStore((state) => state.answerOptions);
 
   // Use the custom hook to manage WebSocket connections and game state synchronization
-  const { players, messages, errorNotice, sendChatMessage, setReady, voteToSkip } =
+  const { players, messages, errorNotice, guessCooldownEndsAt, sendChatMessage, setReady, voteToSkip } =
     useSocket(roomCode, playerName);
   
-  const [now, setNow] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const [guessValue, setGuessValue] = useState("");
   const [highlightedSuggestionIndex, setHighlightedSuggestionIndex] =
     useState(0);
@@ -66,7 +66,10 @@ const Room = () => {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YouTubeEvent["target"] | null>(null);
-  const hasActiveTimer = countdownEndsAt !== null || roundEndsAt !== null;
+  const hasActiveTimer =
+    countdownEndsAt !== null ||
+    roundEndsAt !== null ||
+    guessCooldownEndsAt > now;
   const playerVolume = volume === 0 ? 0 : Math.max(1, Math.round((volume / 100) ** 2 * 100));
   const alreadyGuessedCorrectly = guessedCorrectly.includes(playerName);
   const alreadyVotedToSkip = skipVotes.includes(playerName);
@@ -76,7 +79,9 @@ const Room = () => {
   const isGuessInputDisabled =
     phase === "REVEAL" ||
     phase === "GAME_OVER" ||
-    (phase !== "LOBBY" && alreadyGuessedCorrectly);
+    (phase !== "LOBBY" && alreadyGuessedCorrectly) ||
+    ((phase === "PLAYING" || phase === "GRACE_PERIOD") &&
+      guessCooldownEndsAt > now);
   const answerFuse = useMemo(
     () =>
       new Fuse(answerOptions, {
@@ -148,15 +153,15 @@ const Room = () => {
   }, [playerVolume]);
 
   const countdownSeconds = countdownEndsAt
-    ? now === null
-      ? null
-      : Math.max(0, Math.ceil((countdownEndsAt - now) / 1000))
+    ? Math.max(0, Math.ceil((countdownEndsAt - now) / 1000))
     : null;
   const roundSeconds = roundEndsAt
-    ? now === null
-      ? null
-      : Math.max(0, Math.ceil((roundEndsAt - now) / 1000))
+    ? Math.max(0, Math.ceil((roundEndsAt - now) / 1000))
     : null;
+  const guessCooldownSeconds =
+    guessCooldownEndsAt > now
+      ? Math.max(0, (guessCooldownEndsAt - now) / 1000)
+      : 0;
 
   const handlePlayerReady = (event: YouTubeEvent) => {
     playerRef.current = event.target;
@@ -245,8 +250,9 @@ const Room = () => {
 
   const submitGuess = (message: string) => {
     if (!message.trim()) return;
-    sendChatMessage(message.trim());
-    setGuessValue("");
+    const enforceGuessCooldown =
+      phase === "PLAYING" || phase === "GRACE_PERIOD";
+    if (sendChatMessage(message.trim(), enforceGuessCooldown)) setGuessValue("");
   };
 
   const submitSuggestion = (suggestion: AnswerOption) => {
@@ -640,7 +646,13 @@ const Room = () => {
                 value={guessValue}
                 onChange={handleGuessChange}
                 onKeyDown={handleGuessKeyDown}
-                placeholder={visualPhase === "LOBBY" ? "TYPE A LOBBY MESSAGE..." : "GUESS THE OST..."}
+                placeholder={
+                  visualPhase === "LOBBY"
+                    ? "TYPE A LOBBY MESSAGE..."
+                    : guessCooldownSeconds > 0
+                      ? `NEXT GUESS IN ${guessCooldownSeconds.toFixed(1)}S`
+                      : "GUESS THE OST..."
+                }
                 disabled={isGuessInputDisabled}
                 className="w-full text-center bg-input border border-border text-foreground px-4 py-3 rounded-lg font-bold text-xs uppercase placeholder-zinc-600 shadow-md focus:outline-none focus:border-player-1 focus:ring-1 focus:ring-player-1/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 autoComplete="off"
