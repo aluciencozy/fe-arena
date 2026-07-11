@@ -226,13 +226,12 @@ const Home = () => {
         {view === "play" && (
           <section className="mx-auto max-w-4xl">
             <div className="max-w-2xl">
-              <p className="ui-label">two players · real-time music guessing</p>
+              <p className="ui-label">two players · soundtrack showdown</p>
               <h1 className="ui-title mt-5 text-5xl leading-[0.96] sm:text-7xl">
                 hear it.<br />name it first.
               </h1>
               <p className="mt-6 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
-                A focused anime soundtrack duel. Pick a name, find an opponent,
-                and let the music do the rest.
+               Can you guess the ost? Pick a name, find a match, and become the soundtrack sovereign.
               </p>
             </div>
 
