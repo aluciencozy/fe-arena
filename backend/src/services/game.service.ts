@@ -672,7 +672,7 @@ export const calculateGuessDamage = (
   const safeElapsedSeconds = Math.max(0, elapsedSeconds);
   const baseDamage = Math.max(
     100,
-    Math.round(1000 * Math.pow(0.9, safeElapsedSeconds)),
+    Math.round(1000 * Math.pow(0.96, safeElapsedSeconds)),
   );
   const streakMultiplier = Math.pow(
     1.5,

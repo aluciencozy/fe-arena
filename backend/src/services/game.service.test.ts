@@ -12,13 +12,13 @@ import {
 import { getPlayableTitlesForMode } from "../data/catalog.js";
 import { addPlayerToRoom, createRoom, removePlayerFromRoom } from "./room.service.js";
 
-test("a guess four seconds later loses meaningful damage", () => {
+test("a guess four seconds later retains most of its damage", () => {
   const immediateDamage = calculateGuessDamage(0, 1);
   const delayedDamage = calculateGuessDamage(4, 1);
 
   assert.equal(immediateDamage, 1000);
-  assert.equal(delayedDamage, 656);
-  assert.ok(delayedDamage <= immediateDamage * 0.7);
+  assert.equal(delayedDamage, 849);
+  assert.ok(delayedDamage >= immediateDamage * 0.84);
 });
 
 test("consecutive first guesses compound damage by 1.5x", () => {
@@ -28,8 +28,8 @@ test("consecutive first guesses compound damage by 1.5x", () => {
 });
 
 test("later guesses do not inherit the first guesser's streak", () => {
-  assert.equal(calculateGuessDamage(4, 1), 656);
-  assert.equal(calculateGuessDamage(4, 3), 1476);
+  assert.equal(calculateGuessDamage(4, 1), 849);
+  assert.equal(calculateGuessDamage(4, 3), 1910);
 });
 
 test("a reconnect pause freezes and restores the countdown deadline", () => {
