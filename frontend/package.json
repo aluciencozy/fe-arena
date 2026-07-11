@@ -11,6 +11,7 @@
     "build": "tsc -b && vite build",
     "prelint": "npm run generate:catalog",
     "lint": "eslint .",
+    "test": "tsx --test src/**/*.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -44,6 +45,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
+    "tsx": "^4.23.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.0",
     "vite": "^8.0.4"

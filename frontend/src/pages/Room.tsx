@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import YouTube, { type YouTubeEvent } from "react-youtube";
 import Fuse from "fuse.js";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import {
   ArrowLeft,
   Check,
@@ -10,6 +11,7 @@ import {
   Clock3,
   Home,
   MessageCircle,
+  Mail,
   RotateCcw,
   Send,
   SkipForward,
@@ -24,6 +26,7 @@ import { Toast } from "@/components/Toast";
 import { Button } from "@/components/ui/button";
 import { useSocket } from "@/hooks/useSocket";
 import { playSound } from "@/lib/sound";
+import { getCountdownSeconds, shouldPlayCountdownCue } from "@/lib/timers";
 import { useGameStateStore, useGameStore } from "@/store/gameStore";
 import type { AnswerOption, RoundResult, UnifiedMessage } from "@/types";
 
@@ -93,7 +96,7 @@ const Room = () => {
   const selfReady = Boolean(ready[playerName]);
   const opponentReady = opponentName ? Boolean(ready[opponentName]) : false;
   const hasTimer = countdownEndsAt !== null || roundEndsAt !== null || guessCooldownEndsAt > now || connectionPause?.expiresAt;
-  const countdownSeconds = countdownEndsAt ? Math.max(0, Math.ceil((countdownEndsAt - now) / 1000)) : null;
+  const countdownSeconds = getCountdownSeconds(countdownEndsAt, now);
   const roundSeconds = roundEndsAt ? Math.max(0, Math.ceil((roundEndsAt - now) / 1000)) : null;
   const reconnectSeconds = connectionPause?.expiresAt ? Math.max(0, Math.ceil((connectionPause.expiresAt - now) / 1000)) : null;
   const playerVolume = musicMuted || volume === 0 ? 0 : Math.max(1, Math.round((volume / 100) ** 2 * 100));
@@ -114,7 +117,10 @@ const Room = () => {
     return fuse.search(inputValue.trim()).slice(0, 5).map((result) => result.item);
   }, [canGuess, fuse, inputValue]);
   const selectedSuggestion = suggestions[Math.min(suggestionIndex, suggestions.length - 1)];
-  const latestActivity = messages.at(-1) ?? null;
+  const recentActivity = messages
+    .filter((message) => message.type === "USER")
+    .slice(-2)
+    .reverse();
 
   useEffect(() => {
     if (!roomCode || !playerName) {
@@ -154,14 +160,21 @@ const Room = () => {
 
   useEffect(() => {
     if (messages.length > previousMessageCount.current && !activityOpen) {
-      setUnreadCount((count) => count + messages.length - previousMessageCount.current);
+      const unreadMessages = messages
+        .slice(previousMessageCount.current)
+        .filter(
+          (message) =>
+            message.type === "USER" && message.sender !== playerName,
+        );
+      if (unreadMessages.length > 0) {
+        setUnreadCount((count) => count + unreadMessages.length);
+      }
     }
     previousMessageCount.current = messages.length;
-  }, [activityOpen, messages.length]);
+  }, [activityOpen, messages, playerName]);
 
   useEffect(() => {
     if (previousPhase.current === phase) return;
-    if (phase === "COUNTDOWN") playSound("countdown");
     if (phase === "PLAYING") playSound("round-start");
     if (phase === "REVEAL") playSound("reveal");
     if (phase === "GAME_OVER") playSound(winner === playerName ? "victory" : "defeat");
@@ -169,7 +182,13 @@ const Room = () => {
   }, [phase, playerName, winner]);
 
   useEffect(() => {
-    if (phase === "COUNTDOWN" && countdownSeconds !== null && previousCountdown.current !== countdownSeconds) {
+    if (
+      shouldPlayCountdownCue(
+        phase,
+        countdownSeconds,
+        previousCountdown.current,
+      )
+    ) {
       playSound("countdown");
     }
     previousCountdown.current = countdownSeconds;
@@ -274,6 +293,7 @@ const Room = () => {
   if (!roomCode || !playerName) return null;
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <header className="relative z-40 border-b border-border bg-background/95">
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 sm:px-6">
@@ -289,10 +309,24 @@ const Room = () => {
             <Clipboard className="text-muted-foreground" size={14} />
             <span className="sr-only" aria-live="polite">{copyMessage}</span>
           </button>
-          <button type="button" onClick={toggleActivity} className="interactive relative flex size-10 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:text-foreground" aria-label="Toggle activity">
-            <MessageCircle size={17} />
-            {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 font-mono text-[9px] text-primary-foreground">{Math.min(9, unreadCount)}</span>}
-          </button>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={toggleActivity} className="interactive flex size-10 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:text-foreground" aria-label="Toggle activity">
+              <MessageCircle size={17} />
+            </button>
+            <AnimatePresence initial={false}>
+              {unreadCount > 0 && (
+                <motion.span
+                  initial={{ opacity: 0, scale: 0.8, x: -4 }}
+                  animate={{ opacity: 1, scale: 1, x: 0 }}
+                  exit={{ opacity: 0, scale: 0.8, x: -4 }}
+                  className="flex h-7 items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 font-mono text-[10px] text-primary"
+                  aria-label={`${unreadCount} unread messages`}
+                >
+                  <Mail size={12} /> {Math.min(99, unreadCount)}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </div>
           <AppSettings />
         </div>
       </header>
@@ -366,7 +400,7 @@ const Room = () => {
               alreadySkipped={alreadySkipped}
               onSkip={() => { playSound("select"); voteToSkip(); }}
               error={errorNotice}
-              latestActivity={latestActivity}
+              recentActivity={recentActivity}
               unreadCount={unreadCount}
               onOpenActivity={toggleActivity}
             />
@@ -422,6 +456,7 @@ const Room = () => {
       )}
       <Toast message={copyMessage === "copied" ? "Room code copied." : ""} onDismiss={() => setCopyMessage("")} />
     </div>
+    </MotionConfig>
   );
 };
 
@@ -471,8 +506,8 @@ const Countdown = ({ seconds }: { seconds: number }) => (
   </section>
 );
 
-const GameStage = ({ currentRound, roundSeconds, playerName, opponentName, health, pendingDamage, guessedCorrectly, inputValue, inputRef, setInputValue, submit, suggestions, selectedIndex, setSelectedIndex, submitSuggestion, disabled, cooldown, canSkip, skipVotes, alreadySkipped, onSkip, error, latestActivity, unreadCount, onOpenActivity }: {
-  currentRound: number; roundSeconds: number | null; playerName: string; opponentName: string | null; health: Record<string, number>; pendingDamage: Record<string, number>; guessedCorrectly: string[]; inputValue: string; inputRef: React.RefObject<HTMLInputElement | null>; setInputValue: (value: string) => void; submit: (event: React.FormEvent) => void; suggestions: AnswerOption[]; selectedIndex: number; setSelectedIndex: React.Dispatch<React.SetStateAction<number>>; submitSuggestion: (suggestion: AnswerOption) => void; disabled: boolean; cooldown: number; canSkip: boolean; skipVotes: number; alreadySkipped: boolean; onSkip: () => void; error: string; latestActivity: UnifiedMessage | null; unreadCount: number; onOpenActivity: () => void;
+const GameStage = ({ currentRound, roundSeconds, playerName, opponentName, health, pendingDamage, guessedCorrectly, inputValue, inputRef, setInputValue, submit, suggestions, selectedIndex, setSelectedIndex, submitSuggestion, disabled, cooldown, canSkip, skipVotes, alreadySkipped, onSkip, error, recentActivity, unreadCount, onOpenActivity }: {
+  currentRound: number; roundSeconds: number | null; playerName: string; opponentName: string | null; health: Record<string, number>; pendingDamage: Record<string, number>; guessedCorrectly: string[]; inputValue: string; inputRef: React.RefObject<HTMLInputElement | null>; setInputValue: (value: string) => void; submit: (event: React.FormEvent) => void; suggestions: AnswerOption[]; selectedIndex: number; setSelectedIndex: React.Dispatch<React.SetStateAction<number>>; submitSuggestion: (suggestion: AnswerOption) => void; disabled: boolean; cooldown: number; canSkip: boolean; skipVotes: number; alreadySkipped: boolean; onSkip: () => void; error: string; recentActivity: UnifiedMessage[]; unreadCount: number; onOpenActivity: () => void;
 }) => (
   <section className="page-enter mx-auto max-w-5xl">
     <div className="grid gap-3 sm:grid-cols-2">
@@ -486,7 +521,8 @@ const GameStage = ({ currentRound, roundSeconds, playerName, opponentName, healt
       </div>
       <h1 className="ui-title mt-5 text-3xl sm:text-5xl">name this soundtrack</h1>
       <p className="mt-3 text-sm text-muted-foreground">Type an anime title. Suggestions appear after two characters.</p>
-      <form onSubmit={submit} className="relative mt-8 text-left">
+      {canSkip && <button type="button" disabled={alreadySkipped} onClick={onSkip} className="interactive mt-6 inline-flex items-center gap-2 font-mono text-xs lowercase text-muted-foreground hover:text-foreground disabled:opacity-50"><SkipForward size={14} /> {alreadySkipped ? `skip vote sent (${skipVotes}/2)` : `vote to skip (${skipVotes}/2)`}</button>}
+      <form onSubmit={submit} className={`relative text-left ${canSkip ? "mt-4" : "mt-8"}`}>
         <input
           ref={inputRef}
           autoFocus
@@ -516,17 +552,32 @@ const GameStage = ({ currentRound, roundSeconds, playerName, opponentName, healt
         )}
       </form>
       {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
-      {canSkip && <button type="button" disabled={alreadySkipped} onClick={onSkip} className="interactive mt-6 inline-flex items-center gap-2 font-mono text-xs lowercase text-muted-foreground hover:text-foreground disabled:opacity-50"><SkipForward size={14} /> {alreadySkipped ? `skip vote sent (${skipVotes}/2)` : `vote to skip (${skipVotes}/2)`}</button>}
-      <RecentActivity message={latestActivity} unreadCount={unreadCount} playerName={playerName} onOpen={onOpenActivity} />
+      <RecentActivity messages={recentActivity} unreadCount={unreadCount} playerName={playerName} onOpen={onOpenActivity} />
     </div>
   </section>
 );
 
-const RecentActivity = ({ message, unreadCount, playerName, onOpen }: { message: UnifiedMessage | null; unreadCount: number; playerName: string; onOpen: () => void }) => (
-  <button type="button" onClick={onOpen} className="interactive mt-5 flex h-11 w-full items-center gap-3 rounded-md border border-border bg-card px-3 text-left hover:bg-secondary">
+const RecentActivity = ({ messages, unreadCount, playerName, onOpen }: { messages: UnifiedMessage[]; unreadCount: number; playerName: string; onOpen: () => void }) => (
+  <button type="button" onClick={onOpen} className="interactive mt-3 flex min-h-16 w-full items-center gap-3 overflow-hidden rounded-md border border-border bg-card px-3 py-2 text-left hover:bg-secondary">
     <MessageCircle className="shrink-0 text-primary" size={15} />
-    <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
-      {message ? <><span className="font-mono text-xs lowercase text-foreground">{message.type === "SYSTEM" ? "system" : message.sender === playerName ? "you" : message.sender}:</span> {message.text}</> : "No activity yet"}
+    <span className="relative flex min-w-0 flex-1 flex-col gap-1 overflow-hidden">
+      <AnimatePresence initial={false} mode="popLayout">
+        {messages.length > 0 ? messages.map((message, index) => (
+          <motion.span
+            layout="position"
+            key={message.id}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: index === 0 ? 1 : 0.55, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            transition={{ duration: 0.24, ease: "easeOut" }}
+            className="block min-w-0 truncate text-sm text-muted-foreground"
+          >
+            <span className="font-mono text-xs lowercase text-foreground">{message.type === "SYSTEM" ? "system" : message.sender === playerName ? "you" : message.sender}:</span> {message.text}
+          </motion.span>
+        )) : (
+          <motion.span key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-sm text-muted-foreground">No activity yet</motion.span>
+        )}
+      </AnimatePresence>
     </span>
     <span className="shrink-0 font-mono text-[10px] lowercase text-muted-foreground">{unreadCount > 0 ? `${unreadCount} unread` : "open chat"}</span>
   </button>

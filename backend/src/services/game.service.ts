@@ -10,8 +10,8 @@ import {
   getPlayableTitlesForMode,
   getTitlesForTitleIds,
 } from "../data/catalog.js";
+import { COUNTDOWN_SECONDS } from "../../../shared/game.constants.js";
 
-const COUNTDOWN_SECONDS = 3;
 const ROUND_SECONDS = 30;
 const GRACE_SECONDS = 5;
 const REVEAL_SECONDS = 6;
