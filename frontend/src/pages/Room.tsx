@@ -11,7 +11,6 @@ import {
   Clock3,
   Home,
   MessageCircle,
-  Mail,
   RotateCcw,
   Send,
   SkipForward,
@@ -309,23 +308,23 @@ const Room = () => {
             <Clipboard className="text-muted-foreground" size={14} />
             <span className="sr-only" aria-live="polite">{copyMessage}</span>
           </button>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={toggleActivity} className="interactive flex size-10 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:text-foreground" aria-label="Toggle activity">
+          <div>
+            <button type="button" onClick={toggleActivity} className="interactive relative flex size-10 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:text-foreground" aria-label={unreadCount > 0 ? `Open chat, ${unreadCount} unread messages` : "Toggle activity"}>
               <MessageCircle size={17} />
+              <AnimatePresence initial={false}>
+                {unreadCount > 0 && (
+                  <motion.span
+                    initial={{ opacity: 0, scale: 0.7 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.7 }}
+                    className="absolute -right-1.5 -top-1.5 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 font-mono text-[9px] leading-4 text-primary-foreground"
+                    aria-hidden="true"
+                  >
+                    {Math.min(99, unreadCount)}
+                  </motion.span>
+                )}
+              </AnimatePresence>
             </button>
-            <AnimatePresence initial={false}>
-              {unreadCount > 0 && (
-                <motion.span
-                  initial={{ opacity: 0, scale: 0.8, x: -4 }}
-                  animate={{ opacity: 1, scale: 1, x: 0 }}
-                  exit={{ opacity: 0, scale: 0.8, x: -4 }}
-                  className="flex h-7 items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 font-mono text-[10px] text-primary"
-                  aria-label={`${unreadCount} unread messages`}
-                >
-                  <Mail size={12} /> {Math.min(99, unreadCount)}
-                </motion.span>
-              )}
-            </AnimatePresence>
           </div>
           <AppSettings />
         </div>
