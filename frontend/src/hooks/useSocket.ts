@@ -11,15 +11,50 @@ export const useSocket = (roomCode: string, playerName: string) => {
   const [messages, setMessages] = useState<UnifiedMessage[]>([]); // State to hold chat messages
   const [errorNotice, setErrorNotice] = useState("");
   const [guessCooldownEndsAt, setGuessCooldownEndsAt] = useState(0);
+  const [connectionState, setConnectionState] = useState<
+    "connecting" | "connected" | "disconnected"
+  >("connecting");
   const navigate = useNavigate(); // Hook to programmatically navigate between routes
 
   useEffect(() => {
     if (!roomCode || !playerName) return;
 
-    connectSocket(); // Manually connect the socket
+    const sessionKey = `guess-the-ost-room-session:${roomCode}:${playerName.toLowerCase()}`;
+    const joinOrReconnect = () => {
+      setConnectionState("connecting");
+      const reconnectToken = window.sessionStorage.getItem(sessionKey);
+      if (reconnectToken) {
+        socket.emit("room:reconnect", { roomId: roomCode, reconnectToken });
+      } else {
+        socket.emit("room:join", roomCode, playerName);
+      }
+    };
+    const handleDisconnect = () => setConnectionState("disconnected");
+    const handleRoomSession = ({
+      roomId,
+      reconnectToken,
+    }: {
+      roomId: string;
+      reconnectToken: string;
+    }) => {
+      if (roomId === roomCode) {
+        window.sessionStorage.setItem(sessionKey, reconnectToken);
+        setConnectionState("connected");
+      }
+    };
+    const handleReconnectFailed = () => {
+      window.sessionStorage.removeItem(sessionKey);
+      navigate("/", {
+        state: { notice: "The reconnect window expired. The match was forfeited." },
+      });
+    };
 
-    // Immediately emit the 'room:join' event to join the specified room with the player's name
-    socket.emit("room:join", roomCode, playerName);
+    socket.on("connect", joinOrReconnect);
+    socket.on("disconnect", handleDisconnect);
+    socket.on("room:session", handleRoomSession);
+    socket.on("room:reconnect-failed", handleReconnectFailed);
+    connectSocket();
+    if (socket.connected) joinOrReconnect();
 
     // Handler function to update notifications state when a 'room:notification' event is received
     const handleRoomNotification = (notification: string) => {
@@ -38,6 +73,7 @@ export const useSocket = (roomCode: string, playerName: string) => {
     const handleRoomState = (roomPlayers: string[]) => {
       setErrorNotice("");
       setPlayers(roomPlayers);
+      setConnectionState("connected");
     };
 
     // Handler function to handle room errors, such as when joining fails
@@ -102,6 +138,10 @@ export const useSocket = (roomCode: string, playerName: string) => {
       socket.off("game:state", handleGameState);
       socket.off("game:error", handleGameError);
       socket.off("guess:cooldown", handleGuessCooldown);
+      socket.off("connect", joinOrReconnect);
+      socket.off("disconnect", handleDisconnect);
+      socket.off("room:session", handleRoomSession);
+      socket.off("room:reconnect-failed", handleReconnectFailed);
       scheduleSocketDisconnect();
     };
   }, [navigate, roomCode, playerName]); // Re-run effect if roomCode or playerName changes
@@ -127,13 +167,21 @@ export const useSocket = (roomCode: string, playerName: string) => {
     socket.emit("game:skip-vote");
   };
 
+  const leaveRoom = () => {
+    const sessionKey = `guess-the-ost-room-session:${roomCode}:${playerName.toLowerCase()}`;
+    window.sessionStorage.removeItem(sessionKey);
+    socket.emit("room:leave");
+  };
+
   return {
     players,
     messages,
     errorNotice,
     guessCooldownEndsAt,
+    connectionState,
     sendChatMessage,
     setReady,
     voteToSkip,
+    leaveRoom,
   };
 };
