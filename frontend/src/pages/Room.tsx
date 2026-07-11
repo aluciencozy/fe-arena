@@ -136,7 +136,11 @@ const Room = () => {
       playerRef.current?.pauseVideo();
       return;
     }
-    if ((phase === "PLAYING" || phase === "GRACE_PERIOD") && roundStartTime && playerRef.current) {
+    if (phase !== "PLAYING" && phase !== "GRACE_PERIOD") {
+      playerRef.current = null;
+      return;
+    }
+    if (roundStartTime && playerRef.current) {
       const elapsed = Math.max(0, (Date.now() - roundStartTime) / 1000);
       const rawTime = videoStartTime + elapsed;
       const syncTime = currentVideoDurationSeconds ? rawTime % currentVideoDurationSeconds : rawTime;

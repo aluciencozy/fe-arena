@@ -4,6 +4,7 @@ import {
   calculateGuessDamage,
   clearGameForRoom,
   getGameState,
+  handleGuess,
   pauseGameForReconnect,
   resumeGameAfterReconnect,
   setPlayerReady,
@@ -59,4 +60,57 @@ test("a reconnect pause freezes and restores the countdown deadline", () => {
   clearGameForRoom(room.roomId);
   removePlayerFromRoom("pause-socket-a");
   removePlayerFromRoom("pause-socket-b");
+});
+
+test("the second round starts after the first reveal", (context) => {
+  context.mock.timers.enable({ apis: ["Date", "setTimeout"], now: 1_000_000 });
+  const title = getPlayableTitlesForMode("anime")[0];
+  assert.ok(title);
+  const room = createRoom({ mode: "anime", source: "private", selectedTitleIds: [title.id] });
+  addPlayerToRoom(room.roomId, "A", "round-socket-a");
+  addPlayerToRoom(room.roomId, "B", "round-socket-b");
+  const players = ["A", "B"];
+  const events = { emitState: () => undefined, emitSystemMessage: () => undefined };
+
+  setPlayerReady(room.roomId, "A", players, events);
+  setPlayerReady(room.roomId, "B", players, events);
+  context.mock.timers.tick(3_000);
+  assert.equal(getGameState(room.roomId)?.phase, "PLAYING");
+
+  assert.equal(handleGuess(room.roomId, "A", players, title.canonicalTitle, events), true);
+  context.mock.timers.tick(5_000);
+  assert.equal(getGameState(room.roomId)?.phase, "REVEAL");
+  context.mock.timers.tick(6_000);
+  assert.equal(getGameState(room.roomId)?.phase, "COUNTDOWN");
+  assert.equal(getGameState(room.roomId)?.currentRound, 1);
+  context.mock.timers.tick(3_000);
+  assert.equal(getGameState(room.roomId)?.phase, "PLAYING");
+
+  clearGameForRoom(room.roomId);
+  removePlayerFromRoom("round-socket-a");
+  removePlayerFromRoom("round-socket-b");
+});
+
+test("the second round starts after a timed-out first round", (context) => {
+  context.mock.timers.enable({ apis: ["Date", "setTimeout"], now: 2_000_000 });
+  const title = getPlayableTitlesForMode("anime")[0];
+  assert.ok(title);
+  const room = createRoom({ mode: "anime", source: "private", selectedTitleIds: [title.id] });
+  addPlayerToRoom(room.roomId, "A", "timeout-socket-a");
+  addPlayerToRoom(room.roomId, "B", "timeout-socket-b");
+  const players = ["A", "B"];
+  const events = { emitState: () => undefined, emitSystemMessage: () => undefined };
+  setPlayerReady(room.roomId, "A", players, events);
+  setPlayerReady(room.roomId, "B", players, events);
+  context.mock.timers.tick(3_000);
+  context.mock.timers.tick(30_000);
+  assert.equal(getGameState(room.roomId)?.phase, "REVEAL");
+  context.mock.timers.tick(6_000);
+  assert.equal(getGameState(room.roomId)?.phase, "COUNTDOWN");
+  context.mock.timers.tick(3_000);
+  assert.equal(getGameState(room.roomId)?.phase, "PLAYING");
+
+  clearGameForRoom(room.roomId);
+  removePlayerFromRoom("timeout-socket-a");
+  removePlayerFromRoom("timeout-socket-b");
 });
