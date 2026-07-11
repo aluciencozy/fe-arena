@@ -516,7 +516,7 @@ export const setPlayerReady = (
   }
 
   syncPlayersForLobby(record.state, players);
-  record.state.ready[username] = true;
+  record.state.ready[username] = !record.state.ready[username];
 
   if (players.every((player) => record.state.ready[player])) {
     const playlist = shufflePlaylist(getPlaylistForRoom(roomId));

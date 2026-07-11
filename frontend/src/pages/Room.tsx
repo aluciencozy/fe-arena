@@ -351,6 +351,9 @@ const Room = () => {
               onReady={() => { playSound("confirm"); setReady(); }}
               onCopy={copyCode}
               copyMessage={copyMessage}
+              recentActivity={recentActivity}
+              unreadCount={unreadCount}
+              onOpenActivity={toggleActivity}
             />
           ) : phase === "COUNTDOWN" ? (
             <Countdown seconds={countdownSeconds ?? 3} />
@@ -459,8 +462,8 @@ const Room = () => {
   );
 };
 
-const Lobby = ({ roomCode, playerName, opponentName, selfReady, opponentReady, inputValue, setInputValue, onSubmit, onReady, onCopy, copyMessage }: {
-  roomCode: string; playerName: string; opponentName: string | null; selfReady: boolean; opponentReady: boolean; inputValue: string; setInputValue: (value: string) => void; onSubmit: (event: React.FormEvent) => void; onReady: () => void; onCopy: () => void; copyMessage: string;
+const Lobby = ({ roomCode, playerName, opponentName, selfReady, opponentReady, inputValue, setInputValue, onSubmit, onReady, onCopy, copyMessage, recentActivity, unreadCount, onOpenActivity }: {
+  roomCode: string; playerName: string; opponentName: string | null; selfReady: boolean; opponentReady: boolean; inputValue: string; setInputValue: (value: string) => void; onSubmit: (event: React.FormEvent) => void; onReady: () => void; onCopy: () => void; copyMessage: string; recentActivity: UnifiedMessage[]; unreadCount: number; onOpenActivity: () => void;
 }) => (
   <section className="page-enter mx-auto flex min-h-[calc(100vh-8rem)] max-w-4xl flex-col justify-center">
     <div className="text-center">
@@ -482,6 +485,7 @@ const Lobby = ({ roomCode, playerName, opponentName, selfReady, opponentReady, i
         <input value={inputValue} onChange={(event) => setInputValue(event.target.value)} placeholder="send a lobby message" className="h-10 min-w-0 flex-1 rounded-md border border-border bg-input px-3 text-sm outline-none focus:border-primary" />
         <Button size="icon" variant="outline" className="size-10 rounded-md" aria-label="Send message"><Send size={15} /></Button>
       </form>
+      <RecentActivity messages={recentActivity} unreadCount={unreadCount} playerName={playerName} onOpen={onOpenActivity} />
     </div>
   </section>
 );

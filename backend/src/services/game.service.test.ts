@@ -27,6 +27,28 @@ test("consecutive first guesses compound damage by 1.5x", () => {
   assert.equal(calculateGuessDamage(0, 3), 2250);
 });
 
+test("a player can toggle ready back to unready in the lobby", () => {
+  const title = getPlayableTitlesForMode("anime")[0];
+  assert.ok(title);
+  const room = createRoom({
+    mode: "anime",
+    source: "private",
+    selectedTitleIds: [title.id],
+  });
+  addPlayerToRoom(room.roomId, "A", "ready-socket-a");
+  addPlayerToRoom(room.roomId, "B", "ready-socket-b");
+  const events = { emitState: () => undefined, emitSystemMessage: () => undefined };
+
+  setPlayerReady(room.roomId, "A", ["A", "B"], events);
+  assert.equal(getGameState(room.roomId)?.ready.A, true);
+  setPlayerReady(room.roomId, "A", ["A", "B"], events);
+  assert.equal(getGameState(room.roomId)?.ready.A, false);
+
+  clearGameForRoom(room.roomId);
+  removePlayerFromRoom("ready-socket-a");
+  removePlayerFromRoom("ready-socket-b");
+});
+
 test("later guesses do not inherit the first guesser's streak", () => {
   assert.equal(calculateGuessDamage(4, 1), 849);
   assert.equal(calculateGuessDamage(4, 3), 1910);
