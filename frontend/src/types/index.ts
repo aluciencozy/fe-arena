@@ -65,8 +65,14 @@ export interface RoomMetadata {
 export interface PlayerState {
   playerName: string;
   volume: number;
+  sfxVolume: number;
+  musicMuted: boolean;
+  sfxMuted: boolean;
   setPlayerName: (name: string) => void;
   setVolume: (volume: number) => void;
+  setSfxVolume: (volume: number) => void;
+  setMusicMuted: (muted: boolean) => void;
+  setSfxMuted: (muted: boolean) => void;
 }
 
 export interface GameState {
@@ -97,6 +103,10 @@ export interface GameState {
   matchHistory: RoundResult[];
   playlistIndex: number;
   answerOptions: AnswerOption[];
+  connectionPause: {
+    playerName: string;
+    expiresAt: number;
+  } | null;
 }
 
 export interface GameStore extends GameState {

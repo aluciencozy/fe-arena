@@ -10,8 +10,8 @@ import {
   getPlayableTitlesForMode,
   getTitlesForTitleIds,
 } from "../data/catalog.js";
+import { COUNTDOWN_SECONDS } from "../../../shared/game.constants.js";
 
-const COUNTDOWN_SECONDS = 3;
 const ROUND_SECONDS = 30;
 const GRACE_SECONDS = 5;
 const REVEAL_SECONDS = 6;
@@ -37,6 +37,9 @@ interface GameRecord {
   roundTimer: TimerHandle | undefined;
   graceTimer: TimerHandle | undefined;
   revealTimer: TimerHandle | undefined;
+  pausedAt: number | null;
+  pausedRemainingMs: number | null;
+  phaseDeadlineAt: number | null;
 }
 
 interface GameEvents {
@@ -182,6 +185,7 @@ const makeInitialState = (
   matchHistory: [],
   playlistIndex: 0,
   answerOptions,
+  connectionPause: null,
 });
 
 const syncPlayersForLobby = (state: GameState, players: string[]) => {
@@ -214,6 +218,7 @@ const startCountdown = (
   const now = Date.now();
   record.state.phase = "COUNTDOWN";
   record.state.countdownEndsAt = now + COUNTDOWN_SECONDS * 1000;
+  record.phaseDeadlineAt = record.state.countdownEndsAt;
   record.state.roundStartTime = null;
   record.state.roundEndsAt = null;
   const currentVideo = getCurrentPlaylistItem(record);
@@ -248,6 +253,7 @@ const startRound = (roomId: string, events: GameEvents) => {
   record.state.currentVideoDurationSeconds = getVideoDurationSeconds(currentVideo);
   record.state.roundStartTime = now;
   record.state.roundEndsAt = now + ROUND_SECONDS * 1000;
+  record.phaseDeadlineAt = record.state.roundEndsAt;
   record.state.countdownEndsAt = null;
   record.state.revealedAnswer = null;
   record.state.roundResult = null;
@@ -310,6 +316,7 @@ const timeoutRound = (roomId: string, events: GameEvents) => {
   );
   events.emitState(record.state);
 
+  record.phaseDeadlineAt = Date.now() + REVEAL_SECONDS * 1000;
   record.revealTimer = setTimeout(() => {
     const activeRecord = games.get(roomId);
     if (!activeRecord || activeRecord.state.phase !== "REVEAL") return;
@@ -343,6 +350,7 @@ const revealAfterGrace = (
   events.emitSystemMessage(`The answer was ${currentVideo.canonicalTitle}.`);
   events.emitState(record.state);
 
+  record.phaseDeadlineAt = Date.now() + REVEAL_SECONDS * 1000;
   record.revealTimer = setTimeout(() => {
     const activeRecord = games.get(roomId);
     if (!activeRecord || activeRecord.state.phase !== "REVEAL") return;
@@ -398,6 +406,7 @@ const finishGracePeriod = (
   const winner = players.find((player) => record.state.health[player] === 0);
 
   if (winner) {
+    record.phaseDeadlineAt = null;
     const survivingPlayer = players.find((player) => player !== winner) || null;
     record.state.phase = "GAME_OVER";
     record.state.winner = survivingPlayer;
@@ -458,6 +467,9 @@ export const ensureGameForRoom = (
       roundTimer: undefined,
       graceTimer: undefined,
       revealTimer: undefined,
+      pausedAt: null,
+      pausedRemainingMs: null,
+      phaseDeadlineAt: null,
     });
     return state;
   }
@@ -489,6 +501,9 @@ export const setPlayerReady = (
     roundTimer: undefined,
     graceTimer: undefined,
     revealTimer: undefined,
+    pausedAt: null,
+    pausedRemainingMs: null,
+    phaseDeadlineAt: null,
   };
   games.set(roomId, record);
 
@@ -501,7 +516,7 @@ export const setPlayerReady = (
   }
 
   syncPlayersForLobby(record.state, players);
-  record.state.ready[username] = true;
+  record.state.ready[username] = !record.state.ready[username];
 
   if (players.every((player) => record.state.ready[player])) {
     const playlist = shufflePlaylist(getPlaylistForRoom(roomId));
@@ -657,7 +672,7 @@ export const calculateGuessDamage = (
   const safeElapsedSeconds = Math.max(0, elapsedSeconds);
   const baseDamage = Math.max(
     100,
-    Math.round(1000 * Math.pow(0.9, safeElapsedSeconds)),
+    Math.round(1000 * Math.pow(0.96, safeElapsedSeconds)),
   );
   const streakMultiplier = Math.pow(
     1.5,
@@ -716,7 +731,10 @@ export const handleGuess = (
   record.state.guessedCorrectly.push(username);
   const startsGracePeriod = record.state.phase === "PLAYING";
   record.state.phase = "GRACE_PERIOD";
-  record.state.roundEndsAt = null;
+  if (startsGracePeriod) {
+    record.phaseDeadlineAt = Date.now() + GRACE_SECONDS * 1000;
+    record.state.roundEndsAt = record.phaseDeadlineAt;
+  }
 
   events.emitSystemMessage(`${username} guessed correctly.`);
   events.emitState(record.state);
@@ -727,6 +745,68 @@ export const handleGuess = (
     }, GRACE_SECONDS * 1000);
   }
 
+  return true;
+};
+
+export const pauseGameForReconnect = (
+  roomId: string,
+  playerName: string,
+  expiresAt: number,
+  events: GameEvents,
+) => {
+  const record = games.get(roomId);
+  if (!record || record.state.connectionPause) return false;
+
+  const now = Date.now();
+  const deadline = record.phaseDeadlineAt;
+  record.pausedAt = now;
+  record.pausedRemainingMs = deadline === null ? null : Math.max(0, deadline - now);
+  record.state.connectionPause = { playerName, expiresAt };
+  clearTimers(record);
+  events.emitState(record.state);
+  events.emitSystemMessage(`${playerName} disconnected. The match is paused for 20 seconds.`);
+  return true;
+};
+
+export const resumeGameAfterReconnect = (
+  roomId: string,
+  events: GameEvents,
+) => {
+  const record = games.get(roomId);
+  if (!record || !record.state.connectionPause || record.pausedAt === null) return false;
+
+  const now = Date.now();
+  const pausedDuration = now - record.pausedAt;
+  const remaining = record.pausedRemainingMs;
+  if (record.state.roundStartTime !== null) {
+    record.state.roundStartTime += pausedDuration;
+  }
+  if (record.state.countdownEndsAt !== null) {
+    record.state.countdownEndsAt += pausedDuration;
+  }
+  if (record.state.roundEndsAt !== null) {
+    record.state.roundEndsAt += pausedDuration;
+  }
+  if (record.phaseDeadlineAt !== null) record.phaseDeadlineAt += pausedDuration;
+
+  record.state.connectionPause = null;
+  record.pausedAt = null;
+  record.pausedRemainingMs = null;
+  const players = Object.keys(record.state.health);
+  const delay = Math.max(0, remaining ?? REVEAL_SECONDS * 1000);
+
+  if (record.state.phase === "COUNTDOWN") {
+    record.countdownTimer = setTimeout(() => startRound(roomId, events), delay);
+  } else if (record.state.phase === "PLAYING") {
+    record.roundTimer = setTimeout(() => timeoutRound(roomId, events), delay);
+  } else if (record.state.phase === "GRACE_PERIOD") {
+    record.graceTimer = setTimeout(() => finishGracePeriod(roomId, players, events), delay);
+  } else if (record.state.phase === "REVEAL") {
+    record.revealTimer = setTimeout(() => advanceToNextRound(roomId, players, events), delay);
+  }
+
+  events.emitState(record.state);
+  events.emitSystemMessage("Player reconnected. The match is resuming.");
   return true;
 };
 
@@ -747,6 +827,10 @@ export const handlePlayerDisconnectForGame = (
   const activePhases = new Set(["COUNTDOWN", "PLAYING", "GRACE_PERIOD", "REVEAL"]);
   if (activePhases.has(record.state.phase)) {
     clearTimers(record);
+    record.state.connectionPause = null;
+    record.pausedAt = null;
+    record.pausedRemainingMs = null;
+    record.phaseDeadlineAt = null;
     const winner = updatedPlayers[0] || null;
     record.state.phase = "GAME_OVER";
     record.state.winner = winner;

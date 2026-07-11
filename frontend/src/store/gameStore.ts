@@ -3,6 +3,9 @@ import type { PlayerState, GameStore, GameState } from "../types";
 
 const DEFAULT_VOLUME = 35;
 const VOLUME_STORAGE_KEY = "guess-the-ost-volume";
+const SFX_VOLUME_STORAGE_KEY = "guess-the-ost-sfx-volume";
+const MUSIC_MUTED_STORAGE_KEY = "guess-the-ost-music-muted";
+const SFX_MUTED_STORAGE_KEY = "guess-the-ost-sfx-muted";
 const USERNAME_STORAGE_KEY = "guess-the-ost-username";
 
 const clampVolume = (volume: number) => {
@@ -35,6 +38,13 @@ const normalizeUsername = (name: string) => name.trim().slice(0, 18);
 export const useGameStore = create<PlayerState>((set) => ({
   playerName: getStoredUsername(),
   volume: getStoredVolume(),
+  sfxVolume: (() => {
+    if (typeof window === "undefined") return 45;
+    const stored = window.localStorage.getItem(SFX_VOLUME_STORAGE_KEY);
+    return stored === null ? 45 : clampVolume(Number(stored));
+  })(),
+  musicMuted: typeof window !== "undefined" && window.localStorage.getItem(MUSIC_MUTED_STORAGE_KEY) === "true",
+  sfxMuted: typeof window !== "undefined" && window.localStorage.getItem(SFX_MUTED_STORAGE_KEY) === "true",
   setPlayerName: (name: string) => {
     const normalizedUsername = normalizeUsername(name);
     if (typeof window !== "undefined") {
@@ -48,6 +58,21 @@ export const useGameStore = create<PlayerState>((set) => ({
       window.localStorage.setItem(VOLUME_STORAGE_KEY, String(clampedVolume));
     }
     set({ volume: clampedVolume });
+  },
+  setSfxVolume: (volume: number) => {
+    const clampedVolume = clampVolume(volume);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(SFX_VOLUME_STORAGE_KEY, String(clampedVolume));
+    }
+    set({ sfxVolume: clampedVolume });
+  },
+  setMusicMuted: (muted: boolean) => {
+    if (typeof window !== "undefined") window.localStorage.setItem(MUSIC_MUTED_STORAGE_KEY, String(muted));
+    set({ musicMuted: muted });
+  },
+  setSfxMuted: (muted: boolean) => {
+    if (typeof window !== "undefined") window.localStorage.setItem(SFX_MUTED_STORAGE_KEY, String(muted));
+    set({ sfxMuted: muted });
   },
 }));
 
@@ -72,6 +97,7 @@ export const useGameStateStore = create<GameStore>((set) => ({
   matchHistory: [],
   playlistIndex: 0,
   answerOptions: [],
+  connectionPause: null,
   setGameState: (newState: Partial<GameState>) =>
     set((state) => ({ ...state, ...newState })),
 }));

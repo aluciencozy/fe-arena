@@ -82,4 +82,8 @@ export interface GameState {
   matchHistory: RoundResult[];
   playlistIndex: number;
   answerOptions: AnswerOption[];
+  connectionPause: {
+    playerName: string;
+    expiresAt: number;
+  } | null;
 }

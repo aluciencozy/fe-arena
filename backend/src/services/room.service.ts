@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { GameMode, RoomMetadata, RoomSource } from "../types/index.js";
 
 // Hold the rooms and the players in them
@@ -5,7 +6,9 @@ const rooms = new Map<string, string[]>();
 const roomMetadata = new Map<string, RoomMetadata>();
 
 // Hold the user sessions to track which socket is in which room and their username
-const userSessions = new Map<string, { roomId: string; username: string }>();
+type UserSession = { roomId: string; username: string; reconnectToken: string };
+const userSessions = new Map<string, UserSession>();
+const reconnectReservations = new Map<string, UserSession>();
 
 // Utility functions to manage rooms and user sessions
 export const getUserSession = (socketId: string) => userSessions.get(socketId);
@@ -62,7 +65,7 @@ export const addPlayerToRoom = (
   roomId: string,
   username: string,
   socketId: string,
-): { ok: true; currentPlayers: string[]; isNewPlayer: boolean } | { ok: false; error: string } => {
+): { ok: true; currentPlayers: string[]; isNewPlayer: boolean; reconnectToken: string } | { ok: false; error: string } => {
   const normalizedRoomId = roomId.trim().toUpperCase();
   const normalizedUsername = username.trim();
   const existingSession = userSessions.get(socketId);
@@ -75,6 +78,7 @@ export const addPlayerToRoom = (
       ok: true,
       currentPlayers: rooms.get(normalizedRoomId) || [existingSession.username],
       isNewPlayer: false,
+      reconnectToken: existingSession.reconnectToken,
     };
   }
 
@@ -98,11 +102,52 @@ export const addPlayerToRoom = (
   }
 
   players.push(normalizedUsername);
+  const reconnectToken = randomUUID();
   userSessions.set(socketId, {
     roomId: normalizedRoomId,
     username: normalizedUsername,
+    reconnectToken,
   });
-  return { ok: true, currentPlayers: players, isNewPlayer: true };
+  return { ok: true, currentPlayers: players, isNewPlayer: true, reconnectToken };
+};
+
+export const reservePlayerForReconnect = (socketId: string) => {
+  const session = userSessions.get(socketId);
+  if (!session) return null;
+  userSessions.delete(socketId);
+  reconnectReservations.set(session.reconnectToken, session);
+  return session;
+};
+
+export const restorePlayerFromReconnect = (
+  reconnectToken: string,
+  socketId: string,
+  requestedRoomId: string,
+) => {
+  const session = reconnectReservations.get(reconnectToken);
+  if (!session || session.roomId !== requestedRoomId.trim().toUpperCase()) return null;
+  reconnectReservations.delete(reconnectToken);
+  userSessions.set(socketId, session);
+  return session;
+};
+
+export const expireReconnectReservation = (reconnectToken: string) => {
+  const session = reconnectReservations.get(reconnectToken);
+  if (!session) return null;
+  reconnectReservations.delete(reconnectToken);
+  return removePlayer(session);
+};
+
+const removePlayer = ({ roomId, username }: Pick<UserSession, "roomId" | "username">) => {
+  const players = rooms.get(roomId) ?? [];
+  const updatedPlayers = players.filter((player) => player !== username);
+  if (updatedPlayers.length === 0) {
+    rooms.delete(roomId);
+    roomMetadata.delete(roomId);
+  } else {
+    rooms.set(roomId, updatedPlayers);
+  }
+  return { roomId, username, updatedPlayers };
 };
 
 export const removePlayerFromRoom = (
@@ -114,19 +159,7 @@ export const removePlayerFromRoom = (
   if (!session) return null; // Safe check if there's no session for the socket
 
   // Grab the roomId, username, and current players in the room, then filter out removed player
-  const { roomId, username } = session;
-  const players = rooms.get(roomId) as string[];
-  const updatedPlayers = players.filter((player) => player !== username);
-
-  // If the room is empty after removing the player, delete the room, otherwise update the room with the new list of players
-  if (updatedPlayers.length === 0) {
-    rooms.delete(roomId);
-    roomMetadata.delete(roomId);
-  } else {
-    rooms.set(roomId, updatedPlayers);
-  }
-
-  userSessions.delete(socketId); // Remove the user's session
-
-  return { roomId, username, updatedPlayers };
+  userSessions.delete(socketId);
+  reconnectReservations.delete(session.reconnectToken);
+  return removePlayer(session);
 };

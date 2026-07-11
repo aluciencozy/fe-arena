@@ -1,79 +1,59 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Clock3,
   Gamepad2,
-  ListChecks,
-  ListX,
   Loader2,
-  Lock,
-  Play,
-  Plus,
+  LogIn,
   Search,
-  Swords,
+  Sparkles,
   Users,
   X,
 } from "lucide-react";
+import { AppSettings } from "@/components/AppSettings";
+import { Toast } from "@/components/Toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { animeTitles } from "@/data/catalog";
+import { playSound } from "@/lib/sound";
 import { connectSocket, socket } from "@/lib/socket";
 import { useGameStore } from "@/store/gameStore";
-import type { GameMode, RoomMetadata } from "@/types";
+import type { RoomMetadata } from "@/types";
+
+type HomeView = "play" | "create" | "join" | "queue";
+
+const normalizeRoomCode = (value: string) =>
+  value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
 
 const Home = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const navigationNotice =
-    (location.state as { notice?: string } | null)?.notice ?? "";
   const savedUsername = useGameStore((state) => state.playerName);
   const setPlayerName = useGameStore((state) => state.setPlayerName);
-  const animeModeImages = animeTitles
-    .slice(0, 3)
-    .map((title) => title.coverImageUrl);
-  const videoGameModeImages = [
-    "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=900&q=80",
-  ];
-
   const [username, setUsername] = useState(savedUsername);
-  const [selectedMode, setSelectedMode] = useState<GameMode | null>(null);
+  const [view, setView] = useState<HomeView>("play");
+  const [roomId, setRoomId] = useState("");
+  const [titleSearch, setTitleSearch] = useState("");
   const [selectedTitleIds, setSelectedTitleIds] = useState<string[]>([
     animeTitles[0]?.id ?? "",
   ].filter(Boolean));
-  const [roomId, setRoomId] = useState("");
-  const [notice, setNotice] = useState(navigationNotice);
-  const [isQueueing, setIsQueueing] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [titleSearch, setTitleSearch] = useState("");
-  const [isUsernameGateOpen, setIsUsernameGateOpen] = useState(
-    savedUsername.trim().length === 0,
+  const [notice, setNotice] = useState(
+    (location.state as { notice?: string } | null)?.notice ?? "",
   );
-
-  useEffect(() => {
-    if (!navigationNotice) return;
-
-    navigate(".", { replace: true, state: null });
-  }, [navigate, navigationNotice]);
+  const [isCreating, setIsCreating] = useState(false);
+  const [toast, setToast] = useState("");
+  const [queueStartedAt, setQueueStartedAt] = useState<number | null>(null);
+  const [queueSeconds, setQueueSeconds] = useState(0);
 
   const trimmedUsername = username.trim();
-  const hasUsername = !isUsernameGateOpen && trimmedUsername.length > 0;
-  const canUseAnimeActions =
-    hasUsername && selectedMode === "anime" && selectedTitleIds.length > 0 && !isQueueing;
-  const canJoinRoom =
-    hasUsername && roomId.trim().length > 0 && !isQueueing && !isCreating;
-
-  const selectedTrackCount = useMemo(
-    () =>
-      animeTitles
-        .filter((title) => selectedTitleIds.includes(title.id))
-        .reduce((total, title) => total + title.tracks.length, 0),
-    [selectedTitleIds],
-  );
-  const filteredAnimeTitles = useMemo(() => {
+  const filteredTitles = useMemo(() => {
     const query = titleSearch.trim().toLowerCase();
     if (!query) return animeTitles;
-
-    return animeTitles.filter((title) => {
-      const searchableText = [
+    return animeTitles.filter((title) =>
+      [
         title.name,
         title.canonicalTitle,
         title.romajiName,
@@ -82,613 +62,370 @@ const Home = () => {
       ]
         .filter(Boolean)
         .join(" ")
-        .toLowerCase();
-
-      return searchableText.includes(query);
-    });
+        .toLowerCase()
+        .includes(query),
+    );
   }, [titleSearch]);
-  const filteredSelectedCount = filteredAnimeTitles.filter((title) =>
-    selectedTitleIds.includes(title.id),
-  ).length;
-  const canSelectFiltered =
-    filteredAnimeTitles.length > 0 &&
-    filteredSelectedCount < filteredAnimeTitles.length;
-  const canDeselectFiltered = filteredSelectedCount > 0;
+  const selectedTrackCount = useMemo(
+    () =>
+      animeTitles
+        .filter((title) => selectedTitleIds.includes(title.id))
+        .reduce((sum, title) => sum + title.tracks.length, 0),
+    [selectedTitleIds],
+  );
 
   useEffect(() => {
-    const handleRoomCreated = (metadata: RoomMetadata) => {
+    if (!location.state) return;
+    navigate(".", { replace: true, state: null });
+  }, [location.state, navigate]);
+
+  useEffect(() => {
+    if (!queueStartedAt) return;
+    const update = () => setQueueSeconds(Math.floor((Date.now() - queueStartedAt) / 1000));
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [queueStartedAt]);
+
+  useEffect(() => {
+    const roomCreated = (metadata: RoomMetadata) => {
       setIsCreating(false);
-      setPlayerName(username.trim());
+      setPlayerName(trimmedUsername);
+      playSound("confirm");
       navigate(`/room/${metadata.roomId}`);
     };
-
-    const handleQueueWaiting = () => {
-      setIsQueueing(true);
-      setNotice("Searching for another player...");
+    const queueWaiting = () => {
+      setView("queue");
+      setQueueStartedAt(Date.now());
     };
-
-    const handleQueueMatched = (metadata: RoomMetadata) => {
-      setIsQueueing(false);
-      setPlayerName(username.trim());
+    const queueMatched = (metadata: RoomMetadata) => {
+      setPlayerName(trimmedUsername);
+      playSound("confirm");
       navigate(`/room/${metadata.roomId}`);
     };
-
-    const handleQueueCancelled = () => {
-      setIsQueueing(false);
-      setNotice("Queue cancelled.");
+    const queueCancelled = () => {
+      setQueueStartedAt(null);
+      setView("play");
+      setToast("Matchmaking cancelled.");
     };
-
-    const handleError = (message: string) => {
+    const error = (message: string) => {
       setIsCreating(false);
-      setIsQueueing(false);
+      setQueueStartedAt(null);
+      setView((current) => (current === "queue" ? "play" : current));
       setNotice(message);
+      playSound("incorrect");
     };
-
-    socket.on("room:created", handleRoomCreated);
-    socket.on("room:error", handleError);
-    socket.on("queue:waiting", handleQueueWaiting);
-    socket.on("queue:matched", handleQueueMatched);
-    socket.on("queue:cancelled", handleQueueCancelled);
-    socket.on("queue:error", handleError);
-
+    socket.on("room:created", roomCreated);
+    socket.on("room:error", error);
+    socket.on("queue:waiting", queueWaiting);
+    socket.on("queue:matched", queueMatched);
+    socket.on("queue:cancelled", queueCancelled);
+    socket.on("queue:error", error);
     return () => {
-      socket.off("room:created", handleRoomCreated);
-      socket.off("room:error", handleError);
-      socket.off("queue:waiting", handleQueueWaiting);
-      socket.off("queue:matched", handleQueueMatched);
-      socket.off("queue:cancelled", handleQueueCancelled);
-      socket.off("queue:error", handleError);
+      socket.off("room:created", roomCreated);
+      socket.off("room:error", error);
+      socket.off("queue:waiting", queueWaiting);
+      socket.off("queue:matched", queueMatched);
+      socket.off("queue:cancelled", queueCancelled);
+      socket.off("queue:error", error);
     };
-  }, [navigate, setPlayerName, username]);
+  }, [navigate, setPlayerName, trimmedUsername]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(""), 2500);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   const persistUsername = () => {
     if (!trimmedUsername) {
-      setNotice("Choose a username first.");
-      return null;
+      setNotice("Enter a username to continue.");
+      playSound("incorrect");
+      return false;
     }
-
     setPlayerName(trimmedUsername);
-    return trimmedUsername;
-  };
-
-  const normalizeRoomCodeInput = (value: string) =>
-    value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
-
-  const handleUsernameSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const persistedUsername = persistUsername();
-    if (!persistedUsername) return;
-
-    setUsername(persistedUsername);
-    setIsUsernameGateOpen(false);
     setNotice("");
+    return true;
   };
 
-  const handleModeSelect = (mode: GameMode) => {
-    if (!hasUsername) {
-      setSelectedMode(null);
-      setNotice("Choose a username first.");
-      return;
-    }
-
-    if (mode === "video-game") {
-      setSelectedMode(null);
-      setNotice("Video game OST mode is under development for a future release.");
-      return;
-    }
-
-    setSelectedMode(mode);
-    setNotice("");
+  const chooseView = (nextView: HomeView) => {
+    if (!persistUsername()) return;
+    playSound("navigate");
+    setView(nextView);
   };
 
-  const toggleAnime = (titleId: string) => {
-    setSelectedTitleIds((currentIds) => {
-      if (currentIds.includes(titleId)) {
-        return currentIds.filter((id) => id !== titleId);
-      }
-
-      return [...currentIds, titleId];
-    });
+  const startQueue = () => {
+    if (!persistUsername()) return;
+    playSound("confirm");
+    setView("queue");
+    setQueueStartedAt(Date.now());
+    connectSocket();
+    socket.emit("queue:join", { username: trimmedUsername, mode: "anime" });
   };
 
-  const selectFilteredAnime = () => {
-    if (!canSelectFiltered) return;
-
-    setSelectedTitleIds((currentIds) =>
-      Array.from(
-        new Set([...currentIds, ...filteredAnimeTitles.map((title) => title.id)]),
-      ),
-    );
-  };
-
-  const deselectFilteredAnime = () => {
-    if (!canDeselectFiltered) return;
-
-    const filteredIds = new Set(filteredAnimeTitles.map((title) => title.id));
-    setSelectedTitleIds((currentIds) =>
-      currentIds.filter((titleId) => !filteredIds.has(titleId)),
-    );
-  };
-
-  const handleCreateLobby = () => {
-    const trimmedUsername = persistUsername();
-    if (!trimmedUsername || selectedMode !== "anime") return;
-
+  const createRoom = () => {
+    if (!persistUsername()) return;
     if (selectedTitleIds.length === 0) {
       setNotice("Select at least one anime.");
+      playSound("incorrect");
       return;
     }
-
     setIsCreating(true);
     setNotice("");
+    playSound("confirm");
     connectSocket();
     socket.emit("room:create-private", {
       username: trimmedUsername,
-      mode: selectedMode,
+      mode: "anime",
       selectedTitleIds,
     });
   };
 
-  const handleJoinRoom = (event: React.FormEvent<HTMLFormElement>) => {
+  const joinRoom = (event: React.FormEvent) => {
     event.preventDefault();
-    if (isCreating || isQueueing) return;
-
-    const trimmedUsername = persistUsername();
-    const normalizedRoomId = normalizeRoomCodeInput(roomId);
-    if (!trimmedUsername || !normalizedRoomId) return;
-
-    setNotice("");
-    navigate(`/room/${normalizedRoomId}`);
+    const normalized = normalizeRoomCode(roomId);
+    if (!persistUsername() || normalized.length !== 6) {
+      if (normalized.length !== 6) setNotice("Enter a valid 6-character room code.");
+      return;
+    }
+    playSound("confirm");
+    navigate(`/room/${normalized}`);
   };
 
-  const handleQueue = () => {
-    if (isCreating || isQueueing) return;
-
-    const trimmedUsername = persistUsername();
-    if (!trimmedUsername || selectedMode !== "anime") return;
-
-    setNotice("");
-    setIsQueueing(true);
-    connectSocket();
-    socket.emit("queue:join", {
-      username: trimmedUsername,
-      mode: selectedMode,
-    });
-  };
-
-  const handleCancelQueue = () => {
-    socket.emit("queue:cancel");
-  };
-
-  if (isUsernameGateOpen) {
-    return (
-      <div className="relative flex min-h-screen overflow-x-hidden bg-[#05070d] px-4 py-6 text-foreground">
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,_transparent_1px)] bg-[length:100%_4px]" />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,_rgba(77,255,188,0.24),_transparent_28%),radial-gradient(circle_at_84%_22%,_rgba(255,77,77,0.2),_transparent_30%),linear-gradient(135deg,_rgba(77,255,188,0.08),_transparent_32%,_rgba(255,77,77,0.08))]" />
-        <main className="relative z-10 mx-auto grid w-full max-w-5xl items-center gap-8 py-4 md:grid-cols-[1fr_380px]">
-          <section className="space-y-6">
-            <div className="inline-flex items-center gap-2 border border-player-1/50 bg-player-1/10 px-3 py-2 text-[10px] font-extrabold uppercase tracking-widest text-player-1">
-              <Swords size={14} />
-              Player login
-            </div>
-            <div>
-              <p className="mb-3 text-xs font-extrabold uppercase tracking-[0.35em] text-player-2">
-                Real-time OST battles
-              </p>
-              <h1 className="max-w-3xl text-5xl font-black uppercase tracking-widest text-foreground text-player-1-glow sm:text-7xl lg:text-8xl">
-                Guess The OST
-              </h1>
-            </div>
-            <div className="grid max-w-2xl grid-cols-3 border border-border bg-card/50 text-center">
-              {["Anime", "Versus", "Speed"].map((label) => (
-                <div
-                  key={label}
-                  className="border-r border-border px-3 py-4 last:border-r-0"
-                >
-                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                    Mode
-                  </p>
-                  <p className="mt-1 text-sm font-black uppercase tracking-widest text-foreground">
-                    {label}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-          <form
-            onSubmit={handleUsernameSubmit}
-            className="gaming-card relative overflow-hidden border-player-1/50 bg-[#080a0f]/95 p-6 shadow-2xl shadow-player-1/10"
-          >
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-player-1 via-foreground to-player-2" />
-            <div className="mb-6 flex items-center justify-between gap-4 border-b border-border pb-4">
-              <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
-                  New challenger
-                </p>
-                <h2 className="mt-1 text-2xl font-black uppercase tracking-widest">
-                  Enter Name
-                </h2>
-              </div>
-              <span className="flex size-11 items-center justify-center rounded-lg border border-player-1/50 bg-player-1/10 text-player-1">
-                <Gamepad2 size={22} />
-              </span>
-            </div>
-            <label
-              htmlFor="startup-username"
-              className="mb-2 block text-xs font-bold uppercase tracking-wider text-muted-foreground"
-            >
-              Username
-            </label>
-            <Input
-              id="startup-username"
-              autoFocus
-              value={username}
-              onChange={(event) => {
-                setUsername(event.target.value);
-                if (event.target.value.trim()) setNotice("");
-              }}
-              placeholder="xX_DemonSlayer_Xx"
-              className="mb-4 h-12 border-player-1/40 bg-input text-lg font-black uppercase tracking-widest text-foreground placeholder:text-zinc-600"
-              maxLength={18}
-              aria-describedby={notice ? "startup-username-notice" : undefined}
-            />
-            <Button
-              type="submit"
-              disabled={trimmedUsername.length === 0}
-              className="h-11 w-full bg-player-1 font-extrabold uppercase tracking-widest text-background hover:bg-player-1/90"
-            >
-              <Play size={16} />
-              Press Enter
-            </Button>
-            {notice && (
-              <div
-                id="startup-username-notice"
-                role="status"
-                aria-live="polite"
-                className="mt-4 border border-border bg-input px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground"
-              >
-                {notice}
-              </div>
-            )}
-          </form>
-        </main>
-      </div>
+  const toggleTitle = (titleId: string) => {
+    playSound("select");
+    setSelectedTitleIds((current) =>
+      current.includes(titleId)
+        ? current.filter((id) => id !== titleId)
+        : [...current, titleId],
     );
-  }
+  };
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(31,40,51,0.35)_0%,_rgba(11,15,25,1)_42%,_rgba(3,5,10,1)_100%)] px-4 py-6 text-foreground lg:h-screen lg:overflow-hidden">
-      <main className="mx-auto flex min-h-0 w-full max-w-6xl flex-col gap-5 lg:h-full">
-        <header className="flex flex-col gap-4 border-b border-border/70 pb-6 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="mb-2 text-[10px] font-extrabold uppercase tracking-widest text-player-1">
-              Real-time OST battles
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
+        <button
+          type="button"
+          onClick={() => {
+            playSound("navigate");
+            setView("play");
+          }}
+          className="ui-title text-lg"
+        >
+          guess the ost
+        </button>
+        <div className="flex items-center gap-3">
+          <span className="hidden font-mono text-xs lowercase text-muted-foreground sm:inline">
+            anime mode
+          </span>
+          <AppSettings />
+        </div>
+      </header>
+
+      <main className="page-enter mx-auto w-full max-w-6xl px-5 pb-16 pt-10 sm:px-8 sm:pt-16">
+        {view === "play" && (
+          <section className="mx-auto max-w-4xl">
+            <div className="max-w-2xl">
+              <p className="ui-label">two players · soundtrack showdown</p>
+              <h1 className="ui-title mt-5 text-5xl leading-[0.96] sm:text-7xl">
+                hear it.<br />name it first.
+              </h1>
+              <p className="mt-6 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
+               Can you guess the ost? Pick a name, find a match, and become the soundtrack sovereign.
+              </p>
+            </div>
+
+            <div className="mt-12 grid gap-5 lg:grid-cols-[1fr_1.25fr]">
+              <section className="surface p-5 sm:p-6">
+                <label htmlFor="username" className="ui-label">your name</label>
+                <Input
+                  id="username"
+                  value={username}
+                  maxLength={18}
+                  onChange={(event) => {
+                    setUsername(event.target.value);
+                    setNotice("");
+                  }}
+                  placeholder="enter a username"
+                  className="mt-3 h-12 rounded-md bg-input px-4 text-base"
+                />
+                {notice && (
+                  <p role="alert" className="mt-3 text-sm text-destructive">{notice}</p>
+                )}
+                <Button
+                  type="button"
+                  onClick={startQueue}
+                  className="mt-6 h-12 w-full rounded-md bg-primary font-mono text-sm lowercase text-primary-foreground"
+                >
+                  <Sparkles size={16} /> quick match <ArrowRight size={16} />
+                </Button>
+              </section>
+
+              <section className="grid gap-3 sm:grid-cols-2">
+                <PathCard
+                  icon={<Users size={20} />}
+                  label="create private"
+                  description="Choose an anime pool and invite a friend."
+                  onClick={() => chooseView("create")}
+                />
+                <PathCard
+                  icon={<LogIn size={20} />}
+                  label="join by code"
+                  description="Enter a six-character room code."
+                  onClick={() => chooseView("join")}
+                />
+                <div className="rounded-lg border border-dashed border-border p-5 sm:col-span-2">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="ui-label">coming soon</p>
+                      <p className="ui-title mt-1 text-base text-muted-foreground">video game ost</p>
+                    </div>
+                    <Gamepad2 className="text-muted-foreground" size={20} />
+                  </div>
+                </div>
+              </section>
+            </div>
+          </section>
+        )}
+
+        {view === "queue" && (
+          <section className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center text-center">
+            <div className="relative flex size-20 items-center justify-center rounded-full border border-border bg-card">
+              <Loader2 className="animate-spin text-primary" size={28} />
+            </div>
+            <p className="ui-label mt-8">public matchmaking</p>
+            <h1 className="ui-title mt-2 text-4xl">finding your opponent</h1>
+            <p className="mt-4 text-muted-foreground">
+              Searching the anime queue for {trimmedUsername}.
             </p>
-            <h1 className="text-4xl font-black uppercase tracking-widest text-foreground md:text-6xl">
-              Guess The OST
-            </h1>
-          </div>
-          <div className="flex w-full max-w-sm items-center justify-between gap-3 border border-border bg-card/70 px-4 py-3">
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Username
-              </p>
-              <p className="truncate text-sm font-black uppercase tracking-widest text-foreground">
-                {trimmedUsername}
-              </p>
+            <div className="mt-8 flex items-center gap-2 font-mono text-sm text-muted-foreground">
+              <Clock3 size={15} /> {queueSeconds}s elapsed
             </div>
             <Button
               type="button"
               variant="outline"
-              size="sm"
-              onClick={() => setIsUsernameGateOpen(true)}
-              disabled={isQueueing || isCreating}
-              className="font-extrabold uppercase tracking-widest"
+              onClick={() => {
+                playSound("navigate");
+                socket.emit("queue:cancel");
+              }}
+              className="mt-8 rounded-md font-mono text-xs lowercase"
             >
-              Change
+              <X size={15} /> cancel search
             </Button>
-          </div>
-        </header>
-
-        <section className="grid gap-3">
-          <button
-            type="button"
-            onClick={() => handleModeSelect("anime")}
-            aria-pressed={selectedMode === "anime"}
-            className={`home-row group relative flex min-h-28 items-center justify-between overflow-hidden px-5 py-4 text-left transition-all hover:border-player-1/70 ${
-              selectedMode === "anime" ? "player-1-border-glow" : ""
-            }`}
-          >
-            <div className="relative z-10 flex items-center gap-4">
-              <span className="flex size-11 items-center justify-center rounded-lg border border-player-1/50 bg-player-1/10 text-player-1">
-                <Swords size={22} />
-              </span>
-              <div>
-                <h2 className="text-2xl font-black uppercase tracking-widest text-foreground md:text-3xl">
-                  Anime
-                </h2>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Available now / full catalog queue
-                </p>
-              </div>
-            </div>
-            <p className="relative z-10 hidden max-w-sm text-right text-sm font-semibold text-zinc-300 md:block">
-              Choose title pools for private rooms or queue into the full anime OST set.
-            </p>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex w-3/5 justify-end opacity-70">
-              {animeModeImages.map((imageUrl, index) => (
-                <img
-                  key={imageUrl}
-                  src={imageUrl}
-                  alt=""
-                  aria-hidden="true"
-                  className="h-full w-32 object-cover opacity-80 transition-transform duration-500 group-hover:scale-105 md:w-44"
-                  style={{ transform: `translateX(${index * 18}px)` }}
-                />
-              ))}
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleModeSelect("video-game")}
-            aria-pressed={selectedMode === "video-game"}
-            className="home-row group relative flex min-h-28 items-center justify-between overflow-hidden px-5 py-4 text-left opacity-75 transition-all hover:border-player-2/70"
-          >
-            <div className="relative z-10 flex items-center gap-4">
-              <span className="flex size-11 items-center justify-center rounded-lg border border-player-2/50 bg-player-2/10 text-player-2">
-                <Gamepad2 size={22} />
-              </span>
-              <div>
-                <h2 className="text-2xl font-black uppercase tracking-widest text-foreground md:text-3xl">
-                  Video Game
-                </h2>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Under development
-                </p>
-              </div>
-            </div>
-            <p className="relative z-10 hidden items-center gap-2 text-sm font-semibold text-zinc-400 md:flex">
-              <Lock size={16} /> This section is under development.
-            </p>
-            <div className="pointer-events-none absolute inset-y-0 right-0 w-3/5 opacity-55">
-              {videoGameModeImages.map((imageUrl) => (
-                <img
-                  key={imageUrl}
-                  src={imageUrl}
-                  alt=""
-                  aria-hidden="true"
-                  className="ml-auto h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-              ))}
-            </div>
-          </button>
-        </section>
-
-        {notice && (
-          <div
-            role="status"
-            aria-live="polite"
-            className="border border-border bg-input px-4 py-3 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground"
-          >
-            {notice}
-          </div>
-        )}
-
-        {selectedMode === "anime" && (
-          <section className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[1fr_360px]">
-            <div className="flex min-h-0 flex-col gap-4">
-              <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-                <div className="min-w-0">
-                  <h2 className="whitespace-nowrap text-xl font-black uppercase tracking-widest">
-                    Anime Selection
-                  </h2>
-                  <p className="whitespace-nowrap text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    {selectedTitleIds.length} selected / {selectedTrackCount}{" "}
-                    playable tracks
-                  </p>
-                  <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    {filteredSelectedCount} of {filteredAnimeTitles.length} shown selected
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <div className="relative min-w-0 sm:w-64">
-                    <label htmlFor="anime-title-search" className="sr-only">
-                      Search anime titles
-                    </label>
-                    <Search
-                      size={13}
-                      className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground"
-                    />
-                    <Input
-                      id="anime-title-search"
-                      value={titleSearch}
-                      onChange={(event) => setTitleSearch(event.target.value)}
-                      placeholder="SEARCH ANIME"
-                      className="h-8 bg-input pl-8 text-[10px] font-black uppercase tracking-widest text-foreground placeholder:text-zinc-600"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={selectFilteredAnime}
-                      disabled={!canSelectFiltered}
-                      size="sm"
-                      className="h-8 px-2 text-[10px] font-extrabold uppercase tracking-wider"
-                    >
-                      <ListChecks size={13} />
-                      Select All
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={deselectFilteredAnime}
-                      disabled={!canDeselectFiltered}
-                      size="sm"
-                      className="h-8 px-2 text-[10px] font-extrabold uppercase tracking-wider"
-                    >
-                      <ListX size={13} />
-                      Clear
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="anime-picker-scroll min-h-0 flex-1 overflow-y-auto pr-2">
-                <div className="grid gap-3">
-                {filteredAnimeTitles.map((title) => {
-                  const selected = selectedTitleIds.includes(title.id);
-                  return (
-                    <button
-                      key={title.id}
-                      type="button"
-                      onClick={() => toggleAnime(title.id)}
-                      aria-pressed={selected}
-                      className={`home-row group relative min-h-24 overflow-hidden px-4 py-3 text-left transition-all hover:border-player-1/70 ${
-                        selected ? "player-1-border-glow" : ""
-                      }`}
-                    >
-                      <div className="pointer-events-none absolute inset-y-0 right-0 w-3/5 opacity-65">
-                        <img
-                          src={title.coverImageUrl}
-                          alt=""
-                          aria-hidden="true"
-                          className="ml-auto h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                      </div>
-                      <div className="relative z-10 flex min-h-16 items-center justify-between gap-3">
-                        <div className="max-w-[72%]">
-                          <h3 className="text-base font-black uppercase tracking-wide text-foreground md:text-lg">
-                            {title.name}
-                          </h3>
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                            {title.tracks.length} OST{" "}
-                            {title.tracks.length === 1 ? "entry" : "entries"}
-                          </p>
-                        </div>
-                        <span
-                          className={`flex size-7 items-center justify-center rounded border text-xs font-black ${
-                            selected
-                              ? "border-player-1 bg-player-1 text-background"
-                              : "border-border text-muted-foreground"
-                          }`}
-                        >
-                          {selected ? "ON" : " "}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-                {filteredAnimeTitles.length === 0 && (
-                  <div className="border border-border bg-input px-4 py-8 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                    No anime matched your search.
-                  </div>
-                )}
-                </div>
-              </div>
-            </div>
-
-            <aside className="space-y-4">
-              <div className="gaming-card p-5">
-                <div className="mb-4 flex items-center gap-2 text-player-1">
-                  <Plus size={18} />
-                  <h2 className="text-sm font-black uppercase tracking-widest text-foreground">
-                    Private Lobby
-                  </h2>
-                </div>
-                <p className="mb-4 text-xs font-semibold text-muted-foreground">
-                  Create a generated room code using your anime picks. Share the
-                  code with a friend.
-                </p>
-                <Button
-                  type="button"
-                  onClick={handleCreateLobby}
-                  disabled={!canUseAnimeActions || isCreating}
-                  className="w-full bg-player-1 font-extrabold uppercase tracking-widest text-background hover:bg-player-1/90"
-                >
-                  {isCreating ? (
-                    <Loader2 className="animate-spin" size={16} />
-                  ) : (
-                    <Plus size={16} />
-                  )}
-                  Create Lobby
-                </Button>
-              </div>
-
-              <form onSubmit={handleJoinRoom} className="gaming-card p-5">
-                <div className="mb-4 flex items-center gap-2 text-player-2">
-                  <Users size={18} />
-                  <h2 className="text-sm font-black uppercase tracking-widest text-foreground">
-                    Join Friend
-                  </h2>
-                </div>
-                <label htmlFor="room-code" className="sr-only">
-                  Room code
-                </label>
-                <Input
-                  id="room-code"
-                  value={roomId}
-                  onChange={(event) =>
-                    setRoomId(normalizeRoomCodeInput(event.target.value))
-                  }
-                  placeholder="ROOM CODE"
-                  className="mb-3 bg-input text-center font-black uppercase tracking-widest text-foreground placeholder:text-zinc-600"
-                  maxLength={6}
-                />
-                <Button
-                  type="submit"
-                  disabled={!canJoinRoom}
-                  variant="outline"
-                  className="w-full font-extrabold uppercase tracking-widest"
-                >
-                  <Play size={16} />
-                  Join Lobby
-                </Button>
-              </form>
-
-              <div className="gaming-card p-5">
-                <div className="mb-4 flex items-center gap-2 text-player-1">
-                  <Swords size={18} />
-                  <h2 className="text-sm font-black uppercase tracking-widest text-foreground">
-                    Public Queue
-                  </h2>
-                </div>
-                <p className="mb-4 text-xs font-semibold text-muted-foreground">
-                  Queue for a live opponent using all anime songs.
-                </p>
-                {isQueueing ? (
-                  <Button
-                    type="button"
-                    onClick={handleCancelQueue}
-                    variant="outline"
-                    className="w-full font-extrabold uppercase tracking-widest"
-                  >
-                    <X size={16} />
-                    Cancel Queue
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    onClick={handleQueue}
-                    disabled={
-                      username.trim().length === 0 ||
-                      selectedMode !== "anime" ||
-                      isCreating
-                    }
-                    className="w-full bg-player-2 font-extrabold uppercase tracking-widest text-background hover:bg-player-2/90"
-                  >
-                    <Swords size={16} />
-                    Queue
-                  </Button>
-                )}
-              </div>
-            </aside>
           </section>
         )}
+
+        {view === "join" && (
+          <FocusedShell title="join a room" onBack={() => setView("play")}>
+            <form onSubmit={joinRoom} className="surface mx-auto max-w-lg p-6 sm:p-8">
+              <label htmlFor="room-code" className="ui-label">room code</label>
+              <Input
+                id="room-code"
+                autoFocus
+                value={roomId}
+                onChange={(event) => {
+                  setRoomId(normalizeRoomCode(event.target.value));
+                  setNotice("");
+                }}
+                placeholder="ABC123"
+                maxLength={6}
+                className="mt-3 h-14 rounded-md bg-input text-center font-mono text-xl uppercase tracking-[0.28em]"
+              />
+              {notice && <p role="alert" className="mt-3 text-sm text-destructive">{notice}</p>}
+              <Button className="mt-6 h-12 w-full rounded-md font-mono text-sm lowercase">
+                join room <ArrowRight size={16} />
+              </Button>
+            </form>
+          </FocusedShell>
+        )}
+
+        {view === "create" && (
+          <FocusedShell title="choose the soundtrack pool" onBack={() => setView("play")}>
+            <div className="mb-5 flex flex-col gap-4 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                <Input
+                  value={titleSearch}
+                  onChange={(event) => setTitleSearch(event.target.value)}
+                  placeholder="search anime titles"
+                  className="h-10 rounded-md bg-input pl-10"
+                />
+              </div>
+              <div className="flex items-center justify-between gap-5 font-mono text-xs lowercase text-muted-foreground">
+                <span>{selectedTitleIds.length} selected</span>
+                <span>{selectedTrackCount} tracks</span>
+              </div>
+            </div>
+
+            <div className="quiet-scrollbar grid max-h-[52vh] gap-3 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredTitles.map((title) => {
+                const selected = selectedTitleIds.includes(title.id);
+                return (
+                  <button
+                    key={title.id}
+                    type="button"
+                    onClick={() => toggleTitle(title.id)}
+                    aria-pressed={selected}
+                    className={`interactive group relative min-h-36 overflow-hidden rounded-lg border text-left ${
+                      selected ? "border-primary bg-primary/10" : "border-border bg-card"
+                    }`}
+                  >
+                    <img src={title.coverImageUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" />
+                    <div className="absolute inset-0 bg-background/60" />
+                    <div className="relative flex min-h-36 flex-col justify-between p-4">
+                      <span className={`flex size-7 items-center justify-center rounded-md border ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card/80"}`}>
+                        {selected && <Check size={14} />}
+                      </span>
+                      <div>
+                        <p className="line-clamp-2 font-semibold leading-snug">{title.canonicalTitle}</p>
+                        <p className="ui-label mt-1">{title.tracks.length} tracks</p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="sticky bottom-4 mt-6 flex justify-end">
+              <Button
+                type="button"
+                disabled={isCreating || selectedTitleIds.length === 0}
+                onClick={createRoom}
+                className="h-12 rounded-md px-6 font-mono text-sm lowercase"
+              >
+                {isCreating ? <Loader2 className="animate-spin" size={16} /> : <Users size={16} />}
+                create room
+              </Button>
+            </div>
+            {notice && <p role="alert" className="mt-3 text-right text-sm text-destructive">{notice}</p>}
+          </FocusedShell>
+        )}
       </main>
+      <Toast message={toast} onDismiss={() => setToast("")} />
     </div>
   );
 };
+
+const PathCard = ({ icon, label, description, onClick }: { icon: React.ReactNode; label: string; description: string; onClick: () => void }) => (
+  <button type="button" onClick={onClick} className="interactive surface group p-5 text-left hover:bg-secondary">
+    <span className="flex size-10 items-center justify-center rounded-md border border-border bg-input text-primary">{icon}</span>
+    <p className="ui-title mt-5 text-lg">{label}</p>
+    <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
+    <ArrowRight className="mt-5 text-muted-foreground transition-transform group-hover:translate-x-1" size={16} />
+  </button>
+);
+
+const FocusedShell = ({ title, onBack, children }: { title: string; onBack: () => void; children: React.ReactNode }) => (
+  <section className="mx-auto max-w-5xl">
+    <button type="button" onClick={() => { playSound("navigate"); onBack(); }} className="interactive flex items-center gap-2 font-mono text-xs lowercase text-muted-foreground hover:text-foreground">
+      <ArrowLeft size={15} /> back
+    </button>
+    <div className="mb-8 mt-6">
+      <p className="ui-label">private match</p>
+      <h1 className="ui-title mt-2 text-3xl sm:text-4xl">{title}</h1>
+    </div>
+    {children}
+  </section>
+);
 
 export default Home;

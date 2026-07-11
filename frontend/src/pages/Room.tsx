@@ -1,1104 +1,660 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import YouTube, { type YouTubeEvent } from "react-youtube";
 import Fuse from "fuse.js";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import {
-  CheckCircle2,
+  ArrowLeft,
+  Check,
+  ChevronDown,
   Clipboard,
-  Settings,
+  Clock3,
+  Home,
+  MessageCircle,
+  RotateCcw,
+  Send,
   SkipForward,
-  Volume2,
-  VolumeX,
-  Waves,
+  Trophy,
+  UserRound,
+  WifiOff,
+  X,
   Zap,
 } from "lucide-react";
-import { useGameStore, useGameStateStore } from "@/store/gameStore";
+import { AppSettings } from "@/components/AppSettings";
+import { Toast } from "@/components/Toast";
+import { Button } from "@/components/ui/button";
 import { useSocket } from "@/hooks/useSocket";
-import type { AnswerOption } from "@/types";
+import { playSound } from "@/lib/sound";
+import { getCountdownSeconds, shouldPlayCountdownCue } from "@/lib/timers";
+import { useGameStateStore, useGameStore } from "@/store/gameStore";
+import type { AnswerOption, RoundResult, UnifiedMessage } from "@/types";
+
+const normalizeRoomCode = (value: string) =>
+  value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+
+const activePhases = new Set(["COUNTDOWN", "PLAYING", "GRACE_PERIOD", "REVEAL"]);
 
 const Room = () => {
-  const { id: dynamicRoomId } = useParams(); // Get the room ID from the URL
-  const navigate = useNavigate(); // Hook to programmatically navigate between routes
-  const normalizeRoomCode = (value: string) =>
-    value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
-  const roomCode = normalizeRoomCode(dynamicRoomId ?? "");
-
-  // Access player name and game state from the global stores
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const roomCode = normalizeRoomCode(id ?? "");
   const playerName = useGameStore((state) => state.playerName);
   const volume = useGameStore((state) => state.volume);
-  const setVolume = useGameStore((state) => state.setVolume);
+  const musicMuted = useGameStore((state) => state.musicMuted);
   const phase = useGameStateStore((state) => state.phase);
-  const currentVideoId = useGameStateStore((state) => state.currentVideoID);
-  const videoStartTime = useGameStateStore((state) => state.videoStartTime);
-  const currentVideoDurationSeconds = useGameStateStore(
-    (state) => state.currentVideoDurationSeconds,
-  );
-  const roundStartTime = useGameStateStore((state) => state.roundStartTime);
   const currentRound = useGameStateStore((state) => state.currentRound);
   const health = useGameStateStore((state) => state.health);
   const pendingDamage = useGameStateStore((state) => state.pendingDamage);
+  const currentVideoId = useGameStateStore((state) => state.currentVideoID);
+  const currentVideoDurationSeconds = useGameStateStore((state) => state.currentVideoDurationSeconds);
+  const videoStartTime = useGameStateStore((state) => state.videoStartTime);
+  const roundStartTime = useGameStateStore((state) => state.roundStartTime);
+  const countdownEndsAt = useGameStateStore((state) => state.countdownEndsAt);
+  const roundEndsAt = useGameStateStore((state) => state.roundEndsAt);
   const ready = useGameStateStore((state) => state.ready);
   const winner = useGameStateStore((state) => state.winner);
   const revealedAnswer = useGameStateStore((state) => state.revealedAnswer);
   const roundResult = useGameStateStore((state) => state.roundResult);
   const matchHistory = useGameStateStore((state) => state.matchHistory);
-  const countdownEndsAt = useGameStateStore((state) => state.countdownEndsAt);
-  const roundEndsAt = useGameStateStore((state) => state.roundEndsAt);
   const guessedCorrectly = useGameStateStore((state) => state.guessedCorrectly);
   const skipVotes = useGameStateStore((state) => state.skipVotes);
   const answerOptions = useGameStateStore((state) => state.answerOptions);
+  const connectionPause = useGameStateStore((state) => state.connectionPause);
 
-  // Use the custom hook to manage WebSocket connections and game state synchronization
-  const { players, messages, errorNotice, guessCooldownEndsAt, sendChatMessage, setReady, voteToSkip } =
-    useSocket(roomCode, playerName);
-  
+  const {
+    players,
+    messages,
+    errorNotice,
+    guessCooldownEndsAt,
+    connectionState,
+    sendChatMessage,
+    sendGuess,
+    setReady,
+    voteToSkip,
+    leaveRoom,
+  } = useSocket(roomCode, playerName);
+
   const [now, setNow] = useState(() => Date.now());
-  const [guessValue, setGuessValue] = useState("");
-  const [highlightedSuggestionIndex, setHighlightedSuggestionIndex] =
-    useState(0);
-  const [gameStartTime, setGameStartTime] = useState<number | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [copyNotice, setCopyNotice] = useState<{
-    roomCode: string;
-    message: string;
-  } | null>(null);
-  const visualPhase = phase;
-  
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [inputValue, setInputValue] = useState("");
+  const [suggestionIndex, setSuggestionIndex] = useState(0);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [activityInput, setActivityInput] = useState("");
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [copyMessage, setCopyMessage] = useState("");
   const playerRef = useRef<YouTubeEvent["target"] | null>(null);
-  const hasActiveTimer =
-    countdownEndsAt !== null ||
-    roundEndsAt !== null ||
-    guessCooldownEndsAt > now;
-  const playerVolume = volume === 0 ? 0 : Math.max(1, Math.round((volume / 100) ** 2 * 100));
-  const alreadyGuessedCorrectly = guessedCorrectly.includes(playerName);
-  const alreadyVotedToSkip = skipVotes.includes(playerName);
-  const canUseAnswerSuggestions =
-    (phase === "PLAYING" || phase === "GRACE_PERIOD") &&
-    !alreadyGuessedCorrectly;
-  const isGuessInputDisabled =
-    phase === "REVEAL" ||
-    phase === "GAME_OVER" ||
-    (phase !== "LOBBY" && alreadyGuessedCorrectly) ||
-    ((phase === "PLAYING" || phase === "GRACE_PERIOD") &&
-      guessCooldownEndsAt > now);
-  const answerFuse = useMemo(
-    () =>
-      new Fuse(answerOptions, {
-        keys: [
-          { name: "canonicalTitle", weight: 0.65 },
-          { name: "searchTerms", weight: 0.35 },
-        ],
-        threshold: 0.4,
-        ignoreLocation: true,
-      }),
+  const guessInputRef = useRef<HTMLInputElement>(null);
+  const previousPhase = useRef(phase);
+  const previousCountdown = useRef<number | null>(null);
+  const previousCorrectCount = useRef(guessedCorrectly.length);
+  const previousMessageCount = useRef(messages.length);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const opponentName = players.find((name) => name !== playerName) ?? null;
+  const selfReady = Boolean(ready[playerName]);
+  const opponentReady = opponentName ? Boolean(ready[opponentName]) : false;
+  const hasTimer = countdownEndsAt !== null || roundEndsAt !== null || guessCooldownEndsAt > now || connectionPause?.expiresAt;
+  const countdownSeconds = getCountdownSeconds(countdownEndsAt, now);
+  const roundSeconds = roundEndsAt ? Math.max(0, Math.ceil((roundEndsAt - now) / 1000)) : null;
+  const reconnectSeconds = connectionPause?.expiresAt ? Math.max(0, Math.ceil((connectionPause.expiresAt - now) / 1000)) : null;
+  const playerVolume = musicMuted || volume === 0 ? 0 : Math.max(1, Math.round((volume / 100) ** 2 * 100));
+  const alreadyCorrect = guessedCorrectly.includes(playerName);
+  const alreadySkipped = skipVotes.includes(playerName);
+  const canGuess = (phase === "PLAYING" || phase === "GRACE_PERIOD") && !alreadyCorrect && !connectionPause;
+
+  const fuse = useMemo(
+    () => new Fuse(answerOptions, {
+      keys: [{ name: "canonicalTitle", weight: 0.65 }, { name: "searchTerms", weight: 0.35 }],
+      threshold: 0.4,
+      ignoreLocation: true,
+    }),
     [answerOptions],
   );
-  const answerSuggestions = useMemo(() => {
-    const query = guessValue.trim();
-    if (!canUseAnswerSuggestions || query.length < 2) return [];
-
-    return answerFuse.search(query).slice(0, 5).map((result) => result.item);
-  }, [answerFuse, canUseAnswerSuggestions, guessValue]);
-  const selectedSuggestionIndex =
-    answerSuggestions.length === 0
-      ? 0
-      : Math.min(highlightedSuggestionIndex, answerSuggestions.length - 1);
-  const selectedSuggestion = answerSuggestions[selectedSuggestionIndex];
-  const showRoundResult =
-    visualPhase === "REVEAL" || visualPhase === "GAME_OVER";
+  const suggestions = useMemo(() => {
+    if (!canGuess || inputValue.trim().length < 2) return [];
+    return fuse.search(inputValue.trim()).slice(0, 5).map((result) => result.item);
+  }, [canGuess, fuse, inputValue]);
+  const selectedSuggestion = suggestions[Math.min(suggestionIndex, suggestions.length - 1)];
+  const recentActivity = messages
+    .filter((message) => message.type === "USER")
+    .slice(-2)
+    .reverse();
 
   useEffect(() => {
     if (!roomCode || !playerName) {
       navigate("/", { replace: true });
       return;
     }
-
-    if (dynamicRoomId !== roomCode) {
-      navigate(`/room/${roomCode}`, { replace: true });
-    }
-  }, [dynamicRoomId, navigate, playerName, roomCode]);
-
-  // Clear chat / capture timestamp when active game starts
-  useEffect(() => {
-    if (phase === "COUNTDOWN" || phase === "PLAYING") {
-      const timer = window.setTimeout(() => setGameStartTime(Date.now()), 0);
-      return () => window.clearTimeout(timer);
-    }
-
-    if (phase === "LOBBY") {
-      const timer = window.setTimeout(() => setGameStartTime(null), 0);
-      return () => window.clearTimeout(timer);
-    }
-  }, [phase]);
-
-  // Auto scroll to the bottom of the log when new messages arrive or game starts
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, phase, gameStartTime]);
+    if (id !== roomCode) navigate(`/room/${roomCode}`, { replace: true });
+  }, [id, navigate, playerName, roomCode]);
 
   useEffect(() => {
-    if (!hasActiveTimer) return;
-
-    const immediateTimer = window.setTimeout(() => setNow(Date.now()), 0);
+    if (!hasTimer) return;
     const timer = window.setInterval(() => setNow(Date.now()), 250);
-    return () => {
-      window.clearTimeout(immediateTimer);
-      window.clearInterval(timer);
-    };
-  }, [hasActiveTimer]);
+    return () => window.clearInterval(timer);
+  }, [hasTimer]);
 
   useEffect(() => {
     playerRef.current?.setVolume(playerVolume);
   }, [playerVolume]);
 
-  const countdownSeconds = countdownEndsAt
-    ? Math.max(0, Math.ceil((countdownEndsAt - now) / 1000))
-    : null;
-  const roundSeconds = roundEndsAt
-    ? Math.max(0, Math.ceil((roundEndsAt - now) / 1000))
-    : null;
-  const guessCooldownSeconds =
-    guessCooldownEndsAt > now
-      ? Math.max(0, (guessCooldownEndsAt - now) / 1000)
-      : 0;
-
-  const handlePlayerReady = (event: YouTubeEvent) => {
-    playerRef.current = event.target;
-    event.target.setVolume(playerVolume);
-
-    if (!roundStartTime) return; // Ensure round start time is set before calculating elapsed time
-
-    const elapsedTime = Math.max(0, (Date.now() - roundStartTime) / 1000);
-    const rawSyncTime = videoStartTime + elapsedTime;
-    const syncTime =
-      currentVideoDurationSeconds && currentVideoDurationSeconds > 0
-        ? rawSyncTime % currentVideoDurationSeconds
-        : rawSyncTime;
-
-    event.target.seekTo(syncTime, true); // Seek the video to the calculated sync time
-    event.target.playVideo(); // Start playing the video
-  };
-
-  const handlePlayerEnd = (event: YouTubeEvent) => {
-    if (phase !== "PLAYING" && phase !== "GRACE_PERIOD") return;
-
-    event.target.seekTo(0, true);
-    event.target.playVideo();
-  };
-
-  const handleVolumeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setVolume(Number(event.target.value));
-  };
-
-  const handleTestVolume = () => {
-    const AudioContextClass =
-      window.AudioContext ||
-      (window as Window & typeof globalThis & {
-        webkitAudioContext?: typeof AudioContext;
-      }).webkitAudioContext;
-    if (!AudioContextClass) return;
-
-    const audioContext = new AudioContextClass();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    const nowTime = audioContext.currentTime;
-
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(440, nowTime);
-    oscillator.frequency.exponentialRampToValueAtTime(660, nowTime + 0.18);
-
-    gainNode.gain.setValueAtTime(0, nowTime);
-    gainNode.gain.linearRampToValueAtTime((playerVolume / 100) * 0.2, nowTime + 0.03);
-    gainNode.gain.exponentialRampToValueAtTime(0.0001, nowTime + 0.35);
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    oscillator.start(nowTime);
-    oscillator.stop(nowTime + 0.35);
-    oscillator.addEventListener("ended", () => void audioContext.close());
-  };
-
-  const handleCopyRoomCode = async () => {
-    if (!roomCode) return;
-
-    try {
-      await navigator.clipboard.writeText(roomCode);
-      setCopyNotice({ roomCode, message: "Room code copied." });
-    } catch {
-      setCopyNotice({
-        roomCode,
-        message: "Copy failed. Select the code manually.",
-      });
-    }
-  };
-
-  const copyNoticeMessage =
-    copyNotice?.roomCode === roomCode ? copyNotice.message : "";
-
   useEffect(() => {
-    if (!copyNotice) return;
-
-    const timer = window.setTimeout(() => setCopyNotice(null), 2500);
-    return () => window.clearTimeout(timer);
-  }, [copyNotice]);
-
-  const handleGuessChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setGuessValue(event.target.value);
-    setHighlightedSuggestionIndex(0);
-  };
-
-  const submitGuess = (message: string) => {
-    if (!message.trim()) return;
-    const enforceGuessCooldown =
-      phase === "PLAYING" || phase === "GRACE_PERIOD";
-    if (sendChatMessage(message.trim(), enforceGuessCooldown)) setGuessValue("");
-  };
-
-  const submitSuggestion = (suggestion: AnswerOption) => {
-    submitGuess(suggestion.canonicalTitle);
-  };
-
-  const handleGuessSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const selectedSuggestion = answerSuggestions[selectedSuggestionIndex];
-    if (selectedSuggestion) {
-      submitSuggestion(selectedSuggestion);
+    if (connectionPause) {
+      playerRef.current?.pauseVideo();
       return;
     }
+    if (phase !== "PLAYING" && phase !== "GRACE_PERIOD") {
+      playerRef.current = null;
+      return;
+    }
+    if (roundStartTime && playerRef.current) {
+      const elapsed = Math.max(0, (Date.now() - roundStartTime) / 1000);
+      const rawTime = videoStartTime + elapsed;
+      const syncTime = currentVideoDurationSeconds ? rawTime % currentVideoDurationSeconds : rawTime;
+      playerRef.current.seekTo(syncTime, true);
+      playerRef.current.playVideo();
+    }
+  }, [connectionPause, currentVideoDurationSeconds, phase, roundStartTime, videoStartTime]);
 
-    submitGuess(guessValue);
+  useEffect(() => {
+    if (messages.length > previousMessageCount.current && !activityOpen) {
+      const unreadMessages = messages
+        .slice(previousMessageCount.current)
+        .filter(
+          (message) =>
+            message.type === "USER" && message.sender !== playerName,
+        );
+      if (unreadMessages.length > 0) {
+        setUnreadCount((count) => count + unreadMessages.length);
+      }
+    }
+    previousMessageCount.current = messages.length;
+  }, [activityOpen, messages, playerName]);
+
+  useEffect(() => {
+    if (previousPhase.current === phase) return;
+    if (phase === "PLAYING") playSound("round-start");
+    if (phase === "REVEAL") playSound("reveal");
+    if (phase === "GAME_OVER") playSound(winner === playerName ? "victory" : "defeat");
+    previousPhase.current = phase;
+  }, [phase, playerName, winner]);
+
+  useEffect(() => {
+    if (
+      shouldPlayCountdownCue(
+        phase,
+        countdownSeconds,
+        previousCountdown.current,
+      )
+    ) {
+      playSound("countdown");
+    }
+    previousCountdown.current = countdownSeconds;
+  }, [countdownSeconds, phase]);
+
+  useEffect(() => {
+    if (guessedCorrectly.length > previousCorrectCount.current) playSound("correct");
+    previousCorrectCount.current = guessedCorrectly.length;
+  }, [guessedCorrectly.length]);
+
+  useEffect(() => {
+    if (!activityOpen && (phase === "PLAYING" || phase === "GRACE_PERIOD")) {
+      window.requestAnimationFrame(() => guessInputRef.current?.focus());
+    }
+  }, [activityOpen, phase]);
+
+  useEffect(() => {
+    if (!roundResult?.damageDealt) return;
+    playSound("damage");
+  }, [roundResult]);
+
+  const onPlayerReady = (event: YouTubeEvent) => {
+    playerRef.current = event.target;
+    event.target.setVolume(playerVolume);
+    if (!roundStartTime) return;
+    const elapsed = Math.max(0, (Date.now() - roundStartTime) / 1000);
+    const rawTime = videoStartTime + elapsed;
+    const syncTime = currentVideoDurationSeconds ? rawTime % currentVideoDurationSeconds : rawTime;
+    event.target.seekTo(syncTime, true);
+    if (!connectionPause) event.target.playVideo();
   };
 
-  const handleGuessKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (answerSuggestions.length === 0) return;
+  const submitInput = (value: string) => {
+    const message = value.trim();
+    if (!message) return;
+    if (sendGuess(message)) {
+      setInputValue("");
+      playSound("confirm");
+    }
+    window.requestAnimationFrame(() => guessInputRef.current?.focus());
+  };
 
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      setHighlightedSuggestionIndex(
-        (index) => (index + 1) % answerSuggestions.length,
-      );
-    } else if (event.key === "ArrowUp") {
-      event.preventDefault();
-      setHighlightedSuggestionIndex(
-        (index) =>
-          (index - 1 + answerSuggestions.length) % answerSuggestions.length,
-      );
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    submitInput(selectedSuggestion?.canonicalTitle ?? inputValue);
+  };
+
+  const submitLobbyMessage = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (sendChatMessage(inputValue)) {
+      setInputValue("");
+      playSound("confirm");
     }
   };
 
-  const opponentName = players.find((p) => p !== playerName) || null;
-  const playerReady = ready[playerName] || false;
-  const opponentReady = opponentName ? (ready[opponentName] || false) : false;
-  const canVoteToSkip = phase === "PLAYING" && players.length === 2;
-  const correctGuessFeed = guessedCorrectly.map((name) => ({
-    name,
-    isSelf: name === playerName,
-  }));
-
-  const renderCorrectGuessFeed = () => {
-    if (correctGuessFeed.length === 0 || showRoundResult) return null;
-
-    return (
-      <div className="correct-feed" aria-live="polite">
-        {correctGuessFeed.map(({ name, isSelf }) => (
-          <div
-            key={name}
-            className={`correct-feed-item ${
-              isSelf ? "correct-feed-item-self" : "correct-feed-item-opponent"
-            }`}
-          >
-            <CheckCircle2 size={17} />
-            <div className="min-w-0">
-              <p className="truncate text-xs font-black uppercase text-foreground">
-                {isSelf ? "You locked the answer" : `${name} locked the answer`}
-              </p>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Damage will resolve after the response window
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  const renderRoundResultPanel = () => {
-    if (!showRoundResult || (!roundResult && !revealedAnswer && !winner)) {
-      return null;
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(roomCode);
+      setCopyMessage("copied");
+      playSound("copy");
+    } catch {
+      setCopyMessage("copy failed");
     }
-
-    const damageRows = players.map((name) => ({
-      name,
-      damage: roundResult?.damageByPlayer[name] ?? pendingDamage[name] ?? 0,
-    }));
-    const [firstDamage, secondDamage] = damageRows;
-    const damageFormula =
-      firstDamage && secondDamage
-        ? `${firstDamage.damage} - ${secondDamage.damage} = ${Math.abs(
-            firstDamage.damage - secondDamage.damage,
-          )}`
-        : null;
-    const isWin = winner === playerName;
-    const resultTone =
-      winner === null ? "neutral" : isWin ? "win" : "loss";
-    const resultLabel =
-      winner === null
-        ? roundResult?.isTie
-          ? "No damage dealt"
-          : "Round result"
-        : isWin
-          ? "Victory"
-          : "Defeat";
-    const resultSubtitle =
-      winner === null
-        ? "Next round incoming"
-        : isWin
-          ? "You survived the duel"
-          : "Your HP hit zero";
-
-    return (
-      <section
-        className={`round-result-panel round-result-panel-${resultTone} pointer-events-auto select-none`}
-        aria-live="polite"
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-              {visualPhase === "GAME_OVER" ? "Game over" : "Round reveal"}
-            </p>
-            <h2 className="mt-1 text-3xl font-black uppercase leading-none tracking-wide text-foreground">
-              {resultLabel}
-            </h2>
-            <p className="mt-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              {resultSubtitle}
-            </p>
-          </div>
-          {roundResult?.damageDealt ? (
-            <div className="damage-pop border border-player-2 bg-player-2 px-4 py-2 text-right text-background">
-              <p className="text-[9px] font-black uppercase tracking-widest">
-                Damage
-              </p>
-              <p className="text-2xl font-black leading-none">
-                {roundResult.damageDealt}
-              </p>
-            </div>
-          ) : (
-            <div className="border border-border bg-input px-4 py-2 text-right text-muted-foreground">
-              <p className="text-[9px] font-black uppercase tracking-widest">
-                Damage
-              </p>
-              <p className="text-xl font-black leading-none">0</p>
-            </div>
-          )}
-        </div>
-
-        <div className="mt-5 border-l-2 border-player-1 pl-4">
-          <p className="text-[10px] font-black uppercase tracking-widest text-player-1">
-            Exact song title
-          </p>
-          <p className="mt-1 text-xl font-black text-foreground">
-            {roundResult?.trackTitle ?? "Unknown track title"}
-          </p>
-        </div>
-
-        <div className="mt-4 grid gap-3 border border-border bg-background/70 p-4">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-              Anime title
-            </p>
-            <p className="mt-1 text-lg font-black uppercase text-foreground">
-              {roundResult?.canonicalTitle ?? revealedAnswer ?? "Result unavailable"}
-            </p>
-          </div>
-          {(roundResult?.romajiName || roundResult?.nativeName) && (
-            <div className="grid grid-cols-2 gap-3 text-xs font-bold text-muted-foreground">
-              <span>{roundResult.romajiName ?? "No romaji title"}</span>
-              <span className="text-right">
-                {roundResult.nativeName ?? "No native title"}
-              </span>
-            </div>
-          )}
-        </div>
-
-        <div className="mt-4 grid gap-2">
-          {damageRows.map(({ name, damage }) => {
-            const isSelf = name === playerName;
-            const wasDamaged = roundResult?.damagedPlayer === name;
-            return (
-              <div
-                key={name}
-                className={`damage-row flex items-center justify-between border bg-input px-3 py-2 text-xs font-black uppercase tracking-wider ${
-                  isSelf
-                    ? "border-player-1/60 text-player-1"
-                    : "border-player-2/60 text-player-2"
-                } ${wasDamaged ? "damage-row-hit" : ""}`}
-              >
-                <span>{isSelf ? `${name} / you` : name}</span>
-                <span className="flex items-center gap-2">
-                  {wasDamaged && roundResult?.damageDealt ? (
-                    <span className="text-foreground">-{roundResult.damageDealt} HP</span>
-                  ) : null}
-                  <span>{damage} potential</span>
-                </span>
-              </div>
-            );
-          })}
-        </div>
-
-        {damageFormula && (
-          <div className="mt-4 flex items-center justify-between border border-border bg-card px-4 py-3 text-xs font-black uppercase tracking-widest">
-            <span className="text-muted-foreground">Damage calculation</span>
-            <span className="text-foreground">{damageFormula}</span>
-          </div>
-        )}
-
-        <p className="mt-3 text-center text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-          {roundResult?.damagedPlayer
-            ? `${roundResult.damagedPlayer} took ${roundResult.damageDealt} damage`
-            : "Equal damage or no correct guesses"}
-        </p>
-      </section>
-    );
+    window.setTimeout(() => setCopyMessage(""), 1800);
   };
 
-  const renderMatchHistoryPanel = () => {
-    if (phase !== "GAME_OVER" || matchHistory.length === 0) return null;
-
-    return (
-      <section className="max-h-[260px] overflow-y-auto border border-border bg-card/95 p-4 shadow-xl pointer-events-auto">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-              Match history
-            </p>
-            <h3 className="text-lg font-black uppercase tracking-wider text-foreground">
-              Rounds played
-            </h3>
-          </div>
-          <span className="border border-border bg-input px-2 py-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-            {matchHistory.length}
-          </span>
-        </div>
-
-        <div className="grid gap-3">
-          {matchHistory.map((result, index) => {
-            const scoreRows = players.map((name) => ({
-              name,
-              points: result.damageByPlayer[name] ?? 0,
-              damageTaken:
-                result.damagedPlayer === name ? result.damageDealt : 0,
-            }));
-
-            return (
-              <article
-                key={`${result.titleId}-${index}`}
-                className="border border-border bg-background/80 p-3"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
-                      Round {index + 1}
-                    </p>
-                    <p className="mt-1 truncate text-sm font-black uppercase tracking-wide text-foreground">
-                      {result.canonicalTitle}
-                    </p>
-                    <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                      {result.trackTitle ?? "Unknown track title"}
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-right text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                    {result.damageDealt > 0 ? `${result.damageDealt} dmg` : "No dmg"}
-                  </span>
-                </div>
-
-                <div className="mt-3 grid gap-2">
-                  {scoreRows.map(({ name, points, damageTaken }) => {
-                    const isSelf = name === playerName;
-
-                    return (
-                      <div
-                        key={name}
-                        className={`flex items-center justify-between border bg-input px-3 py-2 text-[10px] font-black uppercase tracking-wider ${
-                          isSelf
-                            ? "border-player-1/60 text-player-1"
-                            : "border-player-2/60 text-player-2"
-                        }`}
-                      >
-                        <span className="truncate">
-                          {isSelf ? `${name} / you` : name}
-                        </span>
-                        <span className="shrink-0 text-muted-foreground">
-                          {points} pts {damageTaken > 0 ? `/ -${damageTaken} HP` : ""}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
-    );
+  const requestLeave = () => {
+    if (activePhases.has(phase) && phase !== "GAME_OVER") setLeaveOpen(true);
+    else exitRoom();
   };
 
-  // Unified Centered Core Component containing Chat log, Guess Input, and Game State headers
-  const renderCenteredCore = () => {
-    // Filter visible game messages using start timestamp to clear lobby logs on transition
-    const gameMessages = gameStartTime 
-      ? messages.filter((msg) => msg.timestamp >= gameStartTime)
-      : messages;
-
-    return (
-      <div
-        key={visualPhase}
-        className={`phase-shell phase-shell-${visualPhase.toLowerCase().replace("_", "-")} w-[420px] pointer-events-auto flex flex-col gap-4`}
-      >
-        
-        {/* Dynamic Countdown Display */}
-        {visualPhase === "COUNTDOWN" ? (
-          <div className="text-center bg-card border border-border/80 text-foreground p-8 rounded-2xl shadow-2xl font-extrabold text-6xl my-8 select-none animate-scale-up tracking-wider border-t-2 border-t-player-1 player-1-glow">
-            {countdownSeconds ?? "5"}
-          </div>
-        ) : (
-          <>
-            {/* Header metadata label */}
-            {visualPhase !== "LOBBY" && (
-              <div className="text-center bg-card text-muted-foreground py-2 px-4 border border-border/80 rounded-lg font-bold uppercase text-[10px] tracking-widest select-none shadow-md">
-                {`ROUND ${currentRound + 1}`}
-              </div>
-            )}
-
-            {renderCorrectGuessFeed()}
-            {renderRoundResultPanel()}
-            {errorNotice && (
-              <div
-                role="status"
-                aria-live="polite"
-                className="border border-player-2/70 bg-player-2/10 px-4 py-3 text-center text-xs font-black uppercase tracking-widest text-player-2 shadow-lg"
-              >
-                {errorNotice}
-              </div>
-            )}
-
-            {/* Scrollable Center Chat Box Container (50 Message capacity during play) */}
-            {visualPhase !== "LOBBY" && !showRoundResult && (
-              <div className="h-[280px] overflow-y-auto pr-1 flex flex-col gap-3 select-none pointer-events-auto gaming-card-glass p-3 no-scrollbar border-border/40 shadow-xl">
-                {gameMessages.length === 0 ? (
-                  <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 text-xs font-semibold uppercase tracking-wider">
-                    No dialogue yet...
-                  </div>
-                ) : (
-                  gameMessages.slice(-50).map((msg) => {
-                    if (msg.type === "SYSTEM") {
-                      const isCorrect = msg.text.includes("guessed correctly.");
-                      if (isCorrect) {
-                        const guessedUser = msg.text.split(" ")[0] || "";
-                        const isSelf = guessedUser === playerName;
-                        return (
-                          <div key={msg.id} className={`flex flex-col gap-1 w-full max-w-[85%] ${isSelf ? 'items-start self-start' : 'items-end self-end'}`}>
-                            <span className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded text-background ${isSelf ? 'bg-player-1 shadow-[0_0_8px_var(--player-1-glow)]' : 'bg-player-2 shadow-[0_0_8px_var(--player-2-glow)]'}`}>
-                              {guessedUser}
-                            </span>
-                            <div className={`relative border bg-card px-4 py-2.5 text-xs font-bold rounded-lg shadow-md ${isSelf ? 'border-player-1/60 border-l-4 border-l-player-1 text-player-1 shadow-[0_0_10px_var(--player-1-glow)]' : 'border-player-2/60 border-r-4 border-r-player-2 text-player-2 shadow-[0_0_10px_var(--player-2-glow)]'}`}>
-                              <p className="break-all whitespace-pre-wrap">
-                                {isSelf ? "CORRECT! YOU GUESSED IT!" : "CORRECT ANSWER DETECTED: [HIDDEN]"}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      }
-                      return (
-                        <div key={msg.id} className="text-center text-[10px] text-zinc-400 bg-input/60 border border-border/50 py-1 px-3 self-center font-bold uppercase tracking-wider rounded-md">
-                          SYSTEM: {msg.text}
-                        </div>
-                      );
-                    }
-
-                    const isSelf = msg.sender === playerName;
-                    return (
-                      <div key={msg.id} className={`flex flex-col gap-1 w-full max-w-[85%] ${isSelf ? 'items-start self-start' : 'items-end self-end'}`}>
-                        <span className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded text-background ${isSelf ? 'bg-player-1' : 'bg-player-2'}`}>
-                          {msg.sender}
-                        </span>
-                        <div className={`relative border border-border/80 bg-card/85 text-foreground px-4 py-2.5 shadow-md text-xs font-semibold rounded-lg ${isSelf ? 'border-l-4 border-l-player-1' : 'border-r-4 border-r-player-2'}`}>
-                          <p className="break-all whitespace-pre-wrap">{msg.text}</p>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-                {/* Scroll Target */}
-                <div ref={messagesEndRef} />
-              </div>
-            )}
-
-            {/* Central Guess/Chat Input Form */}
-            <form onSubmit={handleGuessSubmit} className="relative flex flex-col gap-2 pointer-events-auto">
-              <label htmlFor="room-guess-chat-input" className="sr-only">
-                {visualPhase === "LOBBY"
-                  ? "Lobby message"
-                  : "Guess the OST answer"}
-              </label>
-              <input
-                id="room-guess-chat-input"
-                value={guessValue}
-                onChange={handleGuessChange}
-                onKeyDown={handleGuessKeyDown}
-                placeholder={
-                  visualPhase === "LOBBY"
-                    ? "TYPE A LOBBY MESSAGE..."
-                    : guessCooldownSeconds > 0
-                      ? `NEXT GUESS IN ${guessCooldownSeconds.toFixed(1)}S`
-                      : "GUESS THE OST..."
-                }
-                disabled={isGuessInputDisabled}
-                className="w-full text-center bg-input border border-border text-foreground px-4 py-3 rounded-lg font-bold text-xs uppercase placeholder-zinc-600 shadow-md focus:outline-none focus:border-player-1 focus:ring-1 focus:ring-player-1/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                autoComplete="off"
-                role={canUseAnswerSuggestions ? "combobox" : undefined}
-                aria-autocomplete={canUseAnswerSuggestions ? "list" : undefined}
-                aria-expanded={canUseAnswerSuggestions ? answerSuggestions.length > 0 : undefined}
-                aria-controls={
-                  answerSuggestions.length > 0 ? "answer-suggestions-list" : undefined
-                }
-                aria-activedescendant={
-                  selectedSuggestion
-                    ? `answer-suggestion-${selectedSuggestion.id}`
-                    : undefined
-                }
-                autoFocus
-              />
-              {answerSuggestions.length > 0 && (
-                <div
-                  id="answer-suggestions-list"
-                  role="listbox"
-                  className="answer-suggestions absolute left-0 right-0 top-full z-50 mt-2 grid max-h-[360px] gap-2 overflow-y-auto rounded-lg border border-player-1/40 bg-background/95 p-2 shadow-2xl shadow-black/50 backdrop-blur-md"
-                >
-                  {answerSuggestions.map((suggestion, index) => {
-                    const isSelected = index === selectedSuggestionIndex;
-                    return (
-                      <button
-                        key={suggestion.id}
-                        id={`answer-suggestion-${suggestion.id}`}
-                        role="option"
-                        aria-selected={isSelected}
-                        type="button"
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => submitSuggestion(suggestion)}
-                        className={`answer-suggestion-row group relative min-h-20 overflow-hidden px-4 py-3 text-left transition-all ${
-                          isSelected
-                            ? "answer-suggestion-row-selected"
-                            : "hover:border-player-1/70"
-                        }`}
-                      >
-                        <div className="pointer-events-none absolute inset-y-0 right-0 w-3/5 opacity-65">
-                          <img
-                            src={suggestion.coverImageUrl}
-                            alt=""
-                            aria-hidden="true"
-                            className="ml-auto h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                          />
-                        </div>
-                        <div className="relative z-10 flex min-h-14 items-center justify-between gap-3">
-                          <div className="min-w-0 max-w-[76%]">
-                            <p className="truncate text-sm font-black uppercase tracking-wide text-foreground">
-                              {suggestion.canonicalTitle}
-                            </p>
-                            <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                              {suggestion.romajiName ??
-                                suggestion.nativeName ??
-                                "Anime title"}
-                            </p>
-                          </div>
-                          <span
-                            className={`flex size-7 shrink-0 items-center justify-center rounded border text-xs font-black ${
-                              isSelected
-                                ? "border-player-1 bg-player-1 text-background"
-                                : "border-border text-muted-foreground"
-                            }`}
-                          >
-                            {isSelected ? "OK" : ""}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </form>
-
-            {canVoteToSkip && (
-              <button
-                type="button"
-                onClick={voteToSkip}
-                disabled={alreadyVotedToSkip}
-                className="flex w-full items-center justify-center gap-2 border border-border bg-input px-4 py-2.5 text-xs font-extrabold uppercase tracking-widest text-foreground shadow-md transition-all hover:border-player-2/70 hover:text-player-2 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60 pointer-events-auto"
-              >
-                <SkipForward size={15} />
-                {alreadyVotedToSkip
-                  ? `Skip vote locked (${skipVotes.length}/2)`
-                  : `Vote to skip (${skipVotes.length}/2)`}
-              </button>
-            )}
-
-            {/* Timer status indicator during active rounds */}
-            {visualPhase !== "LOBBY" && (
-              <div className="text-center font-bold text-[10px] uppercase tracking-widest text-zinc-400 bg-input/80 px-3 py-1.5 select-none self-center border border-border rounded-md shadow-sm">
-                TIMER: {roundSeconds ?? "--"}S LEFT
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Rematch button inside core if game is over */}
-        {phase === "GAME_OVER" && (
-          <>
-            {renderMatchHistoryPanel()}
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => navigate("/")}
-                className="w-full font-extrabold text-xs uppercase tracking-widest py-3 border border-border bg-input hover:bg-muted text-foreground rounded-lg transition-all cursor-pointer active:translate-y-px pointer-events-auto"
-              >
-                BACK HOME
-              </button>
-              <button
-                onClick={() => setReady()}
-                className="w-full font-extrabold text-xs uppercase tracking-widest py-3 border border-player-1 bg-player-1/10 hover:bg-player-1/25 text-player-1 rounded-lg transition-all shadow-[0_0_15px_rgba(77,255,188,0.2)] hover:shadow-[0_0_25px_rgba(77,255,188,0.4)] cursor-pointer active:translate-y-px pointer-events-auto"
-              >
-                REMATCH
-              </button>
-            </div>
-          </>
-        )}
-
-      </div>
-    );
+  const toggleActivity = () => {
+    if (activityOpen) {
+      setActivityOpen(false);
+      window.requestAnimationFrame(() => guessInputRef.current?.focus());
+      return;
+    }
+    setUnreadCount(0);
+    setActivityOpen(true);
   };
 
-  // Extract most recent message for player 1 (you) and player 2 (opponent) for lobby speech bubbles
-  const lastPlayerMsg = messages
-    .filter((m) => m.type === "USER" && m.sender === playerName)
-    .slice(-1)[0];
+  const closeActivity = () => {
+    setActivityOpen(false);
+    window.requestAnimationFrame(() => guessInputRef.current?.focus());
+  };
 
-  const lastOpponentMsg = opponentName
-    ? messages
-        .filter((m) => m.type === "USER" && m.sender === opponentName)
-        .slice(-1)[0]
-    : null;
+  useEffect(() => {
+    if (!activityOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeActivity();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  });
 
-  if (!roomCode || !playerName) {
-    return null;
-  }
+  const exitRoom = () => {
+    leaveRoom();
+    playSound("navigate");
+    navigate("/");
+  };
+
+  if (!roomCode || !playerName) return null;
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden text-foreground bg-background bg-[radial-gradient(circle_at_center,_rgba(31,40,51,0.15)_0%,_rgba(11,15,25,1)_100%)] transition-colors duration-500">
-      <div className="absolute right-5 top-5 z-[60] pointer-events-auto">
-        <button
-          type="button"
-          onClick={() => setSettingsOpen((open) => !open)}
-          aria-label={settingsOpen ? "Close settings" : "Open settings"}
-          aria-expanded={settingsOpen}
-          aria-controls="room-settings-panel"
-          className="flex size-10 items-center justify-center border border-border bg-card/90 text-foreground shadow-lg backdrop-blur transition-all hover:border-player-1 hover:text-player-1 active:translate-y-px"
-        >
-          <Settings size={18} />
-        </button>
-
-        {settingsOpen && (
-          <div
-            id="room-settings-panel"
-            className="absolute right-0 mt-3 w-72 border border-border bg-card p-4 shadow-2xl"
-          >
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                {volume === 0 ? (
-                  <VolumeX className="text-player-2" size={18} />
-                ) : (
-                  <Volume2 className="text-player-1" size={18} />
+    <MotionConfig reducedMotion="user">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <header className="relative z-40 border-b border-border bg-background/95">
+        <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 sm:px-6">
+          <button type="button" onClick={requestLeave} className="interactive flex size-10 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:text-foreground" aria-label="Go home">
+            <Home size={17} />
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="ui-label">anime room</p>
+            <p className="ui-title truncate text-sm">{phaseLabel(phase)}</p>
+          </div>
+          <button type="button" onClick={copyCode} className="interactive hidden items-center gap-3 rounded-md border border-border bg-card px-3 py-2 sm:flex">
+            <span className="font-mono text-xs uppercase tracking-[0.18em]">{roomCode}</span>
+            <Clipboard className="text-muted-foreground" size={14} />
+            <span className="sr-only" aria-live="polite">{copyMessage}</span>
+          </button>
+          <div>
+            <button type="button" onClick={toggleActivity} className="interactive relative flex size-10 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:text-foreground" aria-label={unreadCount > 0 ? `Open chat, ${unreadCount} unread messages` : "Toggle activity"}>
+              <MessageCircle size={17} />
+              <AnimatePresence initial={false}>
+                {unreadCount > 0 && (
+                  <motion.span
+                    initial={{ opacity: 0, scale: 0.7 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.7 }}
+                    className="absolute -right-1.5 -top-1.5 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 font-mono text-[9px] leading-4 text-primary-foreground"
+                    aria-hidden="true"
+                  >
+                    {Math.min(99, unreadCount)}
+                  </motion.span>
                 )}
-                <span className="text-xs font-extrabold uppercase tracking-widest">
-                  Volume
-                </span>
-              </div>
-              <span className="text-xs font-black text-muted-foreground">
-                {volume}%
-              </span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="5"
-              value={volume}
-              onChange={handleVolumeChange}
-              aria-label="App volume"
-              className="h-2 w-full cursor-pointer accent-player-1"
-            />
-            <button
-              type="button"
-              onClick={handleTestVolume}
-              className="mt-4 flex w-full items-center justify-center gap-2 border border-player-1/50 bg-player-1/10 px-3 py-2 text-xs font-extrabold uppercase tracking-widest text-player-1 transition-all hover:bg-player-1/20 active:translate-y-px"
-            >
-              <Waves size={15} />
-              Test Volume
+              </AnimatePresence>
             </button>
-            <p className="mt-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Low settings are softened for quieter listening.
-            </p>
           </div>
-        )}
-      </div>
+          <AppSettings />
+        </div>
+      </header>
 
-      {/* BACKGROUND LAYER 1: Lobby Split-Slash (LOBBY phase only) */}
-      {/* ---------------------------------------------------- */}
-      {visualPhase === "LOBBY" && (
-        <div className="absolute inset-0 z-10 pointer-events-none select-none">
-          {/* LEFT SLASH HALF (YOU) */}
-          <div className="absolute inset-0 clip-slash-left bg-gradient-to-r from-[rgba(11,15,25,0.95)] via-[rgba(31,40,51,0.85)] to-transparent text-foreground flex flex-col justify-center items-start pl-24 pr-48 transition-all duration-500">
-            <span className="text-[10px] font-extrabold uppercase tracking-widest bg-player-1 text-background px-3 py-1 mb-2 transform -skew-x-12 shadow-[0_0_10px_var(--player-1-glow)]">
-              PLAYER ONE // YOU
-            </span>
-            
-            <div className="flex items-center gap-6 relative">
-              <h2 className="text-6xl font-extrabold uppercase tracking-tighter text-player-1 text-player-1-glow">
-                {playerName}
-              </h2>
-              {/* Single floating message box to the right of your name */}
-              {lastPlayerMsg && (
-                <div className="relative border border-player-1/50 bg-card px-5 py-3 shadow-[0_0_12px_var(--player-1-glow)] text-xs font-semibold rounded-lg max-w-xs animate-scale-up z-20 pointer-events-auto border-l-4 border-l-player-1">
-                  <p className="break-all whitespace-pre-wrap text-foreground">{lastPlayerMsg.text}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Ready controls positioned directly below Player 1 name inside left slot */}
-            <div className="flex flex-col items-start mt-6 gap-3 pointer-events-auto">
-              <span className={`text-xs font-bold uppercase tracking-widest px-3 py-1.5 border rounded-md transition-all ${playerReady ? "bg-player-1 text-background border-player-1 shadow-[0_0_10px_var(--player-1-glow)]" : "bg-transparent text-zinc-500 border-zinc-700 border-dashed"}`}>
-                {playerReady ? "READIED" : "NOT READY"}
-              </span>
-              {players.length === 2 && (
-                <button
-                  onClick={() => setReady()}
-                  className={`px-5 py-2.5 border rounded-lg text-xs font-bold uppercase tracking-widest transition-all cursor-pointer select-none active:translate-y-px ${playerReady ? "border-zinc-700 text-zinc-400 hover:bg-zinc-800" : "border-player-1 text-player-1 hover:bg-player-1/10 shadow-[0_0_10px_var(--player-1-glow)]"}`}
-                >
-                  {playerReady ? "UNREADY" : "READY UP"}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* RIGHT SLASH HALF (OPPONENT / WAITING) */}
-          <div className="absolute inset-0 clip-slash-right bg-gradient-to-l from-[rgba(11,15,25,0.95)] via-[rgba(31,40,51,0.85)] to-transparent text-foreground flex flex-col justify-center items-end pr-24 pl-48 transition-all duration-500">
-            {opponentName ? (
-              <div className="flex flex-col items-end">
-                <span className="text-[10px] font-extrabold uppercase tracking-widest bg-player-2 text-background px-3 py-1 mb-2 transform -skew-x-12 shadow-[0_0_10px_var(--player-2-glow)]">
-                  PLAYER TWO // CHALLENGER
-                </span>
-                
-                <div className="flex items-center gap-6 relative">
-                  {/* Single floating message box to the left of opponent's name */}
-                  {lastOpponentMsg && (
-                    <div className="relative border border-player-2/50 bg-card px-5 py-3 shadow-[0_0_12px_var(--player-2-glow)] text-xs font-semibold rounded-lg max-w-xs animate-scale-up z-20 pointer-events-auto border-r-4 border-r-player-2">
-                      <p className="break-all whitespace-pre-wrap text-foreground">{lastOpponentMsg.text}</p>
-                    </div>
-                  )}
-                  <h2 className="text-6xl font-extrabold uppercase tracking-tighter text-player-2 text-player-2-glow">
-                    {opponentName}
-                  </h2>
-                </div>
-
-                <div className="flex items-center gap-2 mt-6">
-                  <span className={`text-xs font-bold uppercase tracking-widest px-3 py-1.5 border rounded-md transition-all ${opponentReady ? "bg-player-2 text-background border-player-2 shadow-[0_0_10px_var(--player-2-glow)]" : "bg-transparent text-zinc-500 border-zinc-700 border-dashed"}`}>
-                    {opponentReady ? "READIED" : "NOT READY"}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-end animate-pulse">
-                <span className="text-[10px] font-extrabold uppercase tracking-widest bg-zinc-800 text-zinc-400 px-3 py-1 mb-2 rounded border border-zinc-700">
-                  PLAYER TWO // LOBBY EMPTY
-                </span>
-                <h2 className="text-5xl font-extrabold uppercase tracking-tighter italic text-center text-zinc-600">
-                  WAITING FOR CHALLENGER...
-                </h2>
-              </div>
-            )}
-          </div>
-
-          {/* DIAGONAL DIVISION STROKE & CENTER VS BADGE */}
-          <div className="absolute inset-0 z-20 flex justify-center items-center">
-            <div className="w-[4px] h-[150%] rotate-[168deg] transform origin-center absolute split-divider-line transition-all duration-500"></div>
-            {players.length === 2 && (
-              <div className="bg-card text-foreground border border-border font-extrabold text-4xl py-3 px-7 rounded-xl shadow-2xl rotate-[-10deg] z-30 select-none tracking-widest">
-                <span className="bg-gradient-to-r from-player-1 to-player-2 bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(77,255,188,0.3)]">VS</span>
-              </div>
-            )}
-          </div>
+      {connectionState !== "connected" && !connectionPause && (
+        <div role="status" className="flex items-center justify-center gap-2 border-b border-warning/30 bg-warning/10 px-4 py-2 font-mono text-xs lowercase text-warning">
+          <WifiOff size={14} /> reconnecting to the server…
         </div>
       )}
 
-      {/* BACKGROUND LAYER 2: Dimmed active play overlay */}
-      {/* ---------------------------------------------------- */}
-      {visualPhase !== "LOBBY" && (
-        <div className="absolute inset-0 bg-black/15 dark:bg-black/40 z-0 pointer-events-none"></div>
-      )}
-
-      {/* Hidden/Invisible Audio Stage */}
-      <div className="absolute top-0 left-0 w-1 h-1 opacity-0 pointer-events-none overflow-hidden">
-        {(phase === "PLAYING" || phase === "GRACE_PERIOD") && currentVideoId && (
-          <YouTube
-            videoId={currentVideoId}
-            opts={{
-              width: "1",
-              height: "1",
-              playerVars: {
-                autoplay: 1,
-                controls: 0,
-                disablekb: 1,
-                fs: 0,
-                modestbranding: 1,
-                rel: 0,
-              }
-            }}
-            onReady={handlePlayerReady}
-            onEnd={handlePlayerEnd}
-          />
-        )}
-      </div>
-
-      {/* ---------------------------------------------------- */}
-      {/* FOREGROUND LAYER 1: Centered Chat & Guess Core Stage */}
-      {/* ---------------------------------------------------- */}
-      <div className={`absolute inset-0 flex flex-col items-center z-20 pointer-events-none ${visualPhase === "LOBBY" ? "justify-end pb-32" : "justify-center pb-20"}`}>
-        
-        {/* During Active game: render full chat core vertically centered. During Lobby: core renders centered, keeping space for split names */}
-        {renderCenteredCore()}
-        
-        {/* Lobby warning labels at the bottom (No overlay ready up button here anymore) */}
-        {visualPhase === "LOBBY" && (
-          <div className="absolute bottom-12 left-1/2 z-30 flex -translate-x-1/2 transform flex-col items-center gap-3 pointer-events-auto select-none">
-            <div className="border border-player-1/60 bg-card px-5 py-2 text-center shadow-[0_0_12px_var(--player-1-glow)]">
-              <p className="text-[9px] font-extrabold uppercase tracking-widest text-muted-foreground">
-                Room Code
-              </p>
-              <p className="text-xl font-black uppercase tracking-[0.35em] text-player-1">
-                {roomCode}
-              </p>
-              <button
-                type="button"
-                onClick={handleCopyRoomCode}
-                disabled={!roomCode}
-                aria-label={`Copy room code ${roomCode}`}
-                aria-describedby={
-                  copyNoticeMessage ? "room-code-copy-notice" : undefined
+      <div className="relative mx-auto flex w-full max-w-7xl flex-1 overflow-hidden">
+        <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 sm:py-8">
+          {phase === "LOBBY" ? (
+            <Lobby
+              roomCode={roomCode}
+              playerName={playerName}
+              opponentName={opponentName}
+              selfReady={selfReady}
+              opponentReady={opponentReady}
+              inputValue={inputValue}
+              setInputValue={setInputValue}
+              onSubmit={submitLobbyMessage}
+              onReady={() => { playSound("confirm"); setReady(); }}
+              onCopy={copyCode}
+              copyMessage={copyMessage}
+              recentActivity={recentActivity}
+              unreadCount={unreadCount}
+              onOpenActivity={toggleActivity}
+            />
+          ) : phase === "COUNTDOWN" ? (
+            <Countdown seconds={countdownSeconds ?? 3} />
+          ) : phase === "REVEAL" ? (
+            <RoundReveal result={roundResult} revealedAnswer={revealedAnswer} playerName={playerName} detailsOpen={detailsOpen} setDetailsOpen={setDetailsOpen} />
+          ) : phase === "GAME_OVER" ? (
+            <GameOver
+              winner={winner}
+              playerName={playerName}
+              health={health}
+              players={Object.keys(health)}
+              history={matchHistory}
+              historyOpen={historyOpen}
+              setHistoryOpen={setHistoryOpen}
+              onHome={exitRoom}
+              onRematch={() => { playSound("confirm"); setReady(); }}
+            />
+          ) : (
+            <GameStage
+              currentRound={currentRound}
+              roundSeconds={roundSeconds}
+              playerName={playerName}
+              opponentName={opponentName}
+              health={health}
+              pendingDamage={pendingDamage}
+              guessedCorrectly={guessedCorrectly}
+              inputValue={inputValue}
+              inputRef={guessInputRef}
+              setInputValue={(value) => { setInputValue(value); setSuggestionIndex(0); }}
+              submit={submit}
+              suggestions={suggestions}
+              selectedIndex={suggestionIndex}
+              setSelectedIndex={setSuggestionIndex}
+              submitSuggestion={(suggestion) => {
+                if (guessCooldownEndsAt > now) {
+                  setInputValue(suggestion.canonicalTitle);
+                  window.requestAnimationFrame(() => guessInputRef.current?.focus());
+                  return;
                 }
-                className="mt-2 inline-flex items-center justify-center gap-2 border border-player-1/50 bg-player-1/10 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-widest text-player-1 transition-all hover:bg-player-1/20 active:translate-y-px"
-              >
-                <Clipboard size={13} />
-                Copy Code
-              </button>
-              {copyNoticeMessage && (
-                <p
-                  id="room-code-copy-notice"
-                  role="status"
-                  aria-live="polite"
-                  className="mt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
-                >
-                  {copyNoticeMessage}
-                </p>
-              )}
-            </div>
-            {players.length < 2 && (
-              <div className="text-sm font-extrabold uppercase tracking-widest text-center text-zinc-500 bg-input/80 border border-border/80 px-6 py-3 rounded-lg shadow-lg animate-pulse">
-                Waiting for challenger to join...
-              </div>
-            )}
-          </div>
+                submitInput(suggestion.canonicalTitle);
+              }}
+              disabled={!canGuess}
+              cooldown={Math.max(0, (guessCooldownEndsAt - now) / 1000)}
+              canSkip={phase === "PLAYING" && players.length === 2}
+              skipVotes={skipVotes.length}
+              alreadySkipped={alreadySkipped}
+              onSkip={() => { playSound("select"); voteToSkip(); }}
+              error={errorNotice}
+              recentActivity={recentActivity}
+              unreadCount={unreadCount}
+              onOpenActivity={toggleActivity}
+            />
+          )}
+        </main>
+
+        <ActivityPanel
+          open={activityOpen}
+          onClose={closeActivity}
+          messages={messages}
+          playerName={playerName}
+          value={activityInput}
+          onChange={setActivityInput}
+          onSend={() => {
+            if (sendChatMessage(activityInput)) {
+              setActivityInput("");
+              playSound("confirm");
+            }
+          }}
+        />
+      </div>
+
+      <div className="pointer-events-none absolute size-px overflow-hidden opacity-0">
+        {(phase === "PLAYING" || phase === "GRACE_PERIOD") && currentVideoId && (
+          <YouTube videoId={currentVideoId} opts={{ width: "1", height: "1", playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, modestbranding: 1, rel: 0 } }} onReady={onPlayerReady} onEnd={(event) => { event.target.seekTo(0, true); event.target.playVideo(); }} />
         )}
       </div>
 
-      {/* ---------------------------------------------------- */}
-      {/* FOREGROUND LAYER 2: Corner HP HUDs (PLAYING phases only) */}
-      {/* ---------------------------------------------------- */}
-      {visualPhase !== "LOBBY" && (
-        <div className="absolute inset-x-8 bottom-8 flex justify-between items-end pointer-events-none select-none z-10 transition-all duration-500">
-          {/* Player 1 HUD (Bottom Left) */}
-          <div
-            className={`gaming-card-glass p-4 w-80 pointer-events-auto flex flex-col gap-2.5 player-1-glow border-t-2 border-t-player-1 animate-fade-in ${
-              roundResult?.damagedPlayer === playerName ? "hud-damage-shake" : ""
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-extrabold uppercase text-sm tracking-wide text-foreground">
-                PLAYER: {playerName} <span className="text-[9px] bg-player-1 text-background px-1.5 py-0.5 font-bold ml-1 rounded">YOU</span>
-              </span>
-              <span className="text-xs font-bold text-player-1 text-player-1-glow">
-                {health[playerName] ?? 5000} HP
-              </span>
-            </div>
-            <div className="w-full h-4 border border-border bg-input/80 rounded-md relative overflow-hidden">
-              <div 
-                className="health-fill h-full bg-player-1 transition-all duration-700 ease-out shadow-[0_0_8px_var(--player-1-glow)]" 
-                style={{ width: `${Math.max(0, Math.min(100, ((health[playerName] ?? 5000) / 5000) * 100))}%` }}
-              ></div>
-            </div>
-            {roundResult?.damagedPlayer === playerName && roundResult.damageDealt > 0 && (
-              <span className="damage-float self-start text-player-2">
-                <Zap size={13} />
-                -{roundResult.damageDealt} HP
-              </span>
-            )}
-            {guessedCorrectly.includes(playerName) && (
-              <span className="text-xs font-bold uppercase text-background bg-player-1 py-1 px-3 self-start rounded-md shadow-[0_0_8px_var(--player-1-glow)] mt-1">
-                CORRECT!
-              </span>
-            )}
-          </div>
-
-          {/* Player 2 HUD (Bottom Right) */}
-          {(() => {
-            const oppName = players.find((p) => p !== playerName) || "Challenger";
-            const hasOpponent = players.some((p) => p !== playerName);
-            return (
-              <div
-                className={`gaming-card-glass p-4 w-80 pointer-events-auto flex flex-col gap-2.5 player-2-glow border-t-2 border-t-player-2 animate-fade-in ${
-                  roundResult?.damagedPlayer === oppName ? "hud-damage-shake" : ""
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-extrabold uppercase text-sm tracking-wide text-foreground">
-                    OPPONENT: {oppName}
-                  </span>
-                  <span className="text-xs font-bold text-player-2 text-player-2-glow">
-                    {hasOpponent ? `${health[oppName] ?? 5000} HP` : "-- HP"}
-                  </span>
-                </div>
-                <div className="w-full h-4 border border-border bg-input/80 rounded-md relative overflow-hidden">
-                  <div 
-                    className="health-fill h-full bg-player-2 transition-all duration-700 ease-out shadow-[0_0_8px_var(--player-2-glow)]" 
-                    style={{ width: `${hasOpponent ? Math.max(0, Math.min(100, ((health[oppName] ?? 5000) / 5000) * 100)) : 0}%` }}
-                  ></div>
-                </div>
-                {roundResult?.damagedPlayer === oppName && roundResult.damageDealt > 0 && (
-                  <span className="damage-float self-end text-player-2">
-                    <Zap size={13} />
-                    -{roundResult.damageDealt} HP
-                  </span>
-                )}
-                {hasOpponent && guessedCorrectly.includes(oppName) && (
-                  <span className="text-xs font-bold uppercase text-background bg-player-2 py-1 px-3 self-end rounded-md shadow-[0_0_8px_var(--player-2-glow)] mt-1">
-                    CORRECT!
-                  </span>
-                )}
-              </div>
-            );
-          })()}
+      {connectionPause && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background/90 p-5">
+          <section className="surface-raised event-enter max-w-md p-7 text-center">
+            <WifiOff className="mx-auto text-warning" size={28} />
+            <p className="ui-label mt-5">match paused</p>
+            <h2 className="ui-title mt-2 text-2xl">waiting for {connectionPause.playerName}</h2>
+            <p className="mt-4 leading-6 text-muted-foreground">Music and timers are paused for both players. The match will resume automatically if they reconnect.</p>
+            <p className="mt-6 font-mono text-lg text-warning">{reconnectSeconds ?? 0}s</p>
+          </section>
         </div>
       )}
 
+      {leaveOpen && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-background/80 p-5" role="dialog" aria-modal="true" aria-labelledby="leave-title">
+          <section className="surface-raised max-w-sm p-6">
+            <p className="ui-label">leave active match</p>
+            <h2 id="leave-title" className="ui-title mt-2 text-2xl">forfeit and go home?</h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">Your opponent will win this match. This cannot be undone.</p>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <Button variant="outline" onClick={() => setLeaveOpen(false)} className="rounded-md font-mono text-xs lowercase">stay</Button>
+              <Button onClick={exitRoom} className="rounded-md bg-destructive font-mono text-xs lowercase text-background">leave match</Button>
+            </div>
+          </section>
+        </div>
+      )}
+      <Toast message={copyMessage === "copied" ? "Room code copied." : ""} onDismiss={() => setCopyMessage("")} />
     </div>
+    </MotionConfig>
   );
 };
+
+const Lobby = ({ roomCode, playerName, opponentName, selfReady, opponentReady, inputValue, setInputValue, onSubmit, onReady, onCopy, copyMessage, recentActivity, unreadCount, onOpenActivity }: {
+  roomCode: string; playerName: string; opponentName: string | null; selfReady: boolean; opponentReady: boolean; inputValue: string; setInputValue: (value: string) => void; onSubmit: (event: React.FormEvent) => void; onReady: () => void; onCopy: () => void; copyMessage: string; recentActivity: UnifiedMessage[]; unreadCount: number; onOpenActivity: () => void;
+}) => (
+  <section className="page-enter mx-auto flex min-h-[calc(100vh-8rem)] max-w-4xl flex-col justify-center">
+    <div className="text-center">
+      <p className="ui-label">private lobby</p>
+      <h1 className="ui-title mt-2 text-3xl sm:text-5xl">ready when you are</h1>
+      <button type="button" onClick={onCopy} className="interactive mx-auto mt-5 flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 font-mono text-xs uppercase tracking-[0.2em]">
+        {roomCode}<Clipboard size={14} /><span className="normal-case tracking-normal text-muted-foreground">{copyMessage}</span>
+      </button>
+    </div>
+    <div className="mt-10 grid gap-4 sm:grid-cols-2">
+      <PlayerCard name={playerName} label="you" ready={selfReady} />
+      <PlayerCard name={opponentName ?? "waiting for a player"} label="opponent" ready={opponentReady} empty={!opponentName} />
+    </div>
+    <div className="mx-auto mt-8 w-full max-w-lg">
+      <Button type="button" disabled={!opponentName} onClick={onReady} className={`h-12 w-full rounded-md font-mono text-sm lowercase ${selfReady ? "bg-secondary text-foreground" : "bg-primary text-primary-foreground"}`}>
+        <Check size={16} /> {selfReady ? "unready" : "ready up"}
+      </Button>
+      <form onSubmit={onSubmit} className="mt-4 flex gap-2">
+        <input value={inputValue} onChange={(event) => setInputValue(event.target.value)} placeholder="send a lobby message" className="h-10 min-w-0 flex-1 rounded-md border border-border bg-input px-3 text-sm outline-none focus:border-primary" />
+        <Button size="icon" variant="outline" className="size-10 rounded-md" aria-label="Send message"><Send size={15} /></Button>
+      </form>
+      <RecentActivity messages={recentActivity} unreadCount={unreadCount} playerName={playerName} onOpen={onOpenActivity} />
+    </div>
+  </section>
+);
+
+const PlayerCard = ({ name, label, ready, empty = false }: { name: string; label: string; ready: boolean; empty?: boolean }) => (
+  <article className={`surface p-6 ${empty ? "border-dashed" : ""}`}>
+    <div className="flex items-start justify-between gap-4">
+      <span className="flex size-11 items-center justify-center rounded-md border border-border bg-input text-muted-foreground"><UserRound size={20} /></span>
+      <span className={`rounded-full border px-2 py-1 font-mono text-[10px] lowercase ${ready ? "border-success/40 bg-success/10 text-success" : "border-border text-muted-foreground"}`}>{ready ? "ready" : empty ? "open seat" : "not ready"}</span>
+    </div>
+    <p className="ui-label mt-8">{label}</p>
+    <h2 className={`mt-1 truncate text-xl font-semibold ${empty ? "text-muted-foreground" : ""}`}>{name}</h2>
+  </article>
+);
+
+const Countdown = ({ seconds }: { seconds: number }) => (
+  <section className="page-enter flex min-h-[calc(100vh-10rem)] flex-col items-center justify-center text-center">
+    <p className="ui-label">get ready</p>
+    <p key={seconds} className="event-enter ui-title mt-4 text-8xl text-primary sm:text-9xl">{seconds}</p>
+    <p className="mt-5 text-muted-foreground">The first track is about to begin.</p>
+  </section>
+);
+
+const GameStage = ({ currentRound, roundSeconds, playerName, opponentName, health, pendingDamage, guessedCorrectly, inputValue, inputRef, setInputValue, submit, suggestions, selectedIndex, setSelectedIndex, submitSuggestion, disabled, cooldown, canSkip, skipVotes, alreadySkipped, onSkip, error, recentActivity, unreadCount, onOpenActivity }: {
+  currentRound: number; roundSeconds: number | null; playerName: string; opponentName: string | null; health: Record<string, number>; pendingDamage: Record<string, number>; guessedCorrectly: string[]; inputValue: string; inputRef: React.RefObject<HTMLInputElement | null>; setInputValue: (value: string) => void; submit: (event: React.FormEvent) => void; suggestions: AnswerOption[]; selectedIndex: number; setSelectedIndex: React.Dispatch<React.SetStateAction<number>>; submitSuggestion: (suggestion: AnswerOption) => void; disabled: boolean; cooldown: number; canSkip: boolean; skipVotes: number; alreadySkipped: boolean; onSkip: () => void; error: string; recentActivity: UnifiedMessage[]; unreadCount: number; onOpenActivity: () => void;
+}) => (
+  <section className="page-enter mx-auto max-w-5xl">
+    <div className="grid gap-3 sm:grid-cols-2">
+      <HealthCard label="you" name={playerName} hp={health[playerName] ?? 5000} pending={pendingDamage[playerName] ?? 0} correct={guessedCorrectly.includes(playerName)} />
+      <HealthCard label="opponent" name={opponentName ?? "waiting"} hp={opponentName ? health[opponentName] ?? 5000 : 0} pending={opponentName ? pendingDamage[opponentName] ?? 0 : 0} correct={opponentName ? guessedCorrectly.includes(opponentName) : false} />
+    </div>
+    <div className="mx-auto mt-10 max-w-2xl text-center sm:mt-16">
+      <div className="flex items-center justify-center gap-5 font-mono text-xs lowercase text-muted-foreground">
+        <span>round {currentRound + 1}</span>
+        <span className={`flex items-center gap-2 text-base ${roundSeconds !== null && roundSeconds <= 5 ? "text-warning" : "text-foreground"}`}><Clock3 size={15} /> {roundSeconds ?? "--"}s</span>
+      </div>
+      <h1 className="ui-title mt-5 text-3xl sm:text-5xl">name this soundtrack</h1>
+      <p className="mt-3 text-sm text-muted-foreground">Type an anime title. Suggestions appear after two characters.</p>
+      {canSkip && <button type="button" disabled={alreadySkipped} onClick={onSkip} className="interactive mt-6 inline-flex items-center gap-2 font-mono text-xs lowercase text-muted-foreground hover:text-foreground disabled:opacity-50"><SkipForward size={14} /> {alreadySkipped ? `skip vote sent (${skipVotes}/2)` : `vote to skip (${skipVotes}/2)`}</button>}
+      <form onSubmit={submit} className={`relative text-left ${canSkip ? "mt-4" : "mt-8"}`}>
+        <input
+          ref={inputRef}
+          autoFocus
+          value={inputValue}
+          disabled={disabled}
+          onChange={(event) => setInputValue(event.target.value)}
+          onKeyDown={(event) => {
+            if (!suggestions.length) return;
+            if (event.key === "ArrowDown") { event.preventDefault(); setSelectedIndex((index) => (index + 1) % suggestions.length); }
+            if (event.key === "ArrowUp") { event.preventDefault(); setSelectedIndex((index) => (index - 1 + suggestions.length) % suggestions.length); }
+          }}
+          placeholder={disabled ? "answer locked" : "start typing an anime title"}
+          className="h-14 w-full rounded-md border border-border bg-input px-5 pr-16 text-base outline-none transition-colors placeholder:text-muted-foreground focus:border-primary disabled:cursor-not-allowed disabled:opacity-60 sm:h-16 sm:text-lg"
+          role="combobox"
+          aria-expanded={suggestions.length > 0}
+        />
+        <button disabled={disabled || cooldown > 0} className="absolute right-2 top-2 flex h-10 min-w-10 items-center justify-center rounded-md bg-primary px-2 font-mono text-xs text-primary-foreground disabled:bg-secondary disabled:text-muted-foreground sm:top-3" aria-label={cooldown > 0 ? `Next guess in ${cooldown.toFixed(1)} seconds` : "Submit guess"}>{cooldown > 0 ? cooldown.toFixed(1) : <ArrowLeft className="rotate-180" size={17} />}</button>
+        {suggestions.length > 0 && (
+          <div className="surface-raised quiet-scrollbar absolute inset-x-0 top-full z-30 mt-2 max-h-80 overflow-y-auto p-2">
+            {suggestions.map((suggestion, index) => (
+              <button key={suggestion.id} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => submitSuggestion(suggestion)} className={`interactive flex w-full items-center gap-3 rounded-md p-2 text-left ${index === selectedIndex ? "bg-accent" : "hover:bg-muted"}`}>
+                <div className="relative size-12 shrink-0 overflow-hidden rounded-md"><img src={suggestion.coverImageUrl} alt="" className="h-full w-full object-cover opacity-65" /><div className="absolute inset-0 bg-background/30" /></div>
+                <div className="min-w-0"><p className="truncate font-medium">{suggestion.canonicalTitle}</p><p className="ui-label mt-1 truncate">{suggestion.romajiName ?? suggestion.nativeName ?? "anime title"}</p></div>
+              </button>
+            ))}
+          </div>
+        )}
+      </form>
+      {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+      <RecentActivity messages={recentActivity} unreadCount={unreadCount} playerName={playerName} onOpen={onOpenActivity} />
+    </div>
+  </section>
+);
+
+const RecentActivity = ({ messages, unreadCount, playerName, onOpen }: { messages: UnifiedMessage[]; unreadCount: number; playerName: string; onOpen: () => void }) => (
+  <button type="button" onClick={onOpen} className="interactive mt-3 flex min-h-16 w-full items-center gap-3 overflow-hidden rounded-md border border-border bg-card px-3 py-2 text-left hover:bg-secondary">
+    <MessageCircle className="shrink-0 text-primary" size={15} />
+    <span className="relative flex min-w-0 flex-1 flex-col gap-1 overflow-hidden">
+      <AnimatePresence initial={false} mode="popLayout">
+        {messages.length > 0 ? messages.map((message, index) => (
+          <motion.span
+            layout="position"
+            key={message.id}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: index === 0 ? 1 : 0.55, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            transition={{ duration: 0.24, ease: "easeOut" }}
+            className="block min-w-0 truncate text-sm text-muted-foreground"
+          >
+            <span className="font-mono text-xs lowercase text-foreground">{message.type === "SYSTEM" ? "system" : message.sender === playerName ? "you" : message.sender}:</span> {message.text}
+          </motion.span>
+        )) : (
+          <motion.span key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-sm text-muted-foreground">No activity yet</motion.span>
+        )}
+      </AnimatePresence>
+    </span>
+    <span className="shrink-0 font-mono text-[10px] lowercase text-muted-foreground">{unreadCount > 0 ? `${unreadCount} unread` : "open chat"}</span>
+  </button>
+);
+
+const HealthCard = ({ label, name, hp, pending, correct }: { label: string; name: string; hp: number; pending: number; correct: boolean }) => {
+  const percentage = Math.max(0, Math.min(100, (hp / 5000) * 100));
+  return <article className="surface p-4 sm:p-5">
+    <div className="flex items-center justify-between gap-3"><div className="min-w-0"><p className="ui-label">{label}</p><p className="truncate font-medium">{name}</p></div><div className="text-right"><p className="font-mono text-sm">{hp.toLocaleString()} hp</p>{pending > 0 && <p className="ui-label text-warning">{pending} potential</p>}</div></div>
+    <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-input"><div className="h-full bg-primary transition-[width] duration-500" style={{ width: `${percentage}%` }} /></div>
+    {correct && <p className="mt-3 flex items-center gap-2 font-mono text-xs lowercase text-success"><Check size={13} /> answer locked</p>}
+  </article>;
+};
+
+const RoundReveal = ({ result, revealedAnswer, playerName, detailsOpen, setDetailsOpen }: { result: RoundResult | null; revealedAnswer: string | null; playerName: string; detailsOpen: boolean; setDetailsOpen: (open: boolean) => void }) => {
+  const tookDamage = result?.damagedPlayer === playerName;
+  const dealtDamage = result?.damagedPlayer && result.damagedPlayer !== playerName;
+  const outcome = result?.isTie ? "draw" : tookDamage ? "you took damage" : dealtDamage ? "direct hit" : "round complete";
+  return <section className="event-enter mx-auto flex min-h-[calc(100vh-10rem)] max-w-3xl flex-col justify-center">
+    <div className="surface-raised p-6 sm:p-10">
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between"><div><p className="ui-label">round reveal</p><h1 className="ui-title mt-2 text-4xl sm:text-5xl">{outcome}</h1></div><div className={`flex items-center gap-2 font-mono text-lg ${tookDamage ? "text-destructive" : dealtDamage ? "text-success" : "text-muted-foreground"}`}><Zap size={18} />{result?.damageDealt ?? 0} hp</div></div>
+      <div className="mt-10 border-l-2 border-primary pl-5"><p className="ui-label">the answer</p><h2 className="mt-2 text-2xl font-semibold sm:text-3xl">{result?.canonicalTitle ?? revealedAnswer ?? "Answer unavailable"}</h2><p className="mt-2 text-muted-foreground">{result?.trackTitle ?? "Unknown track title"}</p></div>
+      <button type="button" onClick={() => setDetailsOpen(!detailsOpen)} className="interactive mt-8 flex items-center gap-2 font-mono text-xs lowercase text-muted-foreground hover:text-foreground">details <ChevronDown className={detailsOpen ? "rotate-180" : ""} size={14} /></button>
+      {detailsOpen && <div className="page-enter mt-4 grid gap-4 rounded-md border border-border bg-background/40 p-4 text-sm sm:grid-cols-2"><Detail label="romaji" value={result?.romajiName ?? "not available"} /><Detail label="native title" value={result?.nativeName ?? "not available"} />{Object.entries(result?.damageByPlayer ?? {}).map(([name, damage]) => <Detail key={name} label={`${name} potential`} value={`${damage} damage`} />)}</div>}
+      <p className="ui-label mt-8 text-center">next round starting shortly</p>
+    </div>
+  </section>;
+};
+
+const Detail = ({ label, value }: { label: string; value: string }) => <div><p className="ui-label">{label}</p><p className="mt-1">{value}</p></div>;
+
+const GameOver = ({ winner, playerName, health, players, history, historyOpen, setHistoryOpen, onHome, onRematch }: { winner: string | null; playerName: string; health: Record<string, number>; players: string[]; history: RoundResult[]; historyOpen: boolean; setHistoryOpen: (open: boolean) => void; onHome: () => void; onRematch: () => void }) => {
+  const won = winner === playerName;
+  return <section className="event-enter mx-auto max-w-3xl py-6 sm:py-12">
+    <div className="text-center"><Trophy className={`mx-auto ${won ? "text-warning" : "text-muted-foreground"}`} size={32} /><p className="ui-label mt-5">match complete</p><h1 className="ui-title mt-2 text-5xl sm:text-7xl">{won ? "victory" : winner ? "defeat" : "draw"}</h1><p className="mt-4 text-muted-foreground">{winner ? `${winner} wins the match.` : "No winner this time."}</p></div>
+    <div className="mt-10 grid gap-3 sm:grid-cols-2">{players.map((name) => <HealthCard key={name} label={name === playerName ? "you" : "opponent"} name={name} hp={health[name] ?? 0} pending={0} correct={false} />)}</div>
+    <div className="mt-6 grid grid-cols-2 gap-3"><Button variant="outline" onClick={onHome} className="h-12 rounded-md font-mono text-xs lowercase"><Home size={15} /> home</Button><Button onClick={onRematch} className="h-12 rounded-md font-mono text-xs lowercase"><RotateCcw size={15} /> rematch</Button></div>
+    {history.length > 0 && <div className="mt-8"><button type="button" onClick={() => setHistoryOpen(!historyOpen)} className="interactive flex w-full items-center justify-between border-b border-border py-3 font-mono text-xs lowercase text-muted-foreground"><span>round history · {history.length}</span><ChevronDown className={historyOpen ? "rotate-180" : ""} size={14} /></button>{historyOpen && <div className="page-enter mt-3 grid gap-2">{history.map((result, index) => <article key={`${result.titleId}-${index}`} className="rounded-md border border-border bg-card p-4"><div className="flex justify-between gap-4"><div className="min-w-0"><p className="ui-label">round {index + 1}</p><p className="mt-1 truncate font-medium">{result.canonicalTitle}</p><p className="mt-1 truncate text-sm text-muted-foreground">{result.trackTitle ?? "Unknown track"}</p></div><span className="shrink-0 font-mono text-xs text-muted-foreground">{result.damageDealt} hp</span></div></article>)}</div>}</div>}
+  </section>;
+};
+
+const ActivityPanel = ({ open, onClose, messages, playerName, value, onChange, onSend }: {
+  open: boolean;
+  onClose: () => void;
+  messages: Array<{ id: string; type: "SYSTEM" | "USER"; sender?: string; text: string }>;
+  playerName: string;
+  value: string;
+  onChange: (value: string) => void;
+  onSend: () => void;
+}) => (
+  <>
+    <button type="button" onClick={onClose} aria-label="Close activity" className={`fixed inset-0 top-16 z-40 bg-background/70 transition-opacity lg:bg-transparent ${open ? "opacity-100" : "pointer-events-none opacity-0"}`} />
+    <aside aria-hidden={!open} inert={!open} className={`fixed bottom-0 right-0 top-16 z-50 flex w-[min(23rem,92vw)] flex-col border border-border bg-card shadow-2xl transition-transform duration-200 ${open ? "translate-x-0" : "translate-x-full"}`}>
+      <div className="flex h-16 items-center justify-between border-b border-border px-5">
+        <div><p className="ui-label">room activity</p><h2 className="ui-title text-base">messages</h2></div>
+        <button type="button" onClick={onClose} className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"><X size={16} /></button>
+      </div>
+      <div className="quiet-scrollbar flex flex-1 flex-col gap-3 overflow-y-auto p-4">
+        {messages.length === 0 ? (
+          <div className="m-auto text-center"><MessageCircle className="mx-auto text-muted-foreground" size={22} /><p className="mt-3 text-sm text-muted-foreground">Nothing here yet.</p></div>
+        ) : messages.slice(-50).map((message) => message.type === "SYSTEM" ? (
+          <div key={message.id} className="rounded-md bg-muted px-3 py-2 text-center font-mono text-[11px] lowercase text-muted-foreground">{message.text}</div>
+        ) : (
+          <div key={message.id} className={`max-w-[88%] ${message.sender === playerName ? "self-end" : "self-start"}`}><p className="ui-label mb-1">{message.sender === playerName ? "you" : message.sender}</p><p className="rounded-md border border-border bg-background px-3 py-2 text-sm leading-5">{message.text}</p></div>
+        ))}
+      </div>
+      <form onSubmit={(event) => { event.preventDefault(); onSend(); }} className="flex gap-2 border-t border-border p-3">
+        <input key={open ? "open" : "closed"} autoFocus={open} value={value} onChange={(event) => onChange(event.target.value)} placeholder="send a message" className="h-9 min-w-0 flex-1 rounded-md border border-border bg-input px-3 text-sm outline-none focus:border-primary" />
+        <button className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground" aria-label="Send message"><Send size={14} /></button>
+      </form>
+    </aside>
+  </>
+);
+
+const phaseLabel = (phase: string) => ({ LOBBY: "lobby", COUNTDOWN: "starting soon", PLAYING: "now playing", GRACE_PERIOD: "final guesses", REVEAL: "round reveal", GAME_OVER: "match complete", ROUND_END: "round complete" }[phase] ?? phase.toLowerCase());
 
 export default Room;
