@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { useSocket } from "@/hooks/useSocket";
 import { playSound } from "@/lib/sound";
 import { useGameStateStore, useGameStore } from "@/store/gameStore";
-import type { AnswerOption, RoundResult } from "@/types";
+import type { AnswerOption, RoundResult, UnifiedMessage } from "@/types";
 
 const normalizeRoomCode = (value: string) =>
   value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
@@ -66,6 +66,7 @@ const Room = () => {
     guessCooldownEndsAt,
     connectionState,
     sendChatMessage,
+    sendGuess,
     setReady,
     voteToSkip,
     leaveRoom,
@@ -81,6 +82,7 @@ const Room = () => {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [copyMessage, setCopyMessage] = useState("");
   const playerRef = useRef<YouTubeEvent["target"] | null>(null);
+  const guessInputRef = useRef<HTMLInputElement>(null);
   const previousPhase = useRef(phase);
   const previousCountdown = useRef<number | null>(null);
   const previousCorrectCount = useRef(guessedCorrectly.length);
@@ -112,6 +114,7 @@ const Room = () => {
     return fuse.search(inputValue.trim()).slice(0, 5).map((result) => result.item);
   }, [canGuess, fuse, inputValue]);
   const selectedSuggestion = suggestions[Math.min(suggestionIndex, suggestions.length - 1)];
+  const latestActivity = messages.at(-1) ?? null;
 
   useEffect(() => {
     if (!roomCode || !playerName) {
@@ -178,6 +181,12 @@ const Room = () => {
   }, [guessedCorrectly.length]);
 
   useEffect(() => {
+    if (!activityOpen && (phase === "PLAYING" || phase === "GRACE_PERIOD")) {
+      window.requestAnimationFrame(() => guessInputRef.current?.focus());
+    }
+  }, [activityOpen, phase]);
+
+  useEffect(() => {
     if (!roundResult?.damageDealt) return;
     playSound("damage");
   }, [roundResult]);
@@ -196,16 +205,24 @@ const Room = () => {
   const submitInput = (value: string) => {
     const message = value.trim();
     if (!message) return;
-    const enforceCooldown = phase === "PLAYING" || phase === "GRACE_PERIOD";
-    if (sendChatMessage(message, enforceCooldown)) {
+    if (sendGuess(message)) {
       setInputValue("");
       playSound("confirm");
     }
+    window.requestAnimationFrame(() => guessInputRef.current?.focus());
   };
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     submitInput(selectedSuggestion?.canonicalTitle ?? inputValue);
+  };
+
+  const submitLobbyMessage = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (sendChatMessage(inputValue)) {
+      setInputValue("");
+      playSound("confirm");
+    }
   };
 
   const copyCode = async () => {
@@ -225,9 +242,28 @@ const Room = () => {
   };
 
   const toggleActivity = () => {
-    if (!activityOpen) setUnreadCount(0);
-    setActivityOpen(!activityOpen);
+    if (activityOpen) {
+      setActivityOpen(false);
+      window.requestAnimationFrame(() => guessInputRef.current?.focus());
+      return;
+    }
+    setUnreadCount(0);
+    setActivityOpen(true);
   };
+
+  const closeActivity = () => {
+    setActivityOpen(false);
+    window.requestAnimationFrame(() => guessInputRef.current?.focus());
+  };
+
+  useEffect(() => {
+    if (!activityOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeActivity();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  });
 
   const exitRoom = () => {
     leaveRoom();
@@ -278,7 +314,7 @@ const Room = () => {
               opponentReady={opponentReady}
               inputValue={inputValue}
               setInputValue={setInputValue}
-              onSubmit={submit}
+              onSubmit={submitLobbyMessage}
               onReady={() => { playSound("confirm"); setReady(); }}
               onCopy={copyCode}
               copyMessage={copyMessage}
@@ -309,26 +345,37 @@ const Room = () => {
               pendingDamage={pendingDamage}
               guessedCorrectly={guessedCorrectly}
               inputValue={inputValue}
+              inputRef={guessInputRef}
               setInputValue={(value) => { setInputValue(value); setSuggestionIndex(0); }}
               submit={submit}
               suggestions={suggestions}
               selectedIndex={suggestionIndex}
               setSelectedIndex={setSuggestionIndex}
-              submitSuggestion={(suggestion) => submitInput(suggestion.canonicalTitle)}
-              disabled={!canGuess || guessCooldownEndsAt > now}
+              submitSuggestion={(suggestion) => {
+                if (guessCooldownEndsAt > now) {
+                  setInputValue(suggestion.canonicalTitle);
+                  window.requestAnimationFrame(() => guessInputRef.current?.focus());
+                  return;
+                }
+                submitInput(suggestion.canonicalTitle);
+              }}
+              disabled={!canGuess}
               cooldown={Math.max(0, (guessCooldownEndsAt - now) / 1000)}
               canSkip={phase === "PLAYING" && players.length === 2}
               skipVotes={skipVotes.length}
               alreadySkipped={alreadySkipped}
               onSkip={() => { playSound("select"); voteToSkip(); }}
               error={errorNotice}
+              latestActivity={latestActivity}
+              unreadCount={unreadCount}
+              onOpenActivity={toggleActivity}
             />
           )}
         </main>
 
         <ActivityPanel
           open={activityOpen}
-          onClose={() => setActivityOpen(false)}
+          onClose={closeActivity}
           messages={messages}
           playerName={playerName}
           value={activityInput}
@@ -424,8 +471,8 @@ const Countdown = ({ seconds }: { seconds: number }) => (
   </section>
 );
 
-const GameStage = ({ currentRound, roundSeconds, playerName, opponentName, health, pendingDamage, guessedCorrectly, inputValue, setInputValue, submit, suggestions, selectedIndex, setSelectedIndex, submitSuggestion, disabled, cooldown, canSkip, skipVotes, alreadySkipped, onSkip, error }: {
-  currentRound: number; roundSeconds: number | null; playerName: string; opponentName: string | null; health: Record<string, number>; pendingDamage: Record<string, number>; guessedCorrectly: string[]; inputValue: string; setInputValue: (value: string) => void; submit: (event: React.FormEvent) => void; suggestions: AnswerOption[]; selectedIndex: number; setSelectedIndex: React.Dispatch<React.SetStateAction<number>>; submitSuggestion: (suggestion: AnswerOption) => void; disabled: boolean; cooldown: number; canSkip: boolean; skipVotes: number; alreadySkipped: boolean; onSkip: () => void; error: string;
+const GameStage = ({ currentRound, roundSeconds, playerName, opponentName, health, pendingDamage, guessedCorrectly, inputValue, inputRef, setInputValue, submit, suggestions, selectedIndex, setSelectedIndex, submitSuggestion, disabled, cooldown, canSkip, skipVotes, alreadySkipped, onSkip, error, latestActivity, unreadCount, onOpenActivity }: {
+  currentRound: number; roundSeconds: number | null; playerName: string; opponentName: string | null; health: Record<string, number>; pendingDamage: Record<string, number>; guessedCorrectly: string[]; inputValue: string; inputRef: React.RefObject<HTMLInputElement | null>; setInputValue: (value: string) => void; submit: (event: React.FormEvent) => void; suggestions: AnswerOption[]; selectedIndex: number; setSelectedIndex: React.Dispatch<React.SetStateAction<number>>; submitSuggestion: (suggestion: AnswerOption) => void; disabled: boolean; cooldown: number; canSkip: boolean; skipVotes: number; alreadySkipped: boolean; onSkip: () => void; error: string; latestActivity: UnifiedMessage | null; unreadCount: number; onOpenActivity: () => void;
 }) => (
   <section className="page-enter mx-auto max-w-5xl">
     <div className="grid gap-3 sm:grid-cols-2">
@@ -441,6 +488,7 @@ const GameStage = ({ currentRound, roundSeconds, playerName, opponentName, healt
       <p className="mt-3 text-sm text-muted-foreground">Type an anime title. Suggestions appear after two characters.</p>
       <form onSubmit={submit} className="relative mt-8 text-left">
         <input
+          ref={inputRef}
           autoFocus
           value={inputValue}
           disabled={disabled}
@@ -450,12 +498,12 @@ const GameStage = ({ currentRound, roundSeconds, playerName, opponentName, healt
             if (event.key === "ArrowDown") { event.preventDefault(); setSelectedIndex((index) => (index + 1) % suggestions.length); }
             if (event.key === "ArrowUp") { event.preventDefault(); setSelectedIndex((index) => (index - 1 + suggestions.length) % suggestions.length); }
           }}
-          placeholder={cooldown > 0 ? `next guess in ${cooldown.toFixed(1)}s` : disabled ? "answer locked" : "start typing an anime title"}
-          className="h-14 w-full rounded-md border border-border bg-input px-5 pr-14 text-base outline-none transition-colors placeholder:text-muted-foreground focus:border-primary disabled:cursor-not-allowed disabled:opacity-60 sm:h-16 sm:text-lg"
+          placeholder={disabled ? "answer locked" : "start typing an anime title"}
+          className="h-14 w-full rounded-md border border-border bg-input px-5 pr-16 text-base outline-none transition-colors placeholder:text-muted-foreground focus:border-primary disabled:cursor-not-allowed disabled:opacity-60 sm:h-16 sm:text-lg"
           role="combobox"
           aria-expanded={suggestions.length > 0}
         />
-        <button className="absolute right-2 top-2 flex size-10 items-center justify-center rounded-md bg-primary text-primary-foreground sm:top-3" aria-label="Submit guess"><ArrowLeft className="rotate-180" size={17} /></button>
+        <button disabled={disabled || cooldown > 0} className="absolute right-2 top-2 flex h-10 min-w-10 items-center justify-center rounded-md bg-primary px-2 font-mono text-xs text-primary-foreground disabled:bg-secondary disabled:text-muted-foreground sm:top-3" aria-label={cooldown > 0 ? `Next guess in ${cooldown.toFixed(1)} seconds` : "Submit guess"}>{cooldown > 0 ? cooldown.toFixed(1) : <ArrowLeft className="rotate-180" size={17} />}</button>
         {suggestions.length > 0 && (
           <div className="surface-raised quiet-scrollbar absolute inset-x-0 top-full z-30 mt-2 max-h-80 overflow-y-auto p-2">
             {suggestions.map((suggestion, index) => (
@@ -469,8 +517,19 @@ const GameStage = ({ currentRound, roundSeconds, playerName, opponentName, healt
       </form>
       {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
       {canSkip && <button type="button" disabled={alreadySkipped} onClick={onSkip} className="interactive mt-6 inline-flex items-center gap-2 font-mono text-xs lowercase text-muted-foreground hover:text-foreground disabled:opacity-50"><SkipForward size={14} /> {alreadySkipped ? `skip vote sent (${skipVotes}/2)` : `vote to skip (${skipVotes}/2)`}</button>}
+      <RecentActivity message={latestActivity} unreadCount={unreadCount} playerName={playerName} onOpen={onOpenActivity} />
     </div>
   </section>
+);
+
+const RecentActivity = ({ message, unreadCount, playerName, onOpen }: { message: UnifiedMessage | null; unreadCount: number; playerName: string; onOpen: () => void }) => (
+  <button type="button" onClick={onOpen} className="interactive mt-5 flex h-11 w-full items-center gap-3 rounded-md border border-border bg-card px-3 text-left hover:bg-secondary">
+    <MessageCircle className="shrink-0 text-primary" size={15} />
+    <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+      {message ? <><span className="font-mono text-xs lowercase text-foreground">{message.type === "SYSTEM" ? "system" : message.sender === playerName ? "you" : message.sender}:</span> {message.text}</> : "No activity yet"}
+    </span>
+    <span className="shrink-0 font-mono text-[10px] lowercase text-muted-foreground">{unreadCount > 0 ? `${unreadCount} unread` : "open chat"}</span>
+  </button>
 );
 
 const HealthCard = ({ label, name, hp, pending, correct }: { label: string; name: string; hp: number; pending: number; correct: boolean }) => {
@@ -519,8 +578,8 @@ const ActivityPanel = ({ open, onClose, messages, playerName, value, onChange, o
   onSend: () => void;
 }) => (
   <>
-    <button type="button" onClick={onClose} aria-label="Close activity" className={`fixed inset-0 z-40 bg-background/70 transition-opacity lg:hidden ${open ? "opacity-100" : "pointer-events-none opacity-0"}`} />
-    <aside className={`fixed inset-y-0 right-0 z-50 flex w-[min(23rem,90vw)] flex-col border-l border-border bg-card transition-transform duration-200 lg:static lg:z-20 lg:w-80 ${open ? "translate-x-0" : "translate-x-full lg:hidden"}`}>
+    <button type="button" onClick={onClose} aria-label="Close activity" className={`fixed inset-0 top-16 z-40 bg-background/70 transition-opacity lg:bg-transparent ${open ? "opacity-100" : "pointer-events-none opacity-0"}`} />
+    <aside aria-hidden={!open} inert={!open} className={`fixed bottom-0 right-0 top-16 z-50 flex w-[min(23rem,92vw)] flex-col border border-border bg-card shadow-2xl transition-transform duration-200 ${open ? "translate-x-0" : "translate-x-full"}`}>
       <div className="flex h-16 items-center justify-between border-b border-border px-5">
         <div><p className="ui-label">room activity</p><h2 className="ui-title text-base">messages</h2></div>
         <button type="button" onClick={onClose} className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"><X size={16} /></button>
@@ -535,7 +594,7 @@ const ActivityPanel = ({ open, onClose, messages, playerName, value, onChange, o
         ))}
       </div>
       <form onSubmit={(event) => { event.preventDefault(); onSend(); }} className="flex gap-2 border-t border-border p-3">
-        <input value={value} onChange={(event) => onChange(event.target.value)} placeholder="send a message" className="h-9 min-w-0 flex-1 rounded-md border border-border bg-input px-3 text-sm outline-none focus:border-primary" />
+        <input key={open ? "open" : "closed"} autoFocus={open} value={value} onChange={(event) => onChange(event.target.value)} placeholder="send a message" className="h-9 min-w-0 flex-1 rounded-md border border-border bg-input px-3 text-sm outline-none focus:border-primary" />
         <button className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground" aria-label="Send message"><Send size={14} /></button>
       </form>
     </aside>

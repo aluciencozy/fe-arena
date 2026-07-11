@@ -9,6 +9,7 @@ import {
 } from "../services/game.service.js";
 
 export const registerGameHandler = (io: Server, socket: Socket) => {
+  const GUESS_COOLDOWN_MS = 2500;
   let nextGuessAllowedAt = 0;
   const makeEvents = (roomId: string) => ({
     emitState: (state: ReturnType<typeof ensureGameForRoom>) =>
@@ -21,37 +22,55 @@ export const registerGameHandler = (io: Server, socket: Socket) => {
       }),
   });
 
-  socket.on("chat:message", (message: string) => {
+  socket.on("chat:message", (message: unknown) => {
     const session = getUserSession(socket.id);
-
     if (!session) return;
+
+    if (typeof message !== "string") return;
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage) return;
+    io.to(session.roomId).emit("chat:broadcast", {
+      username: session.username,
+      message: trimmedMessage,
+    });
+  });
+
+  socket.on("game:guess", (message: unknown) => {
+    const session = getUserSession(socket.id);
+    if (!session) return;
+
+    if (typeof message !== "string") return;
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage) return;
 
     const { roomId, username } = session;
     const players = getPlayersInRoom(roomId);
     const gameState = getGameState(roomId);
     const isGuessing =
       gameState?.phase === "PLAYING" || gameState?.phase === "GRACE_PERIOD";
+    if (!isGuessing) return;
 
-    if (isGuessing && Date.now() < nextGuessAllowedAt) {
+    if (Date.now() < nextGuessAllowedAt) {
       socket.emit("guess:cooldown", nextGuessAllowedAt);
       return;
     }
 
-    if (isGuessing) {
-      nextGuessAllowedAt = Date.now() + 2500;
-      socket.emit("guess:cooldown", nextGuessAllowedAt);
-    }
+    nextGuessAllowedAt = Date.now() + GUESS_COOLDOWN_MS;
+    socket.emit("guess:cooldown", nextGuessAllowedAt);
     const handledAsGuess = handleGuess(
       roomId,
       username,
       players,
-      message,
+      trimmedMessage,
       makeEvents(roomId),
     );
 
     if (handledAsGuess) return;
 
-    io.to(roomId).emit("chat:broadcast", { username, message });
+    io.to(roomId).emit("chat:broadcast", {
+      username,
+      message: trimmedMessage,
+    });
   });
 
   socket.on("game:ready", () => {

@@ -146,16 +146,17 @@ export const useSocket = (roomCode: string, playerName: string) => {
     };
   }, [navigate, roomCode, playerName]); // Re-run effect if roomCode or playerName changes
 
-  const sendChatMessage = (message: string, enforceGuessCooldown = false) => {
+  const sendChatMessage = (message: string) => {
     const trimmedMessage = message.trim();
-    if (
-      !trimmedMessage ||
-      (enforceGuessCooldown && Date.now() < guessCooldownEndsAt)
-    ) {
-      return false;
-    }
+    if (!trimmedMessage) return false;
     socket.emit("chat:message", trimmedMessage);
-    if (enforceGuessCooldown) setGuessCooldownEndsAt(Date.now() + 2500);
+    return true;
+  };
+
+  const sendGuess = (message: string) => {
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage || Date.now() < guessCooldownEndsAt) return false;
+    socket.emit("game:guess", trimmedMessage);
     return true;
   };
 
@@ -180,6 +181,7 @@ export const useSocket = (roomCode: string, playerName: string) => {
     guessCooldownEndsAt,
     connectionState,
     sendChatMessage,
+    sendGuess,
     setReady,
     voteToSkip,
     leaveRoom,
