@@ -1,4 +1,5 @@
 export type GameMode = "anime" | "video-game";
+export type GameDifficulty = "standard" | "easy";
 export type RoomSource = "private" | "queue";
 
 export interface AnswerAlias {
@@ -20,6 +21,7 @@ export interface CatalogTrack {
   videoId: string;
   title?: string;
   durationSeconds?: number;
+  easyModeRank?: number;
 }
 
 export interface CatalogTitle {
@@ -50,11 +52,13 @@ export interface RoundResult {
 export interface RoomMetadata {
   roomId: string;
   mode: GameMode;
+  difficulty: GameDifficulty;
   source: RoomSource;
   selectedTitleIds: string[];
 }
 
 export interface GameState {
+  difficulty: GameDifficulty;
   phase:
     | "LOBBY"
     | "COUNTDOWN"

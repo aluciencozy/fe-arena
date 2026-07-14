@@ -17,11 +17,11 @@ import { AppSettings } from "@/components/AppSettings";
 import { Toast } from "@/components/Toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { animeTitles } from "@/data/catalog";
+import { animeTitles, getTracksForDifficulty } from "@/data/catalog";
 import { playSound } from "@/lib/sound";
 import { connectSocket, socket } from "@/lib/socket";
 import { useGameStore } from "@/store/gameStore";
-import type { RoomMetadata } from "@/types";
+import type { GameDifficulty, RoomMetadata } from "@/types";
 
 type HomeView = "play" | "create" | "join" | "queue";
 
@@ -40,6 +40,7 @@ const Home = () => {
   const [selectedTitleIds, setSelectedTitleIds] = useState<string[]>([
     animeTitles[0]?.id ?? "",
   ].filter(Boolean));
+  const [difficulty, setDifficulty] = useState<GameDifficulty>("standard");
   const [notice, setNotice] = useState(
     (location.state as { notice?: string } | null)?.notice ?? "",
   );
@@ -49,10 +50,21 @@ const Home = () => {
   const [queueSeconds, setQueueSeconds] = useState(0);
 
   const trimmedUsername = username.trim();
+  const availableTitles = useMemo(
+    () =>
+      animeTitles.filter(
+        (title) => getTracksForDifficulty(title, difficulty).length > 0,
+      ),
+    [difficulty],
+  );
+  const selectedTitleIdsForDifficulty = useMemo(() => {
+    const availableIds = new Set(availableTitles.map((title) => title.id));
+    return selectedTitleIds.filter((titleId) => availableIds.has(titleId));
+  }, [availableTitles, selectedTitleIds]);
   const filteredTitles = useMemo(() => {
     const query = titleSearch.trim().toLowerCase();
-    if (!query) return animeTitles;
-    return animeTitles.filter((title) =>
+    if (!query) return availableTitles;
+    return availableTitles.filter((title) =>
       [
         title.name,
         title.canonicalTitle,
@@ -65,13 +77,16 @@ const Home = () => {
         .toLowerCase()
         .includes(query),
     );
-  }, [titleSearch]);
+  }, [availableTitles, titleSearch]);
   const selectedTrackCount = useMemo(
     () =>
-      animeTitles
+      availableTitles
         .filter((title) => selectedTitleIds.includes(title.id))
-        .reduce((sum, title) => sum + title.tracks.length, 0),
-    [selectedTitleIds],
+        .reduce(
+          (sum, title) => sum + getTracksForDifficulty(title, difficulty).length,
+          0,
+        ),
+    [availableTitles, difficulty, selectedTitleIds],
   );
 
   useEffect(() => {
@@ -160,12 +175,16 @@ const Home = () => {
     setView("queue");
     setQueueStartedAt(Date.now());
     connectSocket();
-    socket.emit("queue:join", { username: trimmedUsername, mode: "anime" });
+    socket.emit("queue:join", {
+      username: trimmedUsername,
+      mode: "anime",
+      difficulty,
+    });
   };
 
   const createRoom = () => {
     if (!persistUsername()) return;
-    if (selectedTitleIds.length === 0) {
+    if (selectedTitleIdsForDifficulty.length === 0) {
       setNotice("Select at least one anime.");
       playSound("incorrect");
       return;
@@ -177,7 +196,8 @@ const Home = () => {
     socket.emit("room:create-private", {
       username: trimmedUsername,
       mode: "anime",
-      selectedTitleIds,
+      difficulty,
+      selectedTitleIds: selectedTitleIdsForDifficulty,
     });
   };
 
@@ -234,6 +254,8 @@ const Home = () => {
                Can you guess the ost? Pick a name, find a match, and become the soundtrack sovereign.
               </p>
             </div>
+
+            <DifficultyPicker difficulty={difficulty} onChange={setDifficulty} />
 
             <div className="mt-12 grid gap-5 lg:grid-cols-[1fr_1.25fr]">
               <section className="surface p-5 sm:p-6">
@@ -296,7 +318,7 @@ const Home = () => {
             <p className="ui-label mt-8">public matchmaking</p>
             <h1 className="ui-title mt-2 text-4xl">finding your opponent</h1>
             <p className="mt-4 text-muted-foreground">
-              Searching the anime queue for {trimmedUsername}.
+              Searching the {difficulty} anime queue for {trimmedUsername}.
             </p>
             <div className="mt-8 flex items-center gap-2 font-mono text-sm text-muted-foreground">
               <Clock3 size={15} /> {queueSeconds}s elapsed
@@ -341,6 +363,7 @@ const Home = () => {
 
         {view === "create" && (
           <FocusedShell title="choose the soundtrack pool" onBack={() => setView("play")}>
+            <DifficultyPicker difficulty={difficulty} onChange={setDifficulty} />
             <div className="mb-5 flex flex-col gap-4 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
@@ -352,7 +375,7 @@ const Home = () => {
                 />
               </div>
               <div className="flex items-center justify-between gap-5 font-mono text-xs lowercase text-muted-foreground">
-                <span>{selectedTitleIds.length} selected</span>
+                <span>{selectedTitleIdsForDifficulty.length} selected</span>
                 <span>{selectedTrackCount} tracks</span>
               </div>
             </div>
@@ -378,7 +401,7 @@ const Home = () => {
                       </span>
                       <div>
                         <p className="line-clamp-2 font-semibold leading-snug">{title.canonicalTitle}</p>
-                        <p className="ui-label mt-1">{title.tracks.length} tracks</p>
+                        <p className="ui-label mt-1">{getTracksForDifficulty(title, difficulty).length} tracks</p>
                       </div>
                     </div>
                   </button>
@@ -389,7 +412,7 @@ const Home = () => {
             <div className="sticky bottom-4 mt-6 flex justify-end">
               <Button
                 type="button"
-                disabled={isCreating || selectedTitleIds.length === 0}
+                disabled={isCreating || selectedTitleIdsForDifficulty.length === 0}
                 onClick={createRoom}
                 className="h-12 rounded-md px-6 font-mono text-sm lowercase"
               >
@@ -405,6 +428,39 @@ const Home = () => {
     </div>
   );
 };
+
+const DifficultyPicker = ({ difficulty, onChange }: { difficulty: GameDifficulty; onChange: (difficulty: GameDifficulty) => void }) => (
+  <section className="surface mb-5 p-4 sm:p-5">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="ui-label">difficulty</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Easy mode uses up to 10 tracks per anime.
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-2" role="group" aria-label="Game difficulty">
+        {(["standard", "easy"] as const).map((option) => (
+          <button
+            key={option}
+            type="button"
+            aria-pressed={difficulty === option}
+            onClick={() => {
+              playSound("select");
+              onChange(option);
+            }}
+            className={`rounded-md border px-4 py-2 font-mono text-xs lowercase transition-colors ${
+              difficulty === option
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border text-muted-foreground hover:bg-secondary hover:text-foreground"
+            }`}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+    </div>
+  </section>
+);
 
 const PathCard = ({ icon, label, description, onClick }: { icon: React.ReactNode; label: string; description: string; onClick: () => void }) => (
   <button type="button" onClick={onClick} className="interactive surface group p-5 text-left hover:bg-secondary">

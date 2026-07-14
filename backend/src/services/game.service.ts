@@ -1,12 +1,15 @@
 import type {
   AnswerAlias,
   AnswerOption,
+  CatalogTitle,
+  GameDifficulty,
   GameState,
   RoundResult,
 } from "../types/index.js";
 import { getRoomMetadata } from "./room.service.js";
 import {
   getAnswerOptionsForTitles,
+  getTracksForDifficulty,
   getPlayableTitlesForMode,
   getTitlesForTitleIds,
 } from "../data/catalog.js";
@@ -18,7 +21,7 @@ const REVEAL_SECONDS = 6;
 const STARTING_HEALTH = 5000;
 
 type TimerHandle = ReturnType<typeof setTimeout>;
-type PlaylistTrack = {
+export type PlaylistTrack = {
   id: string;
   videoId: string;
   title?: string;
@@ -73,33 +76,27 @@ const getTitlesForRoom = (roomId: string) => {
   if (!metadata || metadata.mode === "video-game") return [];
 
   if (metadata.source === "private") {
-    return getTitlesForTitleIds(metadata.mode, metadata.selectedTitleIds);
+    return getTitlesForTitleIds(
+      metadata.mode,
+      metadata.selectedTitleIds,
+      metadata.difficulty,
+    );
   }
 
-  return getPlayableTitlesForMode(metadata.mode);
+  return getPlayableTitlesForMode(metadata.mode, metadata.difficulty);
 };
+
+const getDifficultyForRoom = (roomId: string): GameDifficulty =>
+  getRoomMetadata(roomId)?.difficulty ?? "standard";
 
 const getAnswerOptionsForRoom = (roomId: string): AnswerOption[] =>
   getAnswerOptionsForTitles(getTitlesForRoom(roomId));
 
-const getPlaylistForRoom = (roomId: string): PlaylistTrack[] => {
-  return getTitlesForRoom(roomId).flatMap((title) =>
-    title.tracks.map((track) => ({
-      ...track,
-      titleId: title.id,
-      canonicalTitle: title.canonicalTitle,
-      romajiName: title.romajiName ?? null,
-      nativeName: title.nativeName ?? null,
-      answerAliases: title.answerAliases,
-    })),
-  );
-};
-
-const shufflePlaylist = (playlist: PlaylistTrack[]) => {
+const shufflePlaylist = <T>(playlist: T[], random = Math.random) => {
   const shuffled = [...playlist];
 
   for (let index = shuffled.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
+    const swapIndex = Math.floor(random() * (index + 1));
     [shuffled[index], shuffled[swapIndex]] = [
       shuffled[swapIndex]!,
       shuffled[index]!,
@@ -107,6 +104,53 @@ const shufflePlaylist = (playlist: PlaylistTrack[]) => {
   }
 
   return shuffled;
+};
+
+export const buildBalancedPlaylist = (
+  groups: PlaylistTrack[][],
+  random = Math.random,
+) => {
+  const shuffledGroups = groups
+    .filter((group) => group.length > 0)
+    .map((group) => shufflePlaylist(group, random));
+  const slotsPerGroup = Math.max(
+    0,
+    ...shuffledGroups.map((group) => group.length),
+  );
+  const playlist: PlaylistTrack[] = [];
+
+  // Preserve every track while giving every anime the same number of slots.
+  // Shorter pools intentionally sample with replacement to keep that balance.
+  for (let round = 0; round < slotsPerGroup; round += 1) {
+    for (const group of shufflePlaylist(shuffledGroups, random)) {
+      playlist.push(group[round % group.length]!);
+    }
+  }
+
+  return playlist;
+};
+
+const toPlaylistTrack = (
+  title: CatalogTitle,
+  track: CatalogTitle["tracks"][number],
+): PlaylistTrack => ({
+  ...track,
+  titleId: title.id,
+  canonicalTitle: title.canonicalTitle,
+  romajiName: title.romajiName ?? null,
+  nativeName: title.nativeName ?? null,
+  answerAliases: title.answerAliases,
+});
+
+const getPlaylistForRoom = (roomId: string): PlaylistTrack[] => {
+  const difficulty = getDifficultyForRoom(roomId);
+  const groups = getTitlesForRoom(roomId).map((title) =>
+    getTracksForDifficulty(title, difficulty).map((track) =>
+      toPlaylistTrack(title, track),
+    ),
+  );
+
+  return buildBalancedPlaylist(groups);
 };
 
 const getCurrentPlaylistItem = (record: GameRecord) =>
@@ -164,7 +208,9 @@ const clearTimers = (record: GameRecord) => {
 const makeInitialState = (
   players: string[],
   answerOptions: AnswerOption[] = [],
+  difficulty: GameDifficulty = "standard",
 ): GameState => ({
+  difficulty,
   phase: "LOBBY",
   currentRound: 0,
   health: createHealth(players),
@@ -459,10 +505,14 @@ export const ensureGameForRoom = (
   const existing = games.get(roomId);
 
   if (!existing) {
-    const state = makeInitialState(players, getAnswerOptionsForRoom(roomId));
+    const state = makeInitialState(
+      players,
+      getAnswerOptionsForRoom(roomId),
+      getDifficultyForRoom(roomId),
+    );
     games.set(roomId, {
       state,
-      playlist: shufflePlaylist(getPlaylistForRoom(roomId)),
+      playlist: getPlaylistForRoom(roomId),
       countdownTimer: undefined,
       roundTimer: undefined,
       graceTimer: undefined,
@@ -495,8 +545,12 @@ export const setPlayerReady = (
   events: GameEvents,
 ): { ok: true; state: GameState } | { ok: false; error: string } => {
   const record = games.get(roomId) || {
-    state: makeInitialState(players, getAnswerOptionsForRoom(roomId)),
-    playlist: shufflePlaylist(getPlaylistForRoom(roomId)),
+    state: makeInitialState(
+      players,
+      getAnswerOptionsForRoom(roomId),
+      getDifficultyForRoom(roomId),
+    ),
+    playlist: getPlaylistForRoom(roomId),
     countdownTimer: undefined,
     roundTimer: undefined,
     graceTimer: undefined,
@@ -519,14 +573,18 @@ export const setPlayerReady = (
   record.state.ready[username] = !record.state.ready[username];
 
   if (players.every((player) => record.state.ready[player])) {
-    const playlist = shufflePlaylist(getPlaylistForRoom(roomId));
+    const playlist = getPlaylistForRoom(roomId);
     if (playlist.length === 0) {
       return { ok: false, error: "This room has no playable songs." };
     }
 
     clearTimers(record);
     record.playlist = playlist;
-    record.state = makeInitialState(players, getAnswerOptionsForRoom(roomId));
+    record.state = makeInitialState(
+      players,
+      getAnswerOptionsForRoom(roomId),
+      getDifficultyForRoom(roomId),
+    );
     record.state.ready = createReady(players, true);
     startCountdown(roomId, players, events);
   } else {

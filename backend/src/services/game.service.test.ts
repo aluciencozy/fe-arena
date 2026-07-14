@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildBalancedPlaylist,
   calculateGuessDamage,
   clearGameForRoom,
   getGameState,
@@ -9,8 +10,69 @@ import {
   resumeGameAfterReconnect,
   setPlayerReady,
 } from "./game.service.js";
-import { getPlayableTitlesForMode } from "../data/catalog.js";
+import {
+  getPlayableTitlesForMode,
+  getTracksForDifficulty,
+} from "../data/catalog.js";
+import type { CatalogTitle } from "../types/index.js";
+import type { PlaylistTrack } from "./game.service.js";
 import { addPlayerToRoom, createRoom, removePlayerFromRoom } from "./room.service.js";
+
+const makeTrack = (titleId: string, index: number): PlaylistTrack => ({
+  id: `${titleId}-${index}`,
+  videoId: `${titleId}-video-${index}`,
+  title: `${titleId} track ${index}`,
+  titleId,
+  canonicalTitle: titleId,
+  romajiName: null,
+  nativeName: null,
+  answerAliases: [],
+});
+
+test("playlist rotation gives each anime the same number of slots", () => {
+  const playlist = buildBalancedPlaylist(
+    [
+      [makeTrack("one", 1), makeTrack("one", 2), makeTrack("one", 3)],
+      [makeTrack("two", 1)],
+      [makeTrack("three", 1), makeTrack("three", 2)],
+    ],
+    () => 0,
+  );
+  const counts = playlist.reduce<Record<string, number>>((result, track) => {
+    result[track.titleId] = (result[track.titleId] ?? 0) + 1;
+    return result;
+  }, {});
+
+  assert.deepEqual(counts, { one: 3, two: 3, three: 3 });
+});
+
+test("easy mode keeps each anime to at most ten ranked tracks", () => {
+  const title = getPlayableTitlesForMode("anime")[0];
+  assert.ok(title);
+  const easyTrackCount = getTracksForDifficulty(title, "easy").length;
+  assert.ok(easyTrackCount > 0 && easyTrackCount <= 10);
+});
+
+test("easy mode honors explicit track ranks", () => {
+  const title: CatalogTitle = {
+    id: "custom-title",
+    mode: "anime",
+    name: "Custom title",
+    canonicalTitle: "Custom title",
+    coverImageUrl: "https://example.com/cover.jpg",
+    answerAliases: [],
+    tracks: [
+      { id: "rank-one", videoId: "one", easyModeRank: 1 },
+      { id: "rank-ten", videoId: "ten", easyModeRank: 10 },
+      { id: "rank-eleven", videoId: "eleven", easyModeRank: 11 },
+    ],
+  };
+
+  assert.deepEqual(
+    getTracksForDifficulty(title, "easy").map((track) => track.id),
+    ["rank-one", "rank-ten"],
+  );
+});
 
 test("a guess four seconds later retains most of its damage", () => {
   const immediateDamage = calculateGuessDamage(0, 1);

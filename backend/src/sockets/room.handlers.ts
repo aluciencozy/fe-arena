@@ -23,9 +23,13 @@ import {
   getTitlesForTitleIds,
 } from "../data/catalog.js";
 import { enqueuePlayer, removeFromQueue } from "../services/queue.service.js";
-import type { GameMode } from "../types/index.js";
+import type { GameDifficulty, GameMode } from "../types/index.js";
 
 const isPlayableMode = (mode: GameMode) => mode === "anime";
+const isPlayableDifficulty = (
+  difficulty: unknown,
+): difficulty is GameDifficulty =>
+  difficulty === "standard" || difficulty === "easy";
 const RECONNECT_GRACE_MS = 20_000;
 const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -77,10 +81,12 @@ export const registerRoomHandler = (io: Server, socket: Socket) => {
     ({
       username,
       mode,
+      difficulty = "standard",
       selectedTitleIds,
     }: {
       username: string;
       mode: GameMode;
+      difficulty?: GameDifficulty;
       selectedTitleIds: string[];
     }) => {
       if (!username || !username.trim()) {
@@ -93,19 +99,35 @@ export const registerRoomHandler = (io: Server, socket: Socket) => {
         return;
       }
 
+      if (!isPlayableDifficulty(difficulty)) {
+        socket.emit("room:error", "That difficulty is not available.");
+        return;
+      }
+
       if (!selectedTitleIds || selectedTitleIds.length === 0) {
         socket.emit("room:error", "Select at least one anime.");
         return;
       }
 
-      const selectedTitles = getTitlesForTitleIds(mode, selectedTitleIds);
-      if (selectedTitles.length === 0) {
-        socket.emit("room:error", "The selected anime have no playable songs.");
+      const selectedTitles = getTitlesForTitleIds(
+        mode,
+        selectedTitleIds,
+        difficulty,
+      );
+      if (
+        selectedTitles.length === 0 ||
+        selectedTitles.length !== new Set(selectedTitleIds).size
+      ) {
+        socket.emit(
+          "room:error",
+          "Every selected anime must have playable songs for this difficulty.",
+        );
         return;
       }
 
       const metadata = createRoom({
         mode,
+        difficulty,
         source: "private",
         selectedTitleIds,
       });
@@ -139,7 +161,11 @@ export const registerRoomHandler = (io: Server, socket: Socket) => {
 
   socket.on(
     "queue:join",
-    ({ username, mode }: { username: string; mode: GameMode }) => {
+    ({ username, mode, difficulty = "standard" }: {
+      username: string;
+      mode: GameMode;
+      difficulty?: GameDifficulty;
+    }) => {
       if (!username || !username.trim()) {
         socket.emit("queue:error", "Username is required.");
         return;
@@ -150,13 +176,23 @@ export const registerRoomHandler = (io: Server, socket: Socket) => {
         return;
       }
 
-      if (getPlayableTitlesForMode(mode).length === 0) {
+      if (!isPlayableDifficulty(difficulty)) {
+        socket.emit("queue:error", "That difficulty is not available.");
+        return;
+      }
+
+      if (getPlayableTitlesForMode(mode, difficulty).length === 0) {
         socket.emit("queue:error", "This mode has no playable songs yet.");
         return;
       }
 
       const normalizedUsername = username.trim();
-      const queueResult = enqueuePlayer(socket.id, normalizedUsername, mode);
+      const queueResult = enqueuePlayer(
+        socket.id,
+        normalizedUsername,
+        mode,
+        difficulty,
+      );
 
       if (queueResult.status === "waiting") {
         socket.emit("queue:waiting");
@@ -168,12 +204,13 @@ export const registerRoomHandler = (io: Server, socket: Socket) => {
       );
       if (!opponentSocket) {
         socket.emit("queue:waiting");
-        enqueuePlayer(socket.id, normalizedUsername, mode);
+        enqueuePlayer(socket.id, normalizedUsername, mode, difficulty);
         return;
       }
 
       const metadata = createRoom({
         mode,
+        difficulty,
         source: "queue",
         selectedTitleIds: [],
       });
