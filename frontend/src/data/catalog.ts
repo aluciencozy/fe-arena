@@ -1,5 +1,5 @@
 import { anilistAnimeCandidates } from "../../../data/anilist-anime-candidates.catalog";
-import type { CatalogTitle, GameDifficulty } from "@/types";
+import type { AnimePlaylist, CatalogTitle } from "@/types";
 import { EASY_MODE_TRACK_LIMIT } from "../../../shared/game.constants";
 
 type SourceTrack = (typeof anilistAnimeCandidates)[number]["tracks"][number];
@@ -43,6 +43,7 @@ export const catalogTitles: CatalogTitle[] = anilistAnimeCandidates.map(
           videoId: track.videoId,
           title: track.title,
           durationSeconds: track.durationSeconds,
+          category: track.category,
           ...(easyModeRank === undefined ? {} : { easyModeRank }),
         };
       }),
@@ -50,12 +51,22 @@ export const catalogTitles: CatalogTitle[] = anilistAnimeCandidates.map(
   },
 );
 
-export const getTracksForDifficulty = (
+export const getTracksForPlaylist = (
   title: CatalogTitle,
-  difficulty: GameDifficulty = "standard",
-) =>
-  difficulty === "easy"
-    ? title.tracks
+  playlist: AnimePlaylist = "standard",
+) => {
+  const soundtrackTracks = title.tracks.filter(
+    (track) => track.category === "ost",
+  );
+
+  if (playlist === "op-ed") {
+    return title.tracks.filter(
+      (track) => track.category === "opening" || track.category === "ending",
+    );
+  }
+
+  return playlist === "easy"
+    ? soundtrackTracks
         .filter(
           (track) =>
             typeof track.easyModeRank === "number" &&
@@ -65,8 +76,9 @@ export const getTracksForDifficulty = (
         )
         .sort((left, right) => left.easyModeRank! - right.easyModeRank!)
         .slice(0, EASY_MODE_TRACK_LIMIT)
-    : title.tracks;
+    : soundtrackTracks;
+};
 
 export const animeTitles = catalogTitles.filter(
-  (title) => title.mode === "anime" && getTracksForDifficulty(title).length > 0,
+  (title) => title.mode === "anime",
 );

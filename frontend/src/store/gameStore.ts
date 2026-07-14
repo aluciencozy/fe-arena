@@ -77,7 +77,7 @@ export const useGameStore = create<PlayerState>((set) => ({
 }));
 
 export const useGameStateStore = create<GameStore>((set) => ({
-  difficulty: "standard",
+  playlist: "standard",
   phase: "LOBBY",
   currentRound: 0,
   health: {},

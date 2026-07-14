@@ -23,13 +23,11 @@ import {
   getTitlesForTitleIds,
 } from "../data/catalog.js";
 import { enqueuePlayer, removeFromQueue } from "../services/queue.service.js";
-import type { GameDifficulty, GameMode } from "../types/index.js";
+import type { AnimePlaylist, GameMode } from "../types/index.js";
 
 const isPlayableMode = (mode: GameMode) => mode === "anime";
-const isPlayableDifficulty = (
-  difficulty: unknown,
-): difficulty is GameDifficulty =>
-  difficulty === "standard" || difficulty === "easy";
+const isPlayablePlaylist = (playlist: unknown): playlist is AnimePlaylist =>
+  playlist === "standard" || playlist === "easy" || playlist === "op-ed";
 const RECONNECT_GRACE_MS = 20_000;
 const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -81,12 +79,12 @@ export const registerRoomHandler = (io: Server, socket: Socket) => {
     ({
       username,
       mode,
-      difficulty = "standard",
+      playlist = "standard",
       selectedTitleIds,
     }: {
       username: string;
       mode: GameMode;
-      difficulty?: GameDifficulty;
+      playlist?: AnimePlaylist;
       selectedTitleIds: string[];
     }) => {
       if (!username || !username.trim()) {
@@ -99,8 +97,8 @@ export const registerRoomHandler = (io: Server, socket: Socket) => {
         return;
       }
 
-      if (!isPlayableDifficulty(difficulty)) {
-        socket.emit("room:error", "That difficulty is not available.");
+      if (!isPlayablePlaylist(playlist)) {
+        socket.emit("room:error", "That playlist is not available.");
         return;
       }
 
@@ -112,7 +110,7 @@ export const registerRoomHandler = (io: Server, socket: Socket) => {
       const selectedTitles = getTitlesForTitleIds(
         mode,
         selectedTitleIds,
-        difficulty,
+        playlist,
       );
       if (
         selectedTitles.length === 0 ||
@@ -120,14 +118,14 @@ export const registerRoomHandler = (io: Server, socket: Socket) => {
       ) {
         socket.emit(
           "room:error",
-          "Every selected anime must have playable songs for this difficulty.",
+          "Every selected anime must have playable songs for this playlist.",
         );
         return;
       }
 
       const metadata = createRoom({
         mode,
-        difficulty,
+        playlist,
         source: "private",
         selectedTitleIds,
       });
@@ -161,10 +159,10 @@ export const registerRoomHandler = (io: Server, socket: Socket) => {
 
   socket.on(
     "queue:join",
-    ({ username, mode, difficulty = "standard" }: {
+    ({ username, mode, playlist = "standard" }: {
       username: string;
       mode: GameMode;
-      difficulty?: GameDifficulty;
+      playlist?: AnimePlaylist;
     }) => {
       if (!username || !username.trim()) {
         socket.emit("queue:error", "Username is required.");
@@ -176,13 +174,13 @@ export const registerRoomHandler = (io: Server, socket: Socket) => {
         return;
       }
 
-      if (!isPlayableDifficulty(difficulty)) {
-        socket.emit("queue:error", "That difficulty is not available.");
+      if (!isPlayablePlaylist(playlist)) {
+        socket.emit("queue:error", "That playlist is not available.");
         return;
       }
 
-      if (getPlayableTitlesForMode(mode, difficulty).length === 0) {
-        socket.emit("queue:error", "This mode has no playable songs yet.");
+      if (getPlayableTitlesForMode(mode, playlist).length === 0) {
+        socket.emit("queue:error", "This playlist has no playable songs yet.");
         return;
       }
 
@@ -191,7 +189,7 @@ export const registerRoomHandler = (io: Server, socket: Socket) => {
         socket.id,
         normalizedUsername,
         mode,
-        difficulty,
+        playlist,
       );
 
       if (queueResult.status === "waiting") {
@@ -204,13 +202,13 @@ export const registerRoomHandler = (io: Server, socket: Socket) => {
       );
       if (!opponentSocket) {
         socket.emit("queue:waiting");
-        enqueuePlayer(socket.id, normalizedUsername, mode, difficulty);
+        enqueuePlayer(socket.id, normalizedUsername, mode, playlist);
         return;
       }
 
       const metadata = createRoom({
         mode,
-        difficulty,
+        playlist,
         source: "queue",
         selectedTitleIds: [],
       });

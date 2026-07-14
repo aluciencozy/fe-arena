@@ -5,6 +5,7 @@ import {
   calculateGuessDamage,
   clearGameForRoom,
   getGameState,
+  getRandomVideoStartTime,
   handleGuess,
   pauseGameForReconnect,
   resumeGameAfterReconnect,
@@ -12,7 +13,7 @@ import {
 } from "./game.service.js";
 import {
   getPlayableTitlesForMode,
-  getTracksForDifficulty,
+  getTracksForPlaylist,
 } from "../data/catalog.js";
 import type { CatalogTitle } from "../types/index.js";
 import type { PlaylistTrack } from "./game.service.js";
@@ -27,6 +28,54 @@ const makeTrack = (titleId: string, index: number): PlaylistTrack => ({
   romajiName: null,
   nativeName: null,
   answerAliases: [],
+});
+
+test("random starts leave room for the complete 30-second excerpt", () => {
+  assert.equal(
+    getRandomVideoStartTime(
+      { ...makeTrack("long", 1), durationSeconds: 100 },
+      () => 0.75,
+    ),
+    52.5,
+  );
+  assert.equal(
+    getRandomVideoStartTime(
+      { ...makeTrack("short", 1), durationSeconds: 20 },
+      () => 0.75,
+    ),
+    0,
+  );
+});
+
+test("an OP & ED room builds rounds from theme tracks only", (context) => {
+  context.mock.timers.enable({ apis: ["Date", "setTimeout"], now: 500_000 });
+  const title = getPlayableTitlesForMode("anime", "op-ed")[0];
+  assert.ok(title);
+  const room = createRoom({
+    mode: "anime",
+    playlist: "op-ed",
+    source: "private",
+    selectedTitleIds: [title.id],
+  });
+  addPlayerToRoom(room.roomId, "A", "op-ed-socket-a");
+  addPlayerToRoom(room.roomId, "B", "op-ed-socket-b");
+  const events = { emitState: () => undefined, emitSystemMessage: () => undefined };
+
+  setPlayerReady(room.roomId, "A", ["A", "B"], events);
+  setPlayerReady(room.roomId, "B", ["A", "B"], events);
+  context.mock.timers.tick(3_000);
+
+  const state = getGameState(room.roomId);
+  assert.equal(state?.playlist, "op-ed");
+  assert.ok(
+    getTracksForPlaylist(title, "op-ed").some(
+      (track) => track.videoId === state?.currentVideoID,
+    ),
+  );
+
+  clearGameForRoom(room.roomId);
+  removePlayerFromRoom("op-ed-socket-a");
+  removePlayerFromRoom("op-ed-socket-b");
 });
 
 test("playlist rotation gives each anime the same number of slots", () => {
@@ -49,7 +98,7 @@ test("playlist rotation gives each anime the same number of slots", () => {
 test("easy mode keeps each anime to at most ten ranked tracks", () => {
   const title = getPlayableTitlesForMode("anime")[0];
   assert.ok(title);
-  const easyTrackCount = getTracksForDifficulty(title, "easy").length;
+  const easyTrackCount = getTracksForPlaylist(title, "easy").length;
   assert.ok(easyTrackCount > 0 && easyTrackCount <= 10);
 });
 
@@ -62,14 +111,14 @@ test("easy mode honors explicit track ranks", () => {
     coverImageUrl: "https://example.com/cover.jpg",
     answerAliases: [],
     tracks: [
-      { id: "rank-one", videoId: "one", easyModeRank: 1 },
-      { id: "rank-ten", videoId: "ten", easyModeRank: 10 },
-      { id: "rank-eleven", videoId: "eleven", easyModeRank: 11 },
+      { id: "rank-one", videoId: "one", easyModeRank: 1, category: "ost" },
+      { id: "rank-ten", videoId: "ten", easyModeRank: 10, category: "ost" },
+      { id: "rank-eleven", videoId: "eleven", easyModeRank: 11, category: "ost" },
     ],
   };
 
   assert.deepEqual(
-    getTracksForDifficulty(title, "easy").map((track) => track.id),
+    getTracksForPlaylist(title, "easy").map((track) => track.id),
     ["rank-one", "rank-ten"],
   );
 });

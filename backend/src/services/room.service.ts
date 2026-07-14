@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type {
-  GameDifficulty,
+  AnimePlaylist,
   GameMode,
   RoomMetadata,
   RoomSource,
@@ -46,12 +46,12 @@ export const generateUniqueRoomId = () => {
 
 export const createRoom = ({
   mode,
-  difficulty = "standard",
+  playlist = "standard",
   source,
   selectedTitleIds,
 }: {
   mode: GameMode;
-  difficulty?: GameDifficulty;
+  playlist?: AnimePlaylist;
   source: RoomSource;
   selectedTitleIds: string[];
 }) => {
@@ -61,7 +61,7 @@ export const createRoom = ({
   roomMetadata.set(roomId, {
     roomId,
     mode,
-    difficulty,
+    playlist,
     source,
     selectedTitleIds,
   });

@@ -1,5 +1,6 @@
 export type GameMode = "anime" | "video-game";
-export type GameDifficulty = "standard" | "easy";
+export type AnimePlaylist = "standard" | "easy" | "op-ed";
+export type AnimeTrackCategory = "ost" | "opening" | "ending";
 export type RoomSource = "private" | "queue";
 
 export interface AnswerAlias {
@@ -22,6 +23,7 @@ export interface CatalogTrack {
   title?: string;
   durationSeconds?: number;
   easyModeRank?: number;
+  category: AnimeTrackCategory;
 }
 
 export interface CatalogTitle {
@@ -52,13 +54,13 @@ export interface RoundResult {
 export interface RoomMetadata {
   roomId: string;
   mode: GameMode;
-  difficulty: GameDifficulty;
+  playlist: AnimePlaylist;
   source: RoomSource;
   selectedTitleIds: string[];
 }
 
 export interface GameState {
-  difficulty: GameDifficulty;
+  playlist: AnimePlaylist;
   phase:
     | "LOBBY"
     | "COUNTDOWN"

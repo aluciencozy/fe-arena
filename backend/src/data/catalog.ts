@@ -1,8 +1,8 @@
 import { anilistAnimeCandidates } from "../../../data/anilist-anime-candidates.catalog.js";
 import type {
   AnswerOption,
+  AnimePlaylist,
   CatalogTitle,
-  GameDifficulty,
 } from "../types/index.js";
 import { EASY_MODE_TRACK_LIMIT } from "../../../shared/game.constants.js";
 
@@ -49,6 +49,7 @@ export const catalogTitles: CatalogTitle[] = anilistAnimeCandidates.map(
           videoId: track.videoId,
           title: track.title,
           durationSeconds: track.durationSeconds,
+          category: track.category,
           ...(easyModeRank === undefined ? {} : { easyModeRank }),
         };
       }),
@@ -59,12 +60,22 @@ export const catalogTitles: CatalogTitle[] = anilistAnimeCandidates.map(
 export const getCatalogTitlesForMode = (mode: CatalogTitle["mode"]) =>
   catalogTitles.filter((title) => title.mode === mode);
 
-export const getTracksForDifficulty = (
+export const getTracksForPlaylist = (
   title: CatalogTitle,
-  difficulty: GameDifficulty = "standard",
-) =>
-  difficulty === "easy"
-    ? title.tracks
+  playlist: AnimePlaylist = "standard",
+) => {
+  const soundtrackTracks = title.tracks.filter(
+    (track) => track.category === "ost",
+  );
+
+  if (playlist === "op-ed") {
+    return title.tracks.filter(
+      (track) => track.category === "opening" || track.category === "ending",
+    );
+  }
+
+  return playlist === "easy"
+    ? soundtrackTracks
         .filter(
           (track) =>
             typeof track.easyModeRank === "number" &&
@@ -74,23 +85,24 @@ export const getTracksForDifficulty = (
         )
         .sort((left, right) => left.easyModeRank! - right.easyModeRank!)
         .slice(0, EASY_MODE_TRACK_LIMIT)
-    : title.tracks;
+    : soundtrackTracks;
+};
 
 export const getPlayableTitlesForMode = (
   mode: CatalogTitle["mode"],
-  difficulty: GameDifficulty = "standard",
+  playlist: AnimePlaylist = "standard",
 ) =>
   getCatalogTitlesForMode(mode).filter(
-    (title) => getTracksForDifficulty(title, difficulty).length > 0,
+    (title) => getTracksForPlaylist(title, playlist).length > 0,
   );
 
 export const getTitlesForTitleIds = (
   mode: CatalogTitle["mode"],
   titleIds: string[],
-  difficulty: GameDifficulty = "standard",
+  playlist: AnimePlaylist = "standard",
 ) => {
   const selectedIds = new Set(titleIds);
-  return getPlayableTitlesForMode(mode, difficulty).filter((title) =>
+  return getPlayableTitlesForMode(mode, playlist).filter((title) =>
     selectedIds.has(title.id),
   );
 };

@@ -27,7 +27,7 @@ import { useSocket } from "@/hooks/useSocket";
 import { playSound } from "@/lib/sound";
 import { getCountdownSeconds, shouldPlayCountdownCue } from "@/lib/timers";
 import { useGameStateStore, useGameStore } from "@/store/gameStore";
-import type { AnswerOption, RoundResult, UnifiedMessage } from "@/types";
+import type { AnimePlaylist, AnswerOption, RoundResult, UnifiedMessage } from "@/types";
 
 const normalizeRoomCode = (value: string) =>
   value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
@@ -42,7 +42,7 @@ const Room = () => {
   const volume = useGameStore((state) => state.volume);
   const musicMuted = useGameStore((state) => state.musicMuted);
   const phase = useGameStateStore((state) => state.phase);
-  const difficulty = useGameStateStore((state) => state.difficulty);
+  const playlist = useGameStateStore((state) => state.playlist);
   const currentRound = useGameStateStore((state) => state.currentRound);
   const health = useGameStateStore((state) => state.health);
   const pendingDamage = useGameStateStore((state) => state.pendingDamage);
@@ -301,7 +301,7 @@ const Room = () => {
             <Home size={17} />
           </button>
           <div className="min-w-0 flex-1">
-            <p className="ui-label">anime · {difficulty} mode</p>
+            <p className="ui-label">anime · {playlist === "op-ed" ? "OP & ED" : playlist} playlist</p>
             <p className="ui-title truncate text-sm">{phaseLabel(phase)}</p>
           </div>
           <button type="button" onClick={copyCode} className="interactive hidden items-center gap-3 rounded-md border border-border bg-card px-3 py-2 sm:flex">
@@ -342,7 +342,7 @@ const Room = () => {
           {phase === "LOBBY" ? (
             <Lobby
               roomCode={roomCode}
-              difficulty={difficulty}
+              playlist={playlist}
               playerName={playerName}
               opponentName={opponentName}
               selfReady={selfReady}
@@ -464,12 +464,12 @@ const Room = () => {
   );
 };
 
-const Lobby = ({ roomCode, difficulty, playerName, opponentName, selfReady, opponentReady, inputValue, setInputValue, onSubmit, onReady, onCopy, copyMessage, recentActivity, unreadCount, onOpenActivity }: {
-  roomCode: string; difficulty: string; playerName: string; opponentName: string | null; selfReady: boolean; opponentReady: boolean; inputValue: string; setInputValue: (value: string) => void; onSubmit: (event: React.FormEvent) => void; onReady: () => void; onCopy: () => void; copyMessage: string; recentActivity: UnifiedMessage[]; unreadCount: number; onOpenActivity: () => void;
+const Lobby = ({ roomCode, playlist, playerName, opponentName, selfReady, opponentReady, inputValue, setInputValue, onSubmit, onReady, onCopy, copyMessage, recentActivity, unreadCount, onOpenActivity }: {
+  roomCode: string; playlist: AnimePlaylist; playerName: string; opponentName: string | null; selfReady: boolean; opponentReady: boolean; inputValue: string; setInputValue: (value: string) => void; onSubmit: (event: React.FormEvent) => void; onReady: () => void; onCopy: () => void; copyMessage: string; recentActivity: UnifiedMessage[]; unreadCount: number; onOpenActivity: () => void;
 }) => (
   <section className="page-enter mx-auto flex min-h-[calc(100vh-8rem)] max-w-4xl flex-col justify-center">
     <div className="text-center">
-      <p className="ui-label">private lobby · {difficulty} mode</p>
+      <p className="ui-label">private lobby · {playlist === "op-ed" ? "OP & ED" : playlist} playlist</p>
       <h1 className="ui-title mt-2 text-3xl sm:text-5xl">ready when you are</h1>
       <button type="button" onClick={onCopy} className="interactive mx-auto mt-5 flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 font-mono text-xs uppercase tracking-[0.2em]">
         {roomCode}<Clipboard size={14} /><span className="normal-case tracking-normal text-muted-foreground">{copyMessage}</span>

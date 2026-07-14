@@ -1,15 +1,15 @@
 import type {
   AnswerAlias,
   AnswerOption,
+  AnimePlaylist,
   CatalogTitle,
-  GameDifficulty,
   GameState,
   RoundResult,
 } from "../types/index.js";
 import { getRoomMetadata } from "./room.service.js";
 import {
   getAnswerOptionsForTitles,
-  getTracksForDifficulty,
+  getTracksForPlaylist,
   getPlayableTitlesForMode,
   getTitlesForTitleIds,
 } from "../data/catalog.js";
@@ -79,15 +79,15 @@ const getTitlesForRoom = (roomId: string) => {
     return getTitlesForTitleIds(
       metadata.mode,
       metadata.selectedTitleIds,
-      metadata.difficulty,
+      metadata.playlist,
     );
   }
 
-  return getPlayableTitlesForMode(metadata.mode, metadata.difficulty);
+  return getPlayableTitlesForMode(metadata.mode, metadata.playlist);
 };
 
-const getDifficultyForRoom = (roomId: string): GameDifficulty =>
-  getRoomMetadata(roomId)?.difficulty ?? "standard";
+const getPlaylistForRoomMetadata = (roomId: string): AnimePlaylist =>
+  getRoomMetadata(roomId)?.playlist ?? "standard";
 
 const getAnswerOptionsForRoom = (roomId: string): AnswerOption[] =>
   getAnswerOptionsForTitles(getTitlesForRoom(roomId));
@@ -143,9 +143,9 @@ const toPlaylistTrack = (
 });
 
 const getPlaylistForRoom = (roomId: string): PlaylistTrack[] => {
-  const difficulty = getDifficultyForRoom(roomId);
+  const playlist = getPlaylistForRoomMetadata(roomId);
   const groups = getTitlesForRoom(roomId).map((title) =>
-    getTracksForDifficulty(title, difficulty).map((track) =>
+    getTracksForPlaylist(title, playlist).map((track) =>
       toPlaylistTrack(title, track),
     ),
   );
@@ -165,9 +165,14 @@ const getVideoDurationSeconds = (track: PlaylistTrack) => {
     : null;
 };
 
-const getRandomVideoStartTime = (track: PlaylistTrack) => {
+export const getRandomVideoStartTime = (
+  track: PlaylistTrack,
+  random = Math.random,
+) => {
   const durationSeconds = getVideoDurationSeconds(track);
-  return durationSeconds === null ? 0 : Math.random() * durationSeconds;
+  return durationSeconds === null
+    ? 0
+    : random() * Math.max(durationSeconds - ROUND_SECONDS, 0);
 };
 
 const createRoundResult = (
@@ -208,9 +213,9 @@ const clearTimers = (record: GameRecord) => {
 const makeInitialState = (
   players: string[],
   answerOptions: AnswerOption[] = [],
-  difficulty: GameDifficulty = "standard",
+  playlist: AnimePlaylist = "standard",
 ): GameState => ({
-  difficulty,
+  playlist,
   phase: "LOBBY",
   currentRound: 0,
   health: createHealth(players),
@@ -508,7 +513,7 @@ export const ensureGameForRoom = (
     const state = makeInitialState(
       players,
       getAnswerOptionsForRoom(roomId),
-      getDifficultyForRoom(roomId),
+      getPlaylistForRoomMetadata(roomId),
     );
     games.set(roomId, {
       state,
@@ -548,7 +553,7 @@ export const setPlayerReady = (
     state: makeInitialState(
       players,
       getAnswerOptionsForRoom(roomId),
-      getDifficultyForRoom(roomId),
+      getPlaylistForRoomMetadata(roomId),
     ),
     playlist: getPlaylistForRoom(roomId),
     countdownTimer: undefined,
@@ -583,7 +588,7 @@ export const setPlayerReady = (
     record.state = makeInitialState(
       players,
       getAnswerOptionsForRoom(roomId),
-      getDifficultyForRoom(roomId),
+      getPlaylistForRoomMetadata(roomId),
     );
     record.state.ready = createReady(players, true);
     startCountdown(roomId, players, events);

@@ -1,16 +1,16 @@
-import type { GameDifficulty, GameMode } from "../types/index.js";
+import type { AnimePlaylist, GameMode } from "../types/index.js";
 
 interface QueueEntry {
   socketId: string;
   username: string;
   mode: GameMode;
-  difficulty: GameDifficulty;
+  playlist: AnimePlaylist;
 }
 
 const queues = new Map<string, QueueEntry[]>();
 
-const getQueueKey = (mode: GameMode, difficulty: GameDifficulty) =>
-  `${mode}:${difficulty}`;
+const getQueueKey = (mode: GameMode, playlist: AnimePlaylist) =>
+  `${mode}:${playlist}`;
 
 export const removeFromQueue = (socketId: string) => {
   for (const [key, entries] of queues) {
@@ -28,11 +28,11 @@ export const enqueuePlayer = (
   socketId: string,
   username: string,
   mode: GameMode,
-  difficulty: GameDifficulty = "standard",
+  playlist: AnimePlaylist = "standard",
 ): { status: "waiting" } | { status: "matched"; opponent: QueueEntry } => {
   removeFromQueue(socketId);
 
-  const queueKey = getQueueKey(mode, difficulty);
+  const queueKey = getQueueKey(mode, playlist);
   const queue = queues.get(queueKey) || [];
   const opponent = queue.shift();
   queues.set(queueKey, queue);
@@ -41,7 +41,7 @@ export const enqueuePlayer = (
     return { status: "matched", opponent };
   }
 
-  queue.push({ socketId, username, mode, difficulty });
+  queue.push({ socketId, username, mode, playlist });
   queues.set(queueKey, queue);
   return { status: "waiting" };
 };
