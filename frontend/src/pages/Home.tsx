@@ -41,7 +41,7 @@ const Home = () => {
   const [selectedTitleIds, setSelectedTitleIds] = useState<string[]>([
     animeTitles[0]?.id ?? "",
   ].filter(Boolean));
-  const [playlist, setPlaylist] = useState<AnimePlaylist>("standard");
+  const [playlist, setPlaylist] = useState<AnimePlaylist>("easy");
   const [notice, setNotice] = useState(
     (location.state as { notice?: string } | null)?.notice ?? "",
   );
