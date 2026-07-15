@@ -13,8 +13,6 @@ import {
 
 export { getTracksForPlaylist };
 
-type SourceTrack = (typeof anilistAnimeCandidates)[number]["tracks"][number];
-
 export const catalogTitles: CatalogTitle[] = anilistAnimeCandidates.map(
   (candidate) => {
     const hasExplicitRanks = hasExplicitEasyModeRanks(candidate.tracks);
@@ -33,11 +31,17 @@ export const catalogTitles: CatalogTitle[] = anilistAnimeCandidates.map(
           index,
           hasExplicitRanks,
         );
+        const viewCount =
+          "viewCount" in track &&
+          (typeof track.viewCount === "number" || track.viewCount === null)
+            ? track.viewCount
+            : undefined;
         return {
           id: track.id,
           videoId: track.videoId,
           title: track.title,
           durationSeconds: track.durationSeconds,
+          ...(viewCount === undefined ? {} : { viewCount }),
           category: track.category,
           ...(easyModeRank === undefined ? {} : { easyModeRank }),
         };

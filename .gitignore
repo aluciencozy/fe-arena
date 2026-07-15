@@ -50,3 +50,7 @@ copilot-instructions.md
 
 # Generated catalog output. Source of truth is data/anilist-anime-candidates.json.
 data/anilist-anime-candidates.catalog.ts
+
+# Local, approval-gated YouTube catalog inputs and reports.
+data/youtube-playlist-mapping.local.json
+data/youtube-catalog-import-report.local.json
