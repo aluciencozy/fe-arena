@@ -98,6 +98,30 @@ test("resolves mapping entries by checklist anime name", () => {
   assert.equal(resolved.mapping.entries[0].canonicalAnimeId, "anilist-1-one");
 });
 
+test("allows intentional exclusions by checklist anime name", async () => {
+  const result = await buildCatalogFromPlaylists({
+    sourceCandidates,
+    checklist,
+    mapping: {
+      version: 1,
+      excludedAnime: ["Two"],
+      entries: [
+        {
+          anime: "One",
+          playlistUrl: "https://www.youtube.com/playlist?list=ONE",
+          category: "ost",
+        },
+      ],
+    },
+    extract: async () => ({
+      entries: [{ id: "aaaaaaaaaaa", title: "Main Theme", view_count: 1 }],
+    }),
+  });
+
+  assert.equal(result.report.errors.length, 0);
+  assert.deepEqual(result.catalog.map((title) => title.canonicalTitle), ["One"]);
+});
+
 test("ranks merged tracks by views, then playlist order, and preserves easy ranks", async () => {
   const payloads = new Map([
     [

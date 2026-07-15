@@ -51,7 +51,7 @@ cd backend
 npm run generate:franchise-checklist
 ```
 
-Review `data/anime-franchise-checklist.json`, correct the groups or primary entries if needed, and set `approved` to `true`. Copy `data/youtube-playlist-mapping.template.json` to `data/youtube-playlist-mapping.local.json` and replace the placeholders with explicitly categorized playlists. The template shows `ost`, `opening`, and `ending` rows for every approved canonical anime; delete rows for categories you do not have. Use the prefilled human-readable anime names; AniList IDs are not required. Then run:
+Review `data/anime-franchise-checklist.json`, correct the groups or primary entries if needed, and set `approved` to `true`. Copy `data/youtube-playlist-mapping.template.json` to `data/youtube-playlist-mapping.local.json` and replace the placeholders with explicitly categorized playlists. The template shows `ost`, `opening`, and `ending` rows for every approved canonical anime; delete rows for categories you do not have. To intentionally leave an anime out of the game, add its exact checklist name to `excludedAnime`; do not silently omit it from `entries`. Use the prefilled human-readable anime names; AniList IDs are not required. Then run:
 
 ```bash
 npm run refresh:catalog

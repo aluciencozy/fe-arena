@@ -265,7 +265,7 @@ export const validateMapping = (mapping, canonicalIds) => {
 
 export const resolveMappingEntries = (mapping, groups) => {
   if (!mapping || !Array.isArray(mapping.entries)) {
-    return { mapping, errors: [] };
+    return { mapping, excludedCanonicalIds: new Set(), errors: [] };
   }
 
   const errors = [];
@@ -280,6 +280,39 @@ export const resolveMappingEntries = (mapping, groups) => {
     ...reference,
     normalizedNames: reference.names.map(normalizeText),
   }));
+
+  const resolveAnimeName = (animeName, label) => {
+    const normalizedName = normalizeText(animeName);
+    const matches = normalizedReferences.filter((reference) =>
+      reference.normalizedNames.includes(normalizedName),
+    );
+    if (matches.length !== 1) {
+      errors.push(
+        `${label} references ${JSON.stringify(animeName)}, but it matches ${matches.length} canonical anime.`,
+      );
+      return null;
+    }
+    return matches[0].canonicalAnimeId;
+  };
+
+  const excludedCanonicalIds = new Set();
+  if (mapping.excludedAnime !== undefined) {
+    if (!Array.isArray(mapping.excludedAnime)) {
+      errors.push("excludedAnime must be an array of checklist anime names.");
+    } else {
+      mapping.excludedAnime.forEach((animeName, index) => {
+        if (typeof animeName !== "string" || !animeName.trim()) {
+          errors.push(`excludedAnime entry ${index + 1} must be a checklist anime name.`);
+          return;
+        }
+        const canonicalAnimeId = resolveAnimeName(
+          animeName,
+          `excludedAnime entry ${index + 1}`,
+        );
+        if (canonicalAnimeId) excludedCanonicalIds.add(canonicalAnimeId);
+      });
+    }
+  }
 
   const entries = mapping.entries.map((entry, index) => {
     if (!entry || typeof entry !== "object" || typeof entry.canonicalAnimeId === "string") {
@@ -296,23 +329,15 @@ export const resolveMappingEntries = (mapping, groups) => {
       return entry;
     }
 
-    const normalizedName = normalizeText(animeName);
-    const matches = normalizedReferences.filter((reference) =>
-      reference.normalizedNames.includes(normalizedName),
-    );
-    if (matches.length !== 1) {
-      errors.push(
-        `Mapping entry ${index + 1} references ${JSON.stringify(animeName)}, but it matches ${matches.length} canonical anime.`,
-      );
-      return entry;
-    }
+    const canonicalAnimeId = resolveAnimeName(animeName, `Mapping entry ${index + 1}`);
+    if (!canonicalAnimeId) return entry;
     return {
       ...entry,
-      canonicalAnimeId: matches[0].canonicalAnimeId,
+      canonicalAnimeId,
     };
   });
 
-  return { mapping: { ...mapping, entries }, errors };
+  return { mapping: { ...mapping, entries }, excludedCanonicalIds, errors };
 };
 
 export const buildCatalogFromPlaylists = async ({
@@ -336,8 +361,11 @@ export const buildCatalogFromPlaylists = async ({
   }
 
   const groups = Array.isArray(checklist.groups) ? checklist.groups : [];
-  const canonicalIds = groups.map((group) => group.canonicalAnimeId);
   const resolvedMapping = resolveMappingEntries(mapping, groups);
+  const activeGroups = groups.filter(
+    (group) => !resolvedMapping.excludedCanonicalIds.has(group.canonicalAnimeId),
+  );
+  const canonicalIds = activeGroups.map((group) => group.canonicalAnimeId);
   report.errors.push(...resolvedMapping.errors);
   report.errors.push(...validateMapping(resolvedMapping.mapping, canonicalIds));
   if (report.errors.length > 0) return { catalog: null, report };
@@ -465,7 +493,7 @@ export const buildCatalogFromPlaylists = async ({
   if (report.errors.length > 0) return { catalog: null, report };
 
   const catalog = [];
-  for (const group of groups) {
+  for (const group of activeGroups) {
     const primaryId = group.primary?.id ?? group.canonicalAnimeId;
     const sourcePrimary = sourceById.get(primaryId);
     const primary = sourcePrimary ?? {
