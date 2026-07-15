@@ -21,6 +21,7 @@ import { animeTitles, getTracksForPlaylist } from "@/data/catalog";
 import { playSound } from "@/lib/sound";
 import { connectSocket, socket } from "@/lib/socket";
 import { useGameStore } from "@/store/gameStore";
+import { getAnimePlaylistLabel } from "../../../shared/playlist";
 import type { AnimePlaylist, RoomMetadata } from "@/types";
 
 type HomeView = "play" | "create" | "join" | "queue";
@@ -318,7 +319,7 @@ const Home = () => {
             <p className="ui-label mt-8">public matchmaking</p>
             <h1 className="ui-title mt-2 text-4xl">finding your opponent</h1>
             <p className="mt-4 text-muted-foreground">
-              Searching the {playlistLabel(playlist)} anime playlist for {trimmedUsername}.
+              Searching the {getAnimePlaylistLabel(playlist)} anime playlist for {trimmedUsername}.
             </p>
             <div className="mt-8 flex items-center gap-2 font-mono text-sm text-muted-foreground">
               <Clock3 size={15} /> {queueSeconds}s elapsed
@@ -429,9 +430,6 @@ const Home = () => {
   );
 };
 
-const playlistLabel = (playlist: AnimePlaylist) =>
-  playlist === "op-ed" ? "OP & ED" : playlist;
-
 const playlistDescription = (playlist: AnimePlaylist) => {
   if (playlist === "easy") return "Up to 10 ranked soundtrack tracks per anime.";
   if (playlist === "op-ed") return "Full opening and ending themes.";
@@ -439,7 +437,7 @@ const playlistDescription = (playlist: AnimePlaylist) => {
 };
 
 const PlaylistPicker = ({ playlist, onChange }: { playlist: AnimePlaylist; onChange: (playlist: AnimePlaylist) => void }) => (
-  <section className="surface mb-5 p-4 sm:p-5">
+  <section className="surface mt-8 mb-5 p-4 sm:p-5">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <p className="ui-label">playlist</p>
@@ -463,7 +461,7 @@ const PlaylistPicker = ({ playlist, onChange }: { playlist: AnimePlaylist; onCha
                 : "border-border text-muted-foreground hover:bg-secondary hover:text-foreground"
             }`}
           >
-            {playlistLabel(option)}
+            {getAnimePlaylistLabel(option)}
           </button>
         ))}
       </div>

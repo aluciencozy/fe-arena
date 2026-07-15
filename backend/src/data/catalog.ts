@@ -5,30 +5,19 @@ import type {
   CatalogTitle,
 } from "../types/index.js";
 import { EASY_MODE_TRACK_LIMIT } from "../../../shared/game.constants.js";
+import {
+  getEasyModeRank,
+  getTracksForPlaylist,
+  hasExplicitEasyModeRanks,
+} from "../../../shared/playlist.js";
+
+export { getTracksForPlaylist };
 
 type SourceTrack = (typeof anilistAnimeCandidates)[number]["tracks"][number];
 
-const getEasyModeRank = (
-  track: SourceTrack,
-  index: number,
-  hasExplicitRanks: boolean,
-) => {
-  if ("easyModeRank" in track && typeof track.easyModeRank === "number") {
-    return track.easyModeRank;
-  }
-
-  if (hasExplicitRanks) return undefined;
-
-  // The current catalog has no popularity metadata. Until tracks are curated,
-  // use its existing order as a stable seed for the easy-mode pool.
-  return index < EASY_MODE_TRACK_LIMIT ? index + 1 : undefined;
-};
-
 export const catalogTitles: CatalogTitle[] = anilistAnimeCandidates.map(
   (candidate) => {
-    const hasExplicitRanks = candidate.tracks.some((track) =>
-      "easyModeRank" in track,
-    );
+    const hasExplicitRanks = hasExplicitEasyModeRanks(candidate.tracks);
     return {
       id: candidate.id,
       mode: "anime",
@@ -59,34 +48,6 @@ export const catalogTitles: CatalogTitle[] = anilistAnimeCandidates.map(
 
 export const getCatalogTitlesForMode = (mode: CatalogTitle["mode"]) =>
   catalogTitles.filter((title) => title.mode === mode);
-
-export const getTracksForPlaylist = (
-  title: CatalogTitle,
-  playlist: AnimePlaylist = "standard",
-) => {
-  const soundtrackTracks = title.tracks.filter(
-    (track) => track.category === "ost",
-  );
-
-  if (playlist === "op-ed") {
-    return title.tracks.filter(
-      (track) => track.category === "opening" || track.category === "ending",
-    );
-  }
-
-  return playlist === "easy"
-    ? soundtrackTracks
-        .filter(
-          (track) =>
-            typeof track.easyModeRank === "number" &&
-            Number.isInteger(track.easyModeRank) &&
-            track.easyModeRank >= 1 &&
-            track.easyModeRank <= EASY_MODE_TRACK_LIMIT,
-        )
-        .sort((left, right) => left.easyModeRank! - right.easyModeRank!)
-        .slice(0, EASY_MODE_TRACK_LIMIT)
-    : soundtrackTracks;
-};
 
 export const getPlayableTitlesForMode = (
   mode: CatalogTitle["mode"],

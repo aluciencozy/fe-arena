@@ -7,8 +7,8 @@ export interface UnifiedMessage {
 }
 
 export type GameMode = "anime" | "video-game";
-export type AnimePlaylist = "standard" | "easy" | "op-ed";
-export type AnimeTrackCategory = "ost" | "opening" | "ending";
+export type { AnimePlaylist, AnimeTrackCategory } from "../../../shared/playlist";
+import type { AnimeTrackCategory } from "../../../shared/playlist";
 export type RoomSource = "private" | "queue";
 
 export interface AnswerAlias {

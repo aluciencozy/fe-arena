@@ -1,6 +1,6 @@
 export type GameMode = "anime" | "video-game";
-export type AnimePlaylist = "standard" | "easy" | "op-ed";
-export type AnimeTrackCategory = "ost" | "opening" | "ending";
+export type { AnimePlaylist, AnimeTrackCategory } from "../../../shared/playlist.js";
+import type { AnimeTrackCategory } from "../../../shared/playlist.js";
 export type RoomSource = "private" | "queue";
 
 export interface AnswerAlias {
