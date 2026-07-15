@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import type { GameMode, RoomMetadata, RoomSource } from "../types/index.js";
+import type {
+  AnimePlaylist,
+  GameMode,
+  RoomMetadata,
+  RoomSource,
+} from "../types/index.js";
 
 // Hold the rooms and the players in them
 const rooms = new Map<string, string[]>();
@@ -41,10 +46,12 @@ export const generateUniqueRoomId = () => {
 
 export const createRoom = ({
   mode,
+  playlist = "standard",
   source,
   selectedTitleIds,
 }: {
   mode: GameMode;
+  playlist?: AnimePlaylist;
   source: RoomSource;
   selectedTitleIds: string[];
 }) => {
@@ -54,6 +61,7 @@ export const createRoom = ({
   roomMetadata.set(roomId, {
     roomId,
     mode,
+    playlist,
     source,
     selectedTitleIds,
   });

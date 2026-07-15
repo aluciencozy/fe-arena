@@ -10,6 +10,23 @@ import {
   restorePlayerFromReconnect,
 } from "./room.service.js";
 
+test("a private room retains the host's playlist for joining players", () => {
+  const room = createRoom({
+    mode: "anime",
+    playlist: "op-ed",
+    source: "private",
+    selectedTitleIds: ["anilist-16498-shingeki-no-kyojin"],
+  });
+
+  assert.equal(room.playlist, "op-ed");
+  assert.equal("difficulty" in room, false);
+  assert.equal(addPlayerToRoom(room.roomId, "Host", "playlist-host").ok, true);
+  assert.equal(addPlayerToRoom(room.roomId, "Guest", "playlist-guest").ok, true);
+
+  removePlayerFromRoom("playlist-host");
+  removePlayerFromRoom("playlist-guest");
+});
+
 test("a reconnect token reclaims the reserved player seat", () => {
   const room = createRoom({ mode: "anime", source: "private", selectedTitleIds: ["test"] });
   const joined = addPlayerToRoom(room.roomId, "Mina", "socket-a");

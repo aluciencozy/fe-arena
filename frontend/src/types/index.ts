@@ -7,6 +7,8 @@ export interface UnifiedMessage {
 }
 
 export type GameMode = "anime" | "video-game";
+import type { AnimePlaylist, AnimeTrackCategory } from "../../../shared/playlist";
+export type { AnimePlaylist, AnimeTrackCategory } from "../../../shared/playlist";
 export type RoomSource = "private" | "queue";
 
 export interface AnswerAlias {
@@ -28,6 +30,9 @@ export interface CatalogTrack {
   videoId: string;
   title?: string;
   durationSeconds?: number;
+  viewCount?: number | null;
+  easyModeRank?: number;
+  category: AnimeTrackCategory;
 }
 
 export interface CatalogTitle {
@@ -58,6 +63,7 @@ export interface RoundResult {
 export interface RoomMetadata {
   roomId: string;
   mode: GameMode;
+  playlist: AnimePlaylist;
   source: RoomSource;
   selectedTitleIds: string[];
 }
@@ -76,6 +82,7 @@ export interface PlayerState {
 }
 
 export interface GameState {
+  playlist: AnimePlaylist;
   phase:
     | "LOBBY"
     | "COUNTDOWN"

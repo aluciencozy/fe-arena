@@ -42,6 +42,23 @@ This repository is split into two main directories: `frontend` and `backend`. Yo
 
 Bash cd backend npm install npm run dev The backend server will typically start on [http://localhost:**3000**](http://localhost:**3000**) (or your configured **PORT**).
 
+### Refreshing the anime catalog
+
+The catalog refresh is approval-gated. First generate the proposed AniList franchise checklist:
+
+```bash
+cd backend
+npm run generate:franchise-checklist
+```
+
+Review `data/anime-franchise-checklist.json`, correct the groups or primary entries if needed, and set `approved` to `true`. Copy `data/youtube-playlist-mapping.template.json` to `data/youtube-playlist-mapping.local.json` and replace the placeholders with explicitly categorized playlists. The template shows `ost`, `opening`, and `ending` rows for every approved canonical anime; delete rows for categories you do not have. To intentionally leave an anime out of the game, add its exact checklist name to `excludedAnime`; do not silently omit it from `entries`. Use the prefilled human-readable anime names; AniList IDs are not required. Then run:
+
+```bash
+npm run refresh:catalog
+```
+
+The importer uses `yt-dlp` metadata only, regenerates the ignored TypeScript catalog, writes a local report, and leaves the tracked JSON catalog unchanged if checklist approval, playlist coverage, or any required playlist extraction fails.
+
 ## Setup the Frontend
 
 Open a new, separate terminal and navigate to the frontend directory:
