@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildCatalogFromPlaylists,
   classifyVideo,
+  resolveMappingEntries,
   validateMapping,
 } from "./youtube-catalog-lib.mjs";
 
@@ -76,6 +77,25 @@ test("requires coverage for every approved canonical anime", () => {
     ),
     ["Canonical anime anilist-2-two has no playlist mapping."],
   );
+});
+
+test("resolves mapping entries by checklist anime name", () => {
+  const resolved = resolveMappingEntries(
+    {
+      version: 1,
+      entries: [
+        {
+          anime: "One",
+          playlistUrl: "https://www.youtube.com/playlist?list=ONE",
+          category: "ost",
+        },
+      ],
+    },
+    checklist.groups,
+  );
+
+  assert.deepEqual(resolved.errors, []);
+  assert.equal(resolved.mapping.entries[0].canonicalAnimeId, "anilist-1-one");
 });
 
 test("ranks merged tracks by views, then playlist order, and preserves easy ranks", async () => {

@@ -263,6 +263,58 @@ export const validateMapping = (mapping, canonicalIds) => {
   return errors;
 };
 
+export const resolveMappingEntries = (mapping, groups) => {
+  if (!mapping || !Array.isArray(mapping.entries)) {
+    return { mapping, errors: [] };
+  }
+
+  const errors = [];
+  const references = groups.map((group) => ({
+    canonicalAnimeId: group.canonicalAnimeId,
+    names: [
+      group.primary?.name,
+      group.primary?.canonicalTitle,
+    ].filter((name) => typeof name === "string" && name.trim()),
+  }));
+  const normalizedReferences = references.map((reference) => ({
+    ...reference,
+    normalizedNames: reference.names.map(normalizeText),
+  }));
+
+  const entries = mapping.entries.map((entry, index) => {
+    if (!entry || typeof entry !== "object" || typeof entry.canonicalAnimeId === "string") {
+      return entry;
+    }
+
+    const animeName =
+      typeof entry.anime === "string"
+        ? entry.anime
+        : typeof entry.animeName === "string"
+          ? entry.animeName
+          : null;
+    if (!animeName?.trim()) {
+      return entry;
+    }
+
+    const normalizedName = normalizeText(animeName);
+    const matches = normalizedReferences.filter((reference) =>
+      reference.normalizedNames.includes(normalizedName),
+    );
+    if (matches.length !== 1) {
+      errors.push(
+        `Mapping entry ${index + 1} references ${JSON.stringify(animeName)}, but it matches ${matches.length} canonical anime.`,
+      );
+      return entry;
+    }
+    return {
+      ...entry,
+      canonicalAnimeId: matches[0].canonicalAnimeId,
+    };
+  });
+
+  return { mapping: { ...mapping, entries }, errors };
+};
+
 export const buildCatalogFromPlaylists = async ({
   sourceCandidates,
   checklist,
@@ -285,7 +337,9 @@ export const buildCatalogFromPlaylists = async ({
 
   const groups = Array.isArray(checklist.groups) ? checklist.groups : [];
   const canonicalIds = groups.map((group) => group.canonicalAnimeId);
-  report.errors.push(...validateMapping(mapping, canonicalIds));
+  const resolvedMapping = resolveMappingEntries(mapping, groups);
+  report.errors.push(...resolvedMapping.errors);
+  report.errors.push(...validateMapping(resolvedMapping.mapping, canonicalIds));
   if (report.errors.length > 0) return { catalog: null, report };
 
   const sourceById = new Map(sourceCandidates.map((candidate) => [candidate.id, candidate]));
@@ -293,7 +347,7 @@ export const buildCatalogFromPlaylists = async ({
   const videosById = new Map();
   let playlistOrder = 0;
 
-  for (const entry of mapping.entries) {
+  for (const entry of resolvedMapping.mapping.entries) {
     try {
       const payload = await extract(entry.playlistUrl);
       if (!payload || !Array.isArray(payload.entries) || payload.entries.length === 0) {
