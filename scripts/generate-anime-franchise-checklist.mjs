@@ -8,7 +8,16 @@ const INPUT_JSON = path.join(ROOT, "data", "anilist-anime-candidates.json");
 const OUTPUT_JSON = path.join(ROOT, "data", "anime-franchise-checklist.json");
 const BATCH_SIZE = 50;
 const REQUEST_RETRIES = 5;
-const REQUEST_DELAY_MS = 1_000;
+const REQUEST_DELAY_MS = 15_000;
+const FRANCHISE_RELATION_TYPES = new Set([
+  "PREQUEL",
+  "SEQUEL",
+  "PARENT_STORY",
+  "SIDE_STORY",
+  "SPIN_OFF",
+  "SUMMARY",
+  "ALTERNATIVE",
+]);
 
 const QUERY = `
   query AnimeRelations($ids: [Int!]) {
@@ -99,7 +108,10 @@ const buildChecklist = (source, relationMedia) => {
   for (const media of relationMedia.values()) {
     const mediaEdges = adjacency.get(media.id) ?? new Set();
     for (const edge of media.relations?.edges ?? []) {
-      if (edge.node?.type !== "ANIME") continue;
+      if (
+        edge.node?.type !== "ANIME" ||
+        !FRANCHISE_RELATION_TYPES.has(edge.relationType)
+      ) continue;
       const relatedId = edge.node.id;
       metadataById.set(relatedId, metadataById.get(relatedId) ?? toMetadata(edge.node));
       mediaEdges.add(relatedId);
@@ -173,19 +185,11 @@ const buildChecklist = (source, relationMedia) => {
 const main = async () => {
   const source = JSON.parse(await readFile(INPUT_JSON, "utf8"));
   const sourceIds = (source.candidates ?? []).map((candidate) => candidate.anilistId);
-  const fetched = new Map();
-  let pending = [...sourceIds];
-  while (pending.length > 0) {
-    const relations = await fetchRelations(pending);
-    const next = [];
-    for (const [id, media] of relations) {
-      fetched.set(id, media);
-      for (const edge of media.relations?.edges ?? []) {
-        if (edge.node?.type === "ANIME" && !fetched.has(edge.node.id)) next.push(edge.node.id);
-      }
-    }
-    pending = [...new Set(next)];
-  }
+  // The seed candidates' relation edges are sufficient to connect the
+  // franchise entries in the proposed checklist. Avoid recursively crawling
+  // every related anime, which can expand a 113-title input into hundreds of
+  // requests and needlessly trigger AniList's rate limit.
+  const fetched = await fetchRelations(sourceIds);
   const groups = buildChecklist(source, fetched);
   const output = {
     generatedAt: new Date().toISOString(),
