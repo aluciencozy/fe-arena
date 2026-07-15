@@ -51,7 +51,7 @@ cd backend
 npm run generate:franchise-checklist
 ```
 
-Review `data/anime-franchise-checklist.json`, correct the groups or primary entries if needed, and set `approved` to `true`. Copy `data/youtube-playlist-mapping.template.json` to `data/youtube-playlist-mapping.local.json` and replace each `PASTE_PLAYLIST_URL_HERE` placeholder with an explicitly categorized playlist for every approved canonical anime. Use the prefilled human-readable anime names; AniList IDs are not required. Add extra `opening` or `ending` entries when desired. Then run:
+Review `data/anime-franchise-checklist.json`, correct the groups or primary entries if needed, and set `approved` to `true`. Copy `data/youtube-playlist-mapping.template.json` to `data/youtube-playlist-mapping.local.json` and replace the placeholders with explicitly categorized playlists. The template shows `ost`, `opening`, and `ending` rows for every approved canonical anime; delete rows for categories you do not have. Use the prefilled human-readable anime names; AniList IDs are not required. Then run:
 
 ```bash
 npm run refresh:catalog
