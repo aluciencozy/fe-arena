@@ -1,0 +1,570 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "anime": "Attack on Titan",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Demon Slayer: Kimetsu no Yaiba",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "JUJUTSU KAISEN",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Death Note",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "My Hero Academia",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Hunter x Hunter (2011)",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "One-Punch Man",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "ONE PIECE",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Tokyo Ghoul",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Fullmetal Alchemist: Brotherhood",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Naruto",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Sword Art Online",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Your Name.",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "A Silent Voice",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "The Promised Neverland",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Assassination Classroom",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Mob Psycho 100",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Chainsaw Man",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Re:ZERO -Starting Life in Another World-",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Your lie in April",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "ERASED",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Steins;Gate",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "HAIKYU!!",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Black Clover",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Rascal Does Not Dream of Bunny Girl Senpai",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "SPY x FAMILY",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Kaguya-sama: Love is War",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Dr. STONE",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Violet Evergarden",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "No Game, No Life",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Toradora!",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Noragami",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Vinland Saga",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Akame ga Kill!",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Horimiya",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "The Seven Deadly Sins",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "KONOSUBA -God's blessing on this wonderful world!",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Bleach",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Parasyte -the maxim-",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "DARLING in the FRANXX",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Code Geass: Lelouch of the Rebellion",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Neon Genesis Evangelion",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Fire Force",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Spirited Away",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "JoJo's Bizarre Adventure",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Death Parade",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Cowboy Bebop",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Frieren: Beyond Journey’s End",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Blue Exorcist",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "The Rising of the Shield Hero",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Kakegurui",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "That Time I Got Reincarnated as a Slime",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Mushoku Tensei: Jobless Reincarnation",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Tokyo Revengers",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Angel Beats!",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Classroom of the Elite",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Solo Leveling",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Charlotte",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "The Future Diary",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Bungo Stray Dogs",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "My Dress-Up Darling",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Kill la Kill",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Made in Abyss",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Food Wars!",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Overlord",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "The Devil is a Part-Timer!",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Anohana: The Flower We Saw That Day",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Is It Wrong to Try to Pick Up Girls in a Dungeon?",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Soul Eater",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Another",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Fairy Tail",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "My Teen Romantic Comedy SNAFU",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Gurren Lagann",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "DAN DA DAN",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Dororo",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Cyberpunk: Edgerunners",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "I Want to Eat Your Pancreas",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Monster",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "The Apothecary Diaries",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "BOCCHI THE ROCK!",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Clannad: After Story",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Witch Hat Atelier",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "86 EIGHTY-SIX Part 2",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Fruits Basket",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Monogatari Series",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Link Click",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "The Disappearance of Haruhi Suzumiya",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Hajime no Ippo: The Fighting!",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Takopi's Original Sin",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "March comes in like a lion Season 2",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Ping Pong the Animation",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "LOOK BACK",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Gintama",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Fate/stay night [Heaven’s Feel] III. spring song",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Orb: On the Movements of the Earth",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "【OSHI NO KO】Season 3",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "The Dangers in My Heart Season 2",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Legend of the Galactic Heroes",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "MUSHI-SHI",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Descending Stories: Showa Genroku Rakugo Shinju",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Natsume's Book of Friends Season 4",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Journal with Witch",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "ARIA The ORIGINATION",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Sound! Euphonium 3",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "THE FIRST SLAM DUNK",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Umamusume: Pretty Derby - Beginning of a New Era",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Umamusume: Cinderella Gray 2nd Cour",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Kingdom",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "The Founder of Diabolism: Final Season",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Heaven Official's Blessing Season 2",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Tomorrow's Joe 2",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Revue Starlight: The Movie",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    },
+    {
+      "anime": "Lord of Mysteries Specials",
+      "playlistUrl": "PASTE_PLAYLIST_URL_HERE",
+      "category": "ost"
+    }
+  ]
+}
