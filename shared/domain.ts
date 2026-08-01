@@ -17,11 +17,23 @@ export const TOPICS = [
 ] as const;
 
 export type TopicId = (typeof TOPICS)[number]["id"];
-export type QuestionType = "multiple-choice" | "numeric" | "short-answer" | "code-output" | "ordered-sequence";
+export type QuestionType = "multiple-choice" | "numeric" | "short-answer" | "code-output" | "ordered-sequence" | "graph";
+export type GraphOperation = "bfs-order" | "dfs-order" | "adjacency" | "reachability" | "shortest-path";
 export type MatchSource = "private" | "public";
 export type MatchPhase = "LOBBY" | "SETUP" | "READY" | "COUNTDOWN" | "QUESTION" | "REVEAL" | "RESULTS" | "REMATCH" | "PAUSED" | "FORFEIT" | "ABANDONED" | "EXPIRED";
 
-export const QuestionTypeSchema = z.enum(["multiple-choice", "numeric", "short-answer", "code-output", "ordered-sequence"]);
+export const QuestionTypeSchema = z.enum(["multiple-choice", "numeric", "short-answer", "code-output", "ordered-sequence", "graph"]);
+export const GraphOperationSchema = z.enum(["bfs-order", "dfs-order", "adjacency", "reachability", "shortest-path"]);
+export const GraphNodeSchema = z.object({ id: z.string().regex(/^[a-z0-9-]+$/), label: z.string().min(1), x: z.number().finite().min(0).max(100), y: z.number().finite().min(0).max(100) });
+export const GraphEdgeSchema = z.object({ from: z.string().regex(/^[a-z0-9-]+$/), to: z.string().regex(/^[a-z0-9-]+$/) });
+export const GraphSchema = z.object({
+  directed: z.boolean(),
+  nodes: z.array(GraphNodeSchema).min(1).max(40),
+  edges: z.array(GraphEdgeSchema).max(120),
+});
+export type GraphNode = z.infer<typeof GraphNodeSchema>;
+export type GraphEdge = z.infer<typeof GraphEdgeSchema>;
+export type GraphDefinition = z.infer<typeof GraphSchema>;
 export const TopicIdSchema = z.enum(TOPICS.map((topic) => topic.id) as [TopicId, ...TopicId[]]);
 export const MatchSourceSchema = z.enum(["private", "public"]);
 export const MatchPhaseSchema = z.enum(["LOBBY", "SETUP", "READY", "COUNTDOWN", "QUESTION", "REVEAL", "RESULTS", "REMATCH", "PAUSED", "FORFEIT", "ABANDONED", "EXPIRED"]);
@@ -61,6 +73,7 @@ export const QuestionSchema = z.discriminatedUnion("type", [
   BaseQuestionSchema.extend({
     type: z.literal("code-output"),
     language: z.literal("c"),
+    code: z.string().min(1),
     output: z.array(z.string()).min(1),
   }),
   BaseQuestionSchema.extend({
@@ -68,12 +81,48 @@ export const QuestionSchema = z.discriminatedUnion("type", [
     items: z.array(z.object({ id: z.string().min(1), label: z.string().min(1) })).min(2),
     answerOrder: z.array(z.string().min(1)).min(2),
   }),
+  BaseQuestionSchema.extend({
+    type: z.literal("graph"),
+    graph: GraphSchema,
+    operation: GraphOperationSchema,
+    startNode: z.string().regex(/^[a-z0-9-]+$/).optional(),
+    targetNode: z.string().regex(/^[a-z0-9-]+$/).optional(),
+    nodeId: z.string().regex(/^[a-z0-9-]+$/).optional(),
+    answerOrder: z.array(z.string().regex(/^[a-z0-9-]+$/)).min(1).optional(),
+    adjacentNodes: z.array(z.string().regex(/^[a-z0-9-]+$/)).optional(),
+    reachable: z.boolean().optional(),
+    distance: z.number().int().min(-1).optional(),
+  }).superRefine((question, context) => {
+    const nodeIds = new Set(question.graph.nodes.map((node) => node.id));
+    if (nodeIds.size !== question.graph.nodes.length) context.addIssue({ code: "custom", path: ["graph", "nodes"], message: "Graph node IDs must be unique." });
+    for (const edge of question.graph.edges) {
+      if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) context.addIssue({ code: "custom", path: ["graph", "edges"], message: "Graph edges must reference displayed nodes." });
+    }
+    const requireNode = (field: "startNode" | "targetNode" | "nodeId") => {
+      const value = question[field];
+      if (!value || !nodeIds.has(value)) context.addIssue({ code: "custom", path: [field], message: `${field} must reference a displayed node.` });
+    };
+    if (question.operation === "bfs-order" || question.operation === "dfs-order") {
+      requireNode("startNode");
+      if (!question.answerOrder?.every((id) => nodeIds.has(id))) context.addIssue({ code: "custom", path: ["answerOrder"], message: "Traversal answers must reference displayed nodes." });
+    }
+    if (question.operation === "adjacency") {
+      requireNode("nodeId");
+      if (!question.adjacentNodes || !question.adjacentNodes.every((id) => nodeIds.has(id))) context.addIssue({ code: "custom", path: ["adjacentNodes"], message: "Adjacency answers must reference displayed nodes." });
+    }
+    if (question.operation === "reachability" || question.operation === "shortest-path") {
+      requireNode("startNode");
+      requireNode("targetNode");
+    }
+    if (question.operation === "reachability" && question.reachable === undefined) context.addIssue({ code: "custom", path: ["reachable"], message: "Reachability questions need a boolean answer." });
+    if (question.operation === "shortest-path" && question.distance === undefined) context.addIssue({ code: "custom", path: ["distance"], message: "Shortest-path questions need a distance answer." });
+  }),
 ]);
 export type Question = z.infer<typeof QuestionSchema>;
 
 export const QuestionAttemptSchema = z.object({
   questionId: z.string().min(1),
-  answer: z.union([z.string(), z.number(), z.array(z.string())]),
+  answer: z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]),
 });
 export type QuestionAttempt = z.infer<typeof QuestionAttemptSchema>;
 
@@ -86,15 +135,22 @@ export type PublicQuestion = {
   options?: Array<{ id: string; label: string }>;
   unit?: string;
   language?: "c";
+  code?: string;
   items?: Array<{ id: string; label: string }>;
   orderLength?: number;
+  answerLength?: number;
+  graph?: GraphDefinition;
+  operation?: GraphOperation;
+  startNode?: string;
+  targetNode?: string;
+  nodeId?: string;
 };
 
 export type RevealedQuestion = PublicQuestion & {
   explanation: string;
   assumptions: string[];
   provenance: { source: string; note: string };
-  answer: string | number | string[];
+  answer: string | number | boolean | string[];
 };
 
 export const toPublicQuestion = (question: Question): PublicQuestion => {
@@ -107,8 +163,17 @@ export const toPublicQuestion = (question: Question): PublicQuestion => {
   };
   if (question.type === "multiple-choice") return { ...base, options: question.options };
   if (question.type === "numeric") return question.unit ? { ...base, unit: question.unit } : base;
-  if (question.type === "code-output") return { ...base, language: question.language };
+  if (question.type === "code-output") return { ...base, language: question.language, code: question.code };
   if (question.type === "ordered-sequence") return { ...base, items: question.items, orderLength: question.answerOrder.length };
+  if (question.type === "graph") {
+    const view: PublicQuestion = { ...base, graph: question.graph, operation: question.operation };
+    if (question.startNode) view.startNode = question.startNode;
+    if (question.targetNode) view.targetNode = question.targetNode;
+    if (question.nodeId) view.nodeId = question.nodeId;
+    const answerLength = question.operation === "bfs-order" || question.operation === "dfs-order" ? question.answerOrder?.length : question.operation === "adjacency" ? question.adjacentNodes?.length : undefined;
+    if (answerLength !== undefined) view.answerLength = answerLength;
+    return view;
+  }
   return base;
 };
 
@@ -118,7 +183,11 @@ export const toRevealedQuestion = (question: Question): RevealedQuestion => {
     : question.type === "numeric" ? question.answer
     : question.type === "short-answer" ? question.answers
     : question.type === "code-output" ? question.output
-    : question.answerOrder;
+    : question.type === "ordered-sequence" ? question.answerOrder
+    : question.operation === "bfs-order" || question.operation === "dfs-order" ? question.answerOrder!
+    : question.operation === "adjacency" ? question.adjacentNodes!
+    : question.operation === "reachability" ? question.reachable!
+    : question.distance!;
   return {
     ...publicQuestion,
     explanation: question.explanation,
@@ -155,10 +224,28 @@ export const gradeQuestion = (question: Question, attempt: QuestionAttempt): boo
   if (question.type === "code-output") {
     if (!Array.isArray(attempt.answer) && typeof attempt.answer !== "string") return false;
     const candidate = Array.isArray(attempt.answer) ? attempt.answer : attempt.answer.split(/\r?\n/);
-    return normalizeSequence(candidate) .join("\n") === normalizeSequence(question.output).join("\n");
+    return normalizeSequence(candidate).join("\n") === normalizeSequence(question.output).join("\n");
   }
-  if (!Array.isArray(attempt.answer)) return false;
-  return normalizeSequence(attempt.answer).join("|") === normalizeSequence(question.answerOrder).join("|");
+  if (question.type === "ordered-sequence") {
+    if (!Array.isArray(attempt.answer)) return false;
+    return normalizeSequence(attempt.answer).join("|") === normalizeSequence(question.answerOrder).join("|");
+  }
+  if (question.operation === "bfs-order" || question.operation === "dfs-order") {
+    return Array.isArray(attempt.answer) && normalizeSequence(attempt.answer).join("|") === normalizeSequence(question.answerOrder ?? []).join("|");
+  }
+  if (question.operation === "adjacency") {
+    return Array.isArray(attempt.answer) && normalizeSequence(attempt.answer).join("|") === normalizeSequence(question.adjacentNodes ?? []).join("|");
+  }
+  if (question.operation === "reachability") {
+    if (typeof attempt.answer === "boolean") return attempt.answer === question.reachable;
+    if (typeof attempt.answer !== "string") return false;
+    const normalized = normalizeAnswer(attempt.answer);
+    const yes = ["true", "yes", "reachable", "connected"];
+    const no = ["false", "no", "unreachable", "not reachable", "disconnected"];
+    return question.reachable ? yes.includes(normalized) : no.includes(normalized);
+  }
+  const candidate = typeof attempt.answer === "number" ? attempt.answer : typeof attempt.answer === "string" ? Number(attempt.answer) : NaN;
+  return Number.isInteger(candidate) && candidate === question.distance;
 };
 
 export const QUESTION_TIMER_MIN_SECONDS = 30;
@@ -242,14 +329,21 @@ export const PublicQuestionSchema = z.object({
   options: z.array(z.object({ id: z.string().min(1), label: z.string().min(1) })).optional(),
   unit: z.string().optional(),
   language: z.literal("c").optional(),
+  code: z.string().min(1).optional(),
   items: z.array(z.object({ id: z.string().min(1), label: z.string().min(1) })).optional(),
   orderLength: z.number().int().positive().optional(),
+  answerLength: z.number().int().nonnegative().optional(),
+  graph: GraphSchema.optional(),
+  operation: GraphOperationSchema.optional(),
+  startNode: z.string().optional(),
+  targetNode: z.string().optional(),
+  nodeId: z.string().optional(),
 });
 export const RevealedQuestionSchema = PublicQuestionSchema.and(z.object({
   explanation: z.string().min(1),
   assumptions: z.array(z.string()).min(1),
   provenance: ProvenanceSchema,
-  answer: z.union([z.string(), z.number(), z.array(z.string())]),
+  answer: z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]),
 }));
 export const ScoreBreakdownSchema: z.ZodType<ScoreBreakdown> = z.object({ correctness: z.number().nonnegative(), speedBonus: z.number().nonnegative(), total: z.number().nonnegative() });
 export const RoomMetadataSchema = z.object({ roomId: z.string().regex(/^[A-Z0-9]{6}$/), source: MatchSourceSchema, hostSeatId: z.string().uuid(), config: MatchConfigSchema });
@@ -259,7 +353,7 @@ export const SubmissionPublicSchema = z.object({
   submitted: z.boolean(),
   correct: z.boolean().nullable(),
   score: ScoreBreakdownSchema.nullable(),
-  answer: z.union([z.string(), z.number(), z.array(z.string())]).nullable(),
+  answer: z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]).nullable(),
 });
 export const RoundHistorySchema = z.object({ round: z.number().int().positive(), question: RevealedQuestionSchema, submissions: z.record(z.string(), SubmissionPublicSchema) });
 export const MatchPublicStateSchema = z.object({
@@ -330,4 +424,5 @@ export const ServerEventSchemas = {
   "server:error": z.object({ code: z.string().min(1), message: z.string().min(1) }),
 } as const;
 
+export const canConfigureMatch = (source: MatchSource, hostSeatId: string, seatId: string | null): boolean => source === "private" && seatId === hostSeatId;
 export const topicLabel = (topicId: TopicId) => TOPICS.find((topic) => topic.id === topicId)?.label ?? topicId;

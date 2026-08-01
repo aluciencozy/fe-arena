@@ -5,7 +5,7 @@ export type { TOPICS } from "../../../shared/domain";
 export type RoomMetadata = { roomId: string; source: MatchSource; hostSeatId: string; config: MatchConfig };
 export type RoomSeat = { seatId: string; name: string; connected: boolean };
 export type RoomState = { metadata: RoomMetadata; seats: RoomSeat[] };
-export type SubmissionPublic = { submitted: boolean; correct: boolean | null; score: ScoreBreakdown | null; answer: string | number | string[] | null };
+export type SubmissionPublic = { submitted: boolean; correct: boolean | null; score: ScoreBreakdown | null; answer: string | number | boolean | string[] | null };
 export type RoundHistory = { round: number; question: RevealedQuestion; submissions: Record<string, SubmissionPublic> };
 export type MatchPublicState = {
   roomId: string; source: MatchSource; phase: MatchPhase; config: MatchConfig; roundIndex: number; totalRounds: number;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateScore, ClientEventSchemas, compareScores, gradeQuestion, normalizeAnswer, selectSeededQuestions, ServerEventSchemas, toPublicQuestion, TOPICS, type Question } from "../../shared/domain.js";
+import { calculateScore, ClientEventSchemas, compareScores, gradeQuestion, normalizeAnswer, QuestionSchema, selectSeededQuestions, ServerEventSchemas, toPublicQuestion, TOPICS, type Question } from "../../shared/domain.js";
 import { QUESTION_BANK, validateQuestionBank } from "./data/questions.js";
 
 test("normalization is stable and explicit aliases grade short answers", () => {
@@ -12,12 +12,19 @@ test("normalization is stable and explicit aliases grade short answers", () => {
 
 test("all five discriminated question types validate and public views hide solutions", () => {
   const questions = validateQuestionBank();
-  assert.equal(new Set(questions.map((question) => question.type)).size, 5);
+  assert.equal(new Set(questions.map((question) => question.type)).size, 6);
   assert.equal(new Set(questions.map((question) => question.topicId)).size, TOPICS.length);
   for (const question of questions) {
     const publicView = toPublicQuestion(question);
     assert.equal("explanation" in publicView, false);
     assert.equal("answer" in publicView, false);
+    if (question.type === "code-output") assert.equal(publicView.code, question.code);
+    if (question.type === "graph") {
+      assert.deepEqual(publicView.graph, question.graph);
+      assert.equal("answerOrder" in publicView, false);
+      assert.equal("reachable" in publicView, false);
+      assert.equal("distance" in publicView, false);
+    }
   }
 });
 
@@ -43,6 +50,24 @@ test("seeded selection is deterministic and topic-filtered", () => {
   const second = selectSeededQuestions(QUESTION_BANK, "replay-seed", 5, ["stacks", "queues"]);
   assert.deepEqual(first.map((question) => question.id), second.map((question) => question.id));
   assert.ok(first.every((question) => question.topicId === "stacks" || question.topicId === "queues"));
+});
+
+test("graph grading supports traversal, adjacency, reachability, and shortest paths", () => {
+  const bfs = QUESTION_BANK.find((item) => item.id === "q-graph-bfs")!;
+  const adjacency = QUESTION_BANK.find((item) => item.id === "q-graph-adjacency")!;
+  const reachability = QUESTION_BANK.find((item) => item.id === "q-graph-reachability")!;
+  const shortest = QUESTION_BANK.find((item) => item.id === "q-graph-shortest")!;
+  assert.equal(gradeQuestion(bfs, { questionId: bfs.id, answer: ["a", "b", "c", "d", "e"] }), true);
+  assert.equal(gradeQuestion(bfs, { questionId: bfs.id, answer: ["a", "c", "b", "d", "e"] }), false);
+  assert.equal(gradeQuestion(adjacency, { questionId: adjacency.id, answer: ["a", "b", "d", "e"] }), true);
+  assert.equal(gradeQuestion(reachability, { questionId: reachability.id, answer: "no" }), true);
+  assert.equal(gradeQuestion(reachability, { questionId: reachability.id, answer: true }), false);
+  assert.equal(gradeQuestion(shortest, { questionId: shortest.id, answer: "3" }), true);
+  assert.equal(gradeQuestion(shortest, { questionId: "q-other", answer: 3 }), false);
+  const graph = QUESTION_BANK.find((item) => item.type === "graph")!;
+  const malformed = structuredClone(graph);
+  malformed.graph.nodes.push({ ...malformed.graph.nodes[0]! });
+  assert.equal(QuestionSchema.safeParse(malformed).success, false);
 });
 
 test("code output and ordered sequence grading do not execute arbitrary code", () => {
