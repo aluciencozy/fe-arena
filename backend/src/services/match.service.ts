@@ -52,6 +52,7 @@ type MatchRecord = {
   phaseEndsAt: number | null;
   pausedFrom: Exclude<MatchPhase, "PAUSED"> | null;
   pausedAt: number | null;
+  disconnectDeadlines: Map<string, number>;
 };
 const matches = new Map<string, MatchRecord>();
 
@@ -92,6 +93,19 @@ const publicSnapshot = (state: MatchPublicState): MatchPublicState => {
 };
 const emit = (record: MatchRecord, events: MatchEvents) => events.emit(publicSnapshot(record.state));
 const configFor = (metadata: RoomMetadata): MatchConfig => metadata.config ?? { topicIds: [], roundCount: DEFAULT_ROUND_COUNT, questionTimerSeconds: PUBLIC_QUESTION_SECONDS };
+const syncPause = (record: MatchRecord) => {
+  const disconnected = getSeats(record.state.roomId)
+    .filter((seat) => !seat.connected)
+    .map((seat) => ({ seat, expiresAt: record.disconnectDeadlines.get(seat.seatId) }))
+    .filter((entry): entry is { seat: (typeof entry)["seat"]; expiresAt: number } => entry.expiresAt !== undefined)
+    .sort((left, right) => left.expiresAt - right.expiresAt);
+  for (const seatId of record.disconnectDeadlines.keys()) {
+    if (!disconnected.some(({ seat }) => seat.seatId === seatId)) record.disconnectDeadlines.delete(seatId);
+  }
+  const next = disconnected[0];
+  record.state.pause = next ? { seatName: next.seat.name, expiresAt: next.expiresAt } : null;
+  return Boolean(next);
+};
 
 export const ensureMatch = (roomId: string, events?: MatchEvents) => {
   const existing = matches.get(roomId);
@@ -109,7 +123,7 @@ export const ensureMatch = (roomId: string, events?: MatchEvents) => {
     question: null, revealedQuestion: null, questionStartedAt: null, questionEndsAt: null, countdownEndsAt: null, pause: null,
     ready: makeReady(roomId), submissions: makeSubmissions(roomId), scores: makeScores(roomId), winnerSeatId: null, endReason: null, history: [],
   };
-  const record: MatchRecord = { state, seed: `${roomId}:${metadata.hostSeatId}`, questionIds: fallbackQuestions.map((question) => question.id), timer: undefined, phaseEndsAt: null, pausedFrom: null, pausedAt: null };
+  const record: MatchRecord = { state, seed: `${roomId}:${metadata.hostSeatId}`, questionIds: fallbackQuestions.map((question) => question.id), timer: undefined, phaseEndsAt: null, pausedFrom: null, pausedAt: null, disconnectDeadlines: new Map() };
   matches.set(roomId, record);
   if (events) emit(record, events);
   return state;
@@ -280,6 +294,7 @@ export const leaveMatch = (roomId: string, leavingSeatId: string, reason: "forfe
   record.state.phase = reason === "forfeit" ? "FORFEIT" : reason === "expired" ? "EXPIRED" : "ABANDONED";
   record.state.winnerSeatId = winner;
   record.state.endReason = reason;
+  record.disconnectDeadlines.clear();
   record.state.pause = null;
   record.state.question = null;
   record.state.revealedQuestion = null;
@@ -294,14 +309,17 @@ export const pauseForDisconnect = (roomId: string, seatId: string, events: Match
   const record = matches.get(roomId);
   const seatName = getSeats(roomId).find((seat) => seat.seatId === seatId)?.name;
   const phase = record?.state.phase;
-  if (!record || !seatName || (phase !== "COUNTDOWN" && phase !== "QUESTION" && phase !== "REVEAL")) return false;
-  const phaseEndsAt = record.phaseEndsAt;
-  clearTimer(record);
-  record.phaseEndsAt = phaseEndsAt;
-  record.pausedFrom = phase;
-  record.pausedAt = Date.now();
-  record.state.phase = "PAUSED";
-  record.state.pause = { seatName, expiresAt: Date.now() + PAUSE_SECONDS * 1000 };
+  if (!record || !seatName || (phase !== "COUNTDOWN" && phase !== "QUESTION" && phase !== "REVEAL" && phase !== "PAUSED")) return false;
+  if (phase !== "PAUSED") {
+    const phaseEndsAt = record.phaseEndsAt;
+    clearTimer(record);
+    record.phaseEndsAt = phaseEndsAt;
+    record.pausedFrom = phase;
+    record.pausedAt = Date.now();
+    record.state.phase = "PAUSED";
+  }
+  record.disconnectDeadlines.set(seatId, Date.now() + PAUSE_SECONDS * 1000);
+  syncPause(record);
   emit(record, events);
   events.message(`${seatName} disconnected. Both guests are paused for ${PAUSE_SECONDS} seconds.`);
   return true;
@@ -310,13 +328,17 @@ export const pauseForDisconnect = (roomId: string, seatId: string, events: Match
 export const resumeAfterReconnect = (roomId: string, events: MatchEvents) => {
   const record = matches.get(roomId);
   if (!record || record.state.phase !== "PAUSED" || !record.pausedFrom || record.pausedAt === null) return false;
-  if (getSeats(roomId).some((seat) => !seat.connected)) return false;
+  if (syncPause(record)) {
+    emit(record, events);
+    return false;
+  }
   const pausedMs = Math.max(0, Date.now() - record.pausedAt);
   if (record.state.questionStartedAt !== null) record.state.questionStartedAt += pausedMs;
   if (record.state.questionEndsAt !== null) record.state.questionEndsAt += pausedMs;
   if (record.state.countdownEndsAt !== null) record.state.countdownEndsAt += pausedMs;
   if (record.phaseEndsAt !== null) record.phaseEndsAt += pausedMs;
   record.state.phase = record.pausedFrom;
+  record.disconnectDeadlines.clear();
   record.state.pause = null;
   const remaining = (record.phaseEndsAt ?? Date.now()) - Date.now();
   record.pausedFrom = null;

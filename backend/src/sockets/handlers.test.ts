@@ -108,3 +108,37 @@ test("two disconnected seats resolve to abandoned", (t) => {
   t.mock.timers.tick(1);
   reset();
 });
+
+test("pause metadata follows the guest who remains disconnected", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
+  reset();
+  const room = createRoom("private", config, "Host");
+  attachSeat(room.metadata.roomId, room.seat, "host");
+  const guest = joinRoom(room.metadata.roomId, "Guest", "guest");
+  assert.equal(guest.ok, true);
+  if (!guest.ok) return;
+  const io = new TestIo();
+  const hostSocket = new TestSocket("host");
+  const guestSocket = new TestSocket("guest");
+  registerHandlers(asServer(io), asSocket(hostSocket));
+  registerHandlers(asServer(io), asSocket(guestSocket));
+  const events = { emit: () => undefined, message: () => undefined };
+  ensureMatch(room.metadata.roomId);
+  configureMatch(room.metadata.roomId, room.seat.seatId, config, events);
+  toggleReady(room.metadata.roomId, room.seat.seatId, events);
+  toggleReady(room.metadata.roomId, guest.seat.seatId, events);
+  hostSocket.trigger("disconnect");
+  t.mock.timers.tick(1);
+  guestSocket.trigger("disconnect");
+  const restoredHost = new TestSocket("host-restored");
+  registerHandlers(asServer(io), asSocket(restoredHost));
+  restoredHost.trigger("room:reconnect", { roomId: room.metadata.roomId, reconnectToken: room.seat.reconnectToken });
+  assert.equal(getMatchState(room.metadata.roomId)?.phase, "PAUSED");
+  assert.deepEqual(getMatchState(room.metadata.roomId)?.pause, { seatName: "Guest", expiresAt: 31_001 });
+  const restoredGuest = new TestSocket("guest-restored");
+  registerHandlers(asServer(io), asSocket(restoredGuest));
+  restoredGuest.trigger("room:reconnect", { roomId: room.metadata.roomId, reconnectToken: guest.seat.reconnectToken });
+  assert.equal(getMatchState(room.metadata.roomId)?.phase, "COUNTDOWN");
+  assert.equal(getMatchState(room.metadata.roomId)?.pause, null);
+  reset();
+});
