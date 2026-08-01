@@ -6,7 +6,7 @@ The live 1v1 engine remains authoritative in `src/services/match.service.ts` and
 
 Without both `SUPABASE_URL` and `SUPABASE_SECRET_KEY`, the backend selects `InMemoryMatchRepository`. This is the default for local development and CI, so no Supabase project or network access is required.
 
-When both values are present, the backend creates `SupabaseMatchRepository`. `SUPABASE_SECRET_KEY` is a server-only Supabase secret API key: keep it out of frontend environment files, client events, logs, browser bundles, and committed example files. This pass does not need a `SUPABASE_PUBLISHABLE_KEY` because the frontend does not access Supabase directly.
+When both values are present, the backend wraps `SupabaseMatchRepository` in a durable local outbox. Failed terminal writes remain in `.fe-arena-match-outbox` and are retried on a schedule and when the process restarts. `SUPABASE_SECRET_KEY` is a server-only Supabase secret API key: keep it out of frontend environment files, client events, logs, browser bundles, and committed example files. This pass does not need a `SUPABASE_PUBLISHABLE_KEY` because the frontend does not access Supabase directly.
 
 The migrations are intentionally not deployed by this change. Apply them only in a separate, explicit Supabase deployment step.
 

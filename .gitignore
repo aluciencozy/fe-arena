@@ -41,6 +41,8 @@ pnpm-debug.log*
 coverage/
 **/coverage/
 .nyc_output
+.fe-arena-match-outbox/
+.terminal-outbox-test-*/
 
 # Tooling/Monorepo Specifics
 .turbo

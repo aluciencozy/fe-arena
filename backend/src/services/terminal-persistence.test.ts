@@ -10,6 +10,7 @@ import {
   ensureMatch,
   getMatchState,
   leaveMatch,
+  requestRematch,
   setMatchRepository,
   submitAnswer,
   toggleReady,
@@ -32,6 +33,22 @@ class RecordingRepository implements MatchRepository {
     if (this.attempts <= this.failuresBeforeSuccess) throw new Error("deterministic database failure");
     this.snapshots.push(structuredClone(snapshot));
     return { status: "inserted" as const, matchId: snapshot.matchId };
+  }
+}
+
+class DeferredRepository implements MatchRepository {
+  readonly snapshots: TerminalMatchSnapshot[] = [];
+  private readonly completions: Array<() => void> = [];
+
+  persistTerminalMatch(snapshot: TerminalMatchSnapshot): Promise<{ status: "inserted"; matchId: string }> {
+    this.snapshots.push(structuredClone(snapshot));
+    return new Promise((resolve) => {
+      this.completions.push(() => resolve({ status: "inserted", matchId: snapshot.matchId }));
+    });
+  }
+
+  completeNext(): void {
+    this.completions.shift()?.();
   }
 }
 
@@ -136,7 +153,7 @@ test("ignores client-supplied scoring fields and persists only server results", 
   clearRoomsForTests();
 });
 
-test("retries transient database failure without changing the live terminal result", async () => {
+test("database failure does not change the live terminal result", async () => {
   const repository = new RecordingRepository(1);
   setMatchRepository(repository);
   clearMatchesForTests();
@@ -144,30 +161,30 @@ test("retries transient database failure without changing the live terminal resu
   const { room, guest } = setupRoom();
   leaveMatch(room.metadata.roomId, guest.seat.seatId, "forfeit", events());
   await waitForMatchPersistenceForTests();
-  assert.equal(repository.attempts, 2);
-  assert.equal(repository.snapshots.length, 1);
+  assert.equal(repository.attempts, 1);
+  assert.equal(repository.snapshots.length, 0);
   assert.equal(getMatchState(room.metadata.roomId)?.phase, "FORFEIT");
   assert.equal(getMatchState(room.metadata.roomId)?.winnerSeatId, room.seat.seatId);
   clearMatchesForTests();
   clearRoomsForTests();
 });
 
-test("allows a later terminal event to retry after persistence attempts are exhausted", async () => {
-  const repository = new RecordingRepository(3);
+test("an old terminal write cannot suppress persistence for a rematch", async () => {
+  const repository = new DeferredRepository();
   setMatchRepository(repository);
   clearMatchesForTests();
   clearRoomsForTests();
   const { room, guest } = setupRoom();
   leaveMatch(room.metadata.roomId, guest.seat.seatId, "forfeit", events());
+  assert.equal(requestRematch(room.metadata.roomId, room.seat.seatId, events()).ok, true);
+  const firstMatchId = repository.snapshots[0]?.matchId;
+  repository.completeNext();
   await waitForMatchPersistenceForTests();
-  assert.equal(repository.attempts, 3);
-  assert.equal(repository.snapshots.length, 0);
-  assert.equal(getMatchState(room.metadata.roomId)?.phase, "FORFEIT");
-  assert.equal(getMatchState(room.metadata.roomId)?.winnerSeatId, room.seat.seatId);
   leaveMatch(room.metadata.roomId, guest.seat.seatId, "forfeit", events());
+  assert.equal(repository.snapshots.length, 2);
+  assert.notEqual(repository.snapshots[1]?.matchId, firstMatchId);
+  repository.completeNext();
   await waitForMatchPersistenceForTests();
-  assert.equal(repository.attempts, 4);
-  assert.equal(repository.snapshots.length, 1);
   clearMatchesForTests();
   clearRoomsForTests();
 });

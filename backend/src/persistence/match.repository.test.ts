@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { join } from "node:path";
 import test from "node:test";
 import {
   createMatchRepository,
+  DurableMatchRepository,
   InMemoryMatchRepository,
-  SupabaseMatchRepository,
   PERSISTENCE_SCHEMA_VERSION,
   QUESTION_BANK_VERSION,
+  type MatchRepository,
   type TerminalMatchSnapshot,
 } from "./index.js";
 
@@ -36,11 +39,51 @@ const snapshot = (overrides: Partial<TerminalMatchSnapshot> = {}): TerminalMatch
   ...overrides,
 });
 
-test("selects memory persistence without complete server-only Supabase configuration", () => {
+test("selects memory persistence without complete server-only Supabase configuration", async () => {
+  const directory = await mkdtemp(join(process.cwd(), ".terminal-outbox-test-"));
   assert.ok(createMatchRepository({}) instanceof InMemoryMatchRepository);
   assert.ok(createMatchRepository({ SUPABASE_URL: "https://example.supabase.co" }) instanceof InMemoryMatchRepository);
   assert.ok(createMatchRepository({ SUPABASE_SECRET_KEY: "secret" }) instanceof InMemoryMatchRepository);
-  assert.ok(createMatchRepository({ SUPABASE_URL: "https://example.supabase.co", SUPABASE_SECRET_KEY: "secret" }) instanceof SupabaseMatchRepository);
+  const repository = createMatchRepository(
+    { SUPABASE_URL: "https://example.supabase.co", SUPABASE_SECRET_KEY: "secret" },
+    directory,
+  );
+  assert.ok(repository instanceof DurableMatchRepository);
+  if (repository instanceof DurableMatchRepository) {
+    await repository.replayPending();
+    repository.close();
+  }
+  await rm(directory, { recursive: true, force: true });
+});
+
+test("durable persistence replays a failed terminal write after process restart", async () => {
+  const directory = await mkdtemp(join(process.cwd(), ".terminal-outbox-test-"));
+  const first = snapshot();
+  const failing: MatchRepository = {
+    persistTerminalMatch: async () => { throw new Error("database unavailable"); },
+  };
+  const delivered: TerminalMatchSnapshot[] = [];
+  const succeeding: MatchRepository = {
+    persistTerminalMatch: async (value) => {
+      delivered.push(structuredClone(value));
+      return { status: "inserted", matchId: value.matchId };
+    },
+  };
+
+  try {
+    const beforeRestart = new DurableMatchRepository(failing, directory, 60_000);
+    await assert.rejects(beforeRestart.persistTerminalMatch(first));
+    assert.equal((await readdir(directory)).filter((name) => name.endsWith(".json")).length, 1);
+    beforeRestart.close();
+
+    const afterRestart = new DurableMatchRepository(succeeding, directory, 60_000);
+    await afterRestart.replayPending();
+    assert.deepEqual(delivered, [first]);
+    assert.equal((await readdir(directory)).filter((name) => name.endsWith(".json")).length, 0);
+    afterRestart.close();
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("memory persistence is idempotent and rejects key reuse", async () => {

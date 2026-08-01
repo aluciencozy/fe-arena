@@ -68,7 +68,6 @@ type MatchRecord = {
 const matches = new Map<string, MatchRecord>();
 let matchRepository: MatchRepository = new InMemoryMatchRepository();
 const pendingPersistence = new Set<Promise<unknown>>();
-const TERMINAL_PERSISTENCE_ATTEMPTS = 3;
 
 export const setMatchRepository = (repository: MatchRepository) => {
   matchRepository = repository;
@@ -163,17 +162,14 @@ const persistTerminal = (record: MatchRecord) => {
   if (!snapshot) return;
   record.terminalPersistence = "pending";
   const repository = matchRepository;
-  const pending = (async () => {
-    for (let attempt = 1; attempt <= TERMINAL_PERSISTENCE_ATTEMPTS; attempt += 1) {
-      try {
-        await repository.persistTerminalMatch(snapshot);
-        record.terminalPersistence = "persisted";
-        return;
-      } catch {
-        if (attempt === TERMINAL_PERSISTENCE_ATTEMPTS) record.terminalPersistence = "idle";
-      }
-    }
-  })();
+  const pending = repository.persistTerminalMatch(snapshot).then(
+    () => {
+      if (record.matchId === snapshot.matchId) record.terminalPersistence = "persisted";
+    },
+    () => {
+      if (record.matchId === snapshot.matchId) record.terminalPersistence = "idle";
+    },
+  );
   pendingPersistence.add(pending);
   void pending.finally(() => pendingPersistence.delete(pending));
 };
