@@ -7,7 +7,7 @@ import {
 import { createRoom, attachSeat, disconnectSocket, getMetadata, getRoomForSocket, getSeatForSocket, getSeats, joinRoom, reconnectRoom, removeSeat } from "../services/room.service.js";
 import { enqueue, dequeue, publicConfig } from "../services/queue.service.js";
 import { clearMatch, configureMatch, ensureMatch, getMatchState, leaveMatch, pauseForDisconnect, resumeAfterReconnect, submitAnswer, toggleReady, requestRematch } from "../services/match.service.js";
-import { soloNext, soloSubmit, startSolo } from "../services/solo.service.js";
+import { clearSolo, soloNext, soloSubmit, startSolo } from "../services/solo.service.js";
 
 const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const chatTimes = new Map<string, number>();
@@ -200,6 +200,7 @@ export const registerHandlers = (io: Server, socket: Socket) => {
   });
 
   socket.on("disconnect", () => {
+    clearSolo(socket.id);
     dequeue(socket.id);
     chatTimes.delete(socket.id);
     const current = session(socket);

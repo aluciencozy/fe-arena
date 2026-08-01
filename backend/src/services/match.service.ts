@@ -233,6 +233,10 @@ export const submitAnswer = (roomId: string, seatId: string, attempt: QuestionAt
   if (!submission) return { ok: false as const, error: "You are not seated in this match." };
   if (submission.submitted) return { ok: false as const, error: "Your answer is already locked for this question." };
   if (attempt.questionId !== question.id) return { ok: false as const, error: "That question is no longer active." };
+  if (record.state.questionEndsAt !== null && Date.now() >= record.state.questionEndsAt) {
+    revealRound(roomId, events);
+    return { ok: false as const, error: "That question's time has expired." };
+  }
   // Grading happens only here, on the server, against the private repository record.
   const correct = gradeQuestion(question, attempt);
   const elapsedMs = Math.max(0, Date.now() - (record.state.questionStartedAt ?? Date.now()));
@@ -298,6 +302,7 @@ export const pauseForDisconnect = (roomId: string, seatId: string, events: Match
 export const resumeAfterReconnect = (roomId: string, events: MatchEvents) => {
   const record = matches.get(roomId);
   if (!record || record.state.phase !== "PAUSED" || !record.pausedFrom || record.pausedAt === null) return false;
+  if (getSeats(roomId).some((seat) => !seat.connected)) return false;
   const pausedMs = Math.max(0, Date.now() - record.pausedAt);
   if (record.state.questionStartedAt !== null) record.state.questionStartedAt += pausedMs;
   if (record.state.questionEndsAt !== null) record.state.questionEndsAt += pausedMs;

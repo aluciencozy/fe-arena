@@ -68,7 +68,7 @@ export const joinRoom = (roomIdInput: string, nameInput: string, socketId: strin
   if (existingSocket) return { ok: false as const, error: "This browser is already seated in a match." };
   const sameName = record.seats.find((seat) => seat.name.toLocaleLowerCase() === name.toLocaleLowerCase());
   if (sameName) return { ok: false as const, error: "That guest name is already in this room." };
-  if (record.seats.length >= 2) return { ok: false as const, error: "This private match already has two guests." };
+  if (record.seats.length >= 2) return { ok: false as const, error: "This room already has two guests." };
   const seat: RoomSeat = { seatId: randomUUID(), name, reconnectToken: randomUUID(), socketId, connected: true };
   record.seats.push(seat);
   socketSeats.set(socketId, { roomId, seatId: seat.seatId });
