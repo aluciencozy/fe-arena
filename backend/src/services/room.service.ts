@@ -111,6 +111,7 @@ export const removeSeat = (roomIdInput: string, seatId: string) => {
   if (seat.socketId) socketSeats.delete(seat.socketId);
   tokenSeats.delete(seat.reconnectToken);
   if (record.seats.length === 0) rooms.delete(roomId);
+  else if (record.metadata.hostSeatId === seatId) record.metadata.hostSeatId = record.seats[0]!.seatId;
   return { roomId, seat, remaining: record.seats };
 };
 

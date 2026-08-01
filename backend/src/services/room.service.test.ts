@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { attachSeat, clearRoomsForTests, createRoom, disconnectSocket, getSeats, joinRoom, reconnectRoom, removeSeat } from "./room.service.js";
+import { attachSeat, clearRoomsForTests, createRoom, disconnectSocket, getMetadata, getSeats, joinRoom, reconnectRoom, removeSeat } from "./room.service.js";
 import { TOPICS, type MatchConfig } from "../../../shared/domain.js";
 
 const config: MatchConfig = { topicIds: [TOPICS[0].id], roundCount: 5, questionTimerSeconds: 60 };
@@ -27,5 +27,16 @@ test("removing a seat cannot touch a different room", () => {
   const removed = removeSeat(first.metadata.roomId, first.seat.seatId);
   assert.equal(removed?.roomId, first.metadata.roomId);
   assert.equal(getSeats(second.metadata.roomId)[0]?.name, "Two");
+  clearRoomsForTests();
+});
+
+test("host ownership transfers to the remaining guest", () => {
+  clearRoomsForTests();
+  const created = createRoom("private", config, "Host");
+  const joined = joinRoom(created.metadata.roomId, "Guest", "socket-guest");
+  assert.equal(joined.ok, true);
+  if (!joined.ok) return;
+  removeSeat(created.metadata.roomId, created.seat.seatId);
+  assert.equal(getMetadata(created.metadata.roomId)?.hostSeatId, joined.seat.seatId);
   clearRoomsForTests();
 });

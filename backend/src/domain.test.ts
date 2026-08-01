@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateScore, gradeQuestion, normalizeAnswer, selectSeededQuestions, toPublicQuestion, TOPICS, type Question } from "../../shared/domain.js";
+import { calculateScore, ClientEventSchemas, compareScores, gradeQuestion, normalizeAnswer, selectSeededQuestions, ServerEventSchemas, toPublicQuestion, TOPICS, type Question } from "../../shared/domain.js";
 import { QUESTION_BANK, validateQuestionBank } from "./data/questions.js";
 
 test("normalization is stable and explicit aliases grade short answers", () => {
@@ -26,6 +26,16 @@ test("score correctness dominates speed and bonus has hard boundaries", () => {
   assert.equal(calculateScore(true, 0, 300_000).total, 1300);
   assert.equal(calculateScore(true, 300_000, 300_000).total, 1000);
   assert.equal(calculateScore(true, 900_000, 300_000).total, 1000);
+  const fourFast = { playerId: "a", playerName: "A", total: 5200, correct: 4, responseMs: 0 };
+  const fiveSlow = { playerId: "b", playerName: "B", total: 5000, correct: 5, responseMs: 1_500_000 };
+  assert.equal(compareScores(fourFast, fiveSlow).playerId, "b");
+});
+
+test("socket contracts validate payloadless requests and public outputs", () => {
+  assert.equal(ClientEventSchemas["room:state-request"].safeParse(undefined).success, true);
+  assert.equal(ClientEventSchemas["room:state-request"].safeParse({}).success, false);
+  assert.equal(ServerEventSchemas["server:error"].safeParse({ code: "BAD_REQUEST", message: "Invalid request" }).success, true);
+  assert.equal(ServerEventSchemas["queue:state"].safeParse({ status: "waiting" }).success, false);
 });
 
 test("seeded selection is deterministic and topic-filtered", () => {

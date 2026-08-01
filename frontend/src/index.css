@@ -1,6 +1,10 @@
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --font-sans: "Geist Variable", sans-serif;
@@ -12,6 +16,27 @@
   --color-line: var(--line);
   --color-gold: var(--gold);
   --color-gold-soft: var(--gold-soft);
+  --color-background: var(--ink);
+  --color-foreground: var(--cream);
+  --color-card: var(--panel);
+  --color-card-foreground: var(--cream);
+  --color-popover: var(--panel-raised);
+  --color-popover-foreground: var(--cream);
+  --color-primary: var(--gold);
+  --color-primary-foreground: var(--ink);
+  --color-secondary: var(--panel-raised);
+  --color-secondary-foreground: var(--cream);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--gold-soft);
+  --color-accent-foreground: var(--ink);
+  --color-destructive: var(--red-300);
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--gold);
+  --radius-sm: 4px;
+  --radius-md: 7px;
+  --radius-lg: 12px;
+  --radius-xl: 12px;
   --color-red-300: #fca5a5;
   --color-green-300: #86efac;
 }

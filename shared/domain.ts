@@ -23,6 +23,8 @@ export type MatchPhase = "LOBBY" | "SETUP" | "READY" | "COUNTDOWN" | "QUESTION" 
 
 export const QuestionTypeSchema = z.enum(["multiple-choice", "numeric", "short-answer", "code-output", "ordered-sequence"]);
 export const TopicIdSchema = z.enum(TOPICS.map((topic) => topic.id) as [TopicId, ...TopicId[]]);
+export const MatchSourceSchema = z.enum(["private", "public"]);
+export const MatchPhaseSchema = z.enum(["LOBBY", "SETUP", "READY", "COUNTDOWN", "QUESTION", "REVEAL", "RESULTS", "REMATCH", "PAUSED", "FORFEIT", "ABANDONED", "EXPIRED"]);
 
 const ProvenanceSchema = z.object({
   source: z.string().min(1),
@@ -206,8 +208,8 @@ export const selectSeededQuestions = (questions: readonly Question[], seed: stri
 
 export type MatchScore = { playerId: string; playerName: string; total: number; correct: number; responseMs: number };
 export const compareScores = (left: MatchScore, right: MatchScore): MatchScore => {
-  if (left.total !== right.total) return left.total > right.total ? left : right;
   if (left.correct !== right.correct) return left.correct > right.correct ? left : right;
+  if (left.total !== right.total) return left.total > right.total ? left : right;
   if (left.responseMs !== right.responseMs) return left.responseMs < right.responseMs ? left : right;
   return left;
 };
@@ -230,5 +232,102 @@ export const SoloStartSchema = z.object({
   count: z.number().int().min(1).max(MAX_ROUND_COUNT).default(DEFAULT_ROUND_COUNT),
   timerSeconds: z.number().int().min(QUESTION_TIMER_MIN_SECONDS).max(QUESTION_TIMER_MAX_SECONDS).default(120),
 });
+
+export const PublicQuestionSchema = z.object({
+  id: z.string().min(1),
+  topicId: TopicIdSchema,
+  type: QuestionTypeSchema,
+  prompt: z.string().min(1),
+  difficulty: z.enum(["intro", "core", "stretch"]),
+  options: z.array(z.object({ id: z.string().min(1), label: z.string().min(1) })).optional(),
+  unit: z.string().optional(),
+  language: z.literal("c").optional(),
+  items: z.array(z.object({ id: z.string().min(1), label: z.string().min(1) })).optional(),
+  orderLength: z.number().int().positive().optional(),
+});
+export const RevealedQuestionSchema = PublicQuestionSchema.and(z.object({
+  explanation: z.string().min(1),
+  assumptions: z.array(z.string()).min(1),
+  provenance: ProvenanceSchema,
+  answer: z.union([z.string(), z.number(), z.array(z.string())]),
+}));
+export const ScoreBreakdownSchema: z.ZodType<ScoreBreakdown> = z.object({ correctness: z.number().nonnegative(), speedBonus: z.number().nonnegative(), total: z.number().nonnegative() });
+export const RoomMetadataSchema = z.object({ roomId: z.string().regex(/^[A-Z0-9]{6}$/), source: MatchSourceSchema, hostSeatId: z.string().uuid(), config: MatchConfigSchema });
+export const SafeRoomSeatSchema = z.object({ seatId: z.string().uuid(), name: z.string().min(1), connected: z.boolean() });
+export const RoomStateSchema = z.object({ metadata: RoomMetadataSchema, seats: z.array(SafeRoomSeatSchema).max(2) });
+export const SubmissionPublicSchema = z.object({
+  submitted: z.boolean(),
+  correct: z.boolean().nullable(),
+  score: ScoreBreakdownSchema.nullable(),
+  answer: z.union([z.string(), z.number(), z.array(z.string())]).nullable(),
+});
+export const RoundHistorySchema = z.object({ round: z.number().int().positive(), question: RevealedQuestionSchema, submissions: z.record(z.string(), SubmissionPublicSchema) });
+export const MatchPublicStateSchema = z.object({
+  roomId: z.string().regex(/^[A-Z0-9]{6}$/),
+  source: MatchSourceSchema,
+  phase: MatchPhaseSchema,
+  config: MatchConfigSchema,
+  roundIndex: z.number().int().nonnegative(),
+  totalRounds: z.number().int().nonnegative(),
+  question: PublicQuestionSchema.nullable(),
+  revealedQuestion: RevealedQuestionSchema.nullable(),
+  questionStartedAt: z.number().nullable(),
+  questionEndsAt: z.number().nullable(),
+  countdownEndsAt: z.number().nullable(),
+  pause: z.object({ seatName: z.string().min(1), expiresAt: z.number() }).nullable(),
+  ready: z.record(z.string(), z.boolean()),
+  submissions: z.record(z.string(), SubmissionPublicSchema),
+  scores: z.record(z.string(), z.object({ total: z.number().nonnegative(), correct: z.number().int().nonnegative(), responseMs: z.number().nonnegative() })),
+  winnerSeatId: z.string().uuid().nullable(),
+  endReason: z.enum(["completed", "forfeit", "abandoned", "expired"]).nullable(),
+  history: z.array(RoundHistorySchema),
+});
+export const SoloStateSchema = z.object({
+  phase: z.enum(["QUESTION", "RESULT", "COMPLETE"]),
+  question: PublicQuestionSchema.nullable(),
+  revealedQuestion: RevealedQuestionSchema.nullable(),
+  questionStartedAt: z.number().nullable(),
+  questionEndsAt: z.number().nullable(),
+  result: z.object({ correct: z.boolean(), score: ScoreBreakdownSchema }).nullable(),
+  runScore: z.number().nonnegative(),
+  runCorrect: z.number().int().nonnegative(),
+  runTotal: z.number().int().nonnegative(),
+});
+
+export const NoPayloadSchema = z.undefined();
+export const ClientEventSchemas = {
+  "room:create-private": CreatePrivateSchema,
+  "room:join": JoinRoomSchema,
+  "room:reconnect": ReconnectSchema,
+  "room:state-request": NoPayloadSchema,
+  "room:leave": NoPayloadSchema,
+  "queue:join": QueueJoinSchema,
+  "queue:leave": NoPayloadSchema,
+  "match:configure": MatchConfigSchema,
+  "match:ready": NoPayloadSchema,
+  "match:submit": SubmitSchema,
+  "match:rematch": NoPayloadSchema,
+  "chat:send": ChatSchema,
+  "solo:start": SoloStartSchema,
+  "solo:submit": SubmitSchema,
+  "solo:next": NoPayloadSchema,
+} as const;
+export const ServerEventSchemas = {
+  "room:created": z.object({ roomId: z.string().regex(/^[A-Z0-9]{6}$/), metadata: RoomMetadataSchema, seatId: z.string().uuid(), reconnectToken: z.string().uuid() }),
+  "room:session": z.object({ roomId: z.string().regex(/^[A-Z0-9]{6}$/), seatId: z.string().uuid(), reconnectToken: z.string().uuid() }),
+  "room:state": RoomStateSchema,
+  "room:reconnect-failed": z.object({ message: z.string().min(1) }),
+  "queue:state": z.discriminatedUnion("status", [
+    z.object({ status: z.literal("waiting"), expiresAt: z.number() }),
+    z.object({ status: z.enum(["expired", "cancelled"]) }),
+  ]),
+  "queue:matched": z.object({ roomId: z.string().regex(/^[A-Z0-9]{6}$/), metadata: RoomMetadataSchema }),
+  "queue:seat": z.object({ roomId: z.string().regex(/^[A-Z0-9]{6}$/), seatId: z.string().uuid(), reconnectToken: z.string().uuid() }),
+  "match:state": MatchPublicStateSchema,
+  "match:submission-ack": z.object({ correct: z.boolean(), score: ScoreBreakdownSchema }),
+  "chat:message": z.object({ type: z.enum(["system", "user"]), sender: z.string().min(1), text: z.string().min(1).max(280), sentAt: z.number() }),
+  "solo:state": SoloStateSchema,
+  "server:error": z.object({ code: z.string().min(1), message: z.string().min(1) }),
+} as const;
 
 export const topicLabel = (topicId: TopicId) => TOPICS.find((topic) => topic.id === topicId)?.label ?? topicId;

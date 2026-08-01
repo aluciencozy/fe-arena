@@ -17,15 +17,20 @@ export default function Room() {
   const seatId = useGameStore((state) => state.seatId);
   const clearSession = useGameStore((state) => state.clearSession);
   const api = useArenaSocket(roomId, name);
+  const questionId = match?.question?.id ?? null;
   const [chatOpen, setChatOpen] = useState(false);
   const [chatText, setChatText] = useState("");
-  const [answer, setAnswer] = useState<string | number | string[]>("");
-  const [ordered, setOrdered] = useState<string[]>([]);
+  const [answerState, setAnswerState] = useState<{ questionId: string | null; value: string | number | string[] }>({ questionId: null, value: "" });
+  const [orderedState, setOrderedState] = useState<{ questionId: string | null; value: string[] }>({ questionId: null, value: [] });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedTopics, setSelectedTopics] = useState<TopicId[]>(["arrays-memory", "linked-lists", "stacks", "queues", "binary-trees", "sorting", "recursion", "analysis-mathematics"]);
   const [timer, setTimer] = useState(90);
   const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const answer = answerState.questionId === questionId ? answerState.value : "";
+  const ordered = orderedState.questionId === questionId ? orderedState.value : [];
+  const setAnswer = (value: string | number | string[]) => setAnswerState({ questionId, value });
+  const setOrdered = (value: string[]) => setOrderedState({ questionId, value });
 
   useEffect(() => { if (!name || !roomId) navigate("/", { replace: true }); }, [name, navigate, roomId]);
   useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 250); return () => window.clearInterval(id); }, []);
@@ -44,7 +49,7 @@ export default function Room() {
   if (!name || !roomId) return null;
   return <div className="min-h-screen bg-ink text-cream"><header className="sticky top-0 z-30 border-b border-line bg-ink/95 backdrop-blur"><div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-8"><button className="icon-button" onClick={leave} aria-label="Leave room"><ArrowLeft size={17} /></button><div className="min-w-0 flex-1"><p className="eyebrow">{match ? phaseLabel(match.phase) : "connecting"} · {match?.source === "public" ? "public queue" : "private 1v1"}</p><p className="truncate font-mono text-sm text-muted">{self?.name ?? name} <span className="text-line">vs</span> {opponent?.name ?? "open seat"}</p></div><button className="code-pill" onClick={copy}><span>{roomId}</span>{copied ? <Check size={14} /> : <Copy size={14} />}</button><button className="icon-button relative" onClick={() => setChatOpen((open) => !open)} aria-label="Toggle chat"><MessageCircle size={17} />{api.messages.length > 0 && <span className="badge">{Math.min(99, api.messages.length)}</span>}</button><button className="button button-danger hidden sm:flex" onClick={leave}><LogOut size={14} /> leave</button></div></header>
     {api.connection !== "connected" && !match?.pause && <div className="border-b border-gold/20 bg-gold/10 px-4 py-2 text-center font-mono text-xs text-gold"><WifiOff className="mr-2 inline" size={14} />reconnecting to the server…</div>}
-    <main className="mx-auto max-w-7xl px-4 py-6 sm:px-8 sm:py-10">{api.errorNotice && <div className="notice-error mb-5"><ShieldAlert size={16} />{api.errorNotice}</div>}{!match ? <Loading /> : match.phase === "LOBBY" || match.phase === "SETUP" || match.phase === "READY" || match.phase === "REMATCH" ? <Lobby match={match} seatId={seatId} host={host} self={self?.name ?? name} opponent={opponent?.name} selectedTopics={selectedTopics} timer={timer} setSelectedTopics={setSelectedTopics} setTimer={setTimer} settingsOpen={settingsOpen} setSettingsOpen={setSettingsOpen} onConfigure={configure} onReady={api.ready} /> : match.phase === "COUNTDOWN" ? <Countdown seconds={seconds ?? 3} round={match.roundIndex + 1} /> : match.phase === "QUESTION" ? <QuestionStage match={match} seatId={seatId} opponent={opponent?.name} seconds={seconds} answer={answer} setAnswer={setAnswer} ordered={ordered} setOrdered={setOrdered} submitted={isSubmitted} submit={submit} lastSubmission={api.lastSubmission} /> : match.phase === "REVEAL" ? <Reveal match={match} /> : match.phase === "PAUSED" ? <Paused pause={match.pause} now={now} /> : <Results match={match} selfSeatId={seatId} onRematch={api.rematch} onHome={leave} />}</main>
+    <main className="mx-auto max-w-7xl px-4 py-6 sm:px-8 sm:py-10">{api.errorNotice && <div className="notice-error mb-5"><ShieldAlert size={16} />{api.errorNotice}</div>}{!match ? <Loading /> : match.phase === "LOBBY" || match.phase === "SETUP" || match.phase === "READY" || match.phase === "REMATCH" ? <Lobby match={match} seatId={seatId} host={host} self={self?.name ?? name} opponent={opponent?.name} selectedTopics={selectedTopics} timer={timer} setSelectedTopics={setSelectedTopics} setTimer={setTimer} settingsOpen={settingsOpen} setSettingsOpen={setSettingsOpen} onConfigure={configure} onReady={api.ready} /> : match.phase === "COUNTDOWN" ? <Countdown seconds={seconds ?? 3} round={match.roundIndex + 1} /> : match.phase === "QUESTION" ? <QuestionStage match={match} seatId={seatId} opponent={opponent?.name} seconds={seconds} answer={answer} setAnswer={setAnswer} ordered={ordered} setOrdered={setOrdered} submitted={isSubmitted} submit={submit} lastSubmission={isSubmitted ? api.lastSubmission : null} /> : match.phase === "REVEAL" ? <Reveal match={match} /> : match.phase === "PAUSED" ? <Paused pause={match.pause} now={now} /> : <Results match={match} selfSeatId={seatId} onRematch={api.rematch} onHome={leave} />}</main>
     <Chat open={chatOpen} messages={api.messages} value={chatText} setValue={setChatText} onClose={() => setChatOpen(false)} onSend={sendChat} self={self?.name ?? name} />
   </div>;
 }

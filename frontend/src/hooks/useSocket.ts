@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { connectSocket, scheduleSocketDisconnect, socket } from "@/lib/socket";
 import { clearStoredToken, storedTokenForRoom, useGameStore } from "@/store/gameStore";
@@ -13,6 +13,7 @@ export const useArenaSocket = (roomId: string, playerName: string) => {
   const [errorNotice, setErrorNotice] = useState("");
   const [connection, setConnection] = useState<"connecting" | "connected" | "disconnected">("connecting");
   const [lastSubmission, setLastSubmission] = useState<{ correct: boolean; total: number } | null>(null);
+  const clearSubmission = useCallback(() => setLastSubmission(null), []);
 
   useEffect(() => {
     if (!roomId || !playerName) return;
@@ -40,7 +41,7 @@ export const useArenaSocket = (roomId: string, playerName: string) => {
 
   return {
     messages, errorNotice, connection, lastSubmission,
-    clearSubmission: () => setLastSubmission(null),
+    clearSubmission,
     sendChat: (message: string) => { if (message.trim()) socket.emit("chat:send", { message }); },
     configure: (config: unknown) => socket.emit("match:configure", config),
     ready: () => socket.emit("match:ready"),
