@@ -8,7 +8,7 @@ FE Arena is an unofficial UCF Computer Science Foundation Exam study tool. It is
 - Public random-player queue with a five-minute maximum wait and five-minute question timer.
 - Five-round server-authoritative matches, explicit confirmed leave/forfeit, 30-second disconnect pause, rematch, and current-run results.
 - Solo practice using the same question repository, normalization, grading, and scoring functions.
-- Original reviewed prompts across twelve topic families and five domain question types: multiple choice, numeric, normalized short answer, C output tracing, and ordered sequence.
+- Original reviewed prompts across twelve topic families and six domain question types: multiple choice, numeric, normalized short answer, curated C output tracing, ordered sequence, and graph reasoning.
 - Collapsible room chat limited to one message per second.
 
 ## Local development
@@ -40,7 +40,7 @@ The frontend runs at `http://localhost:5173`; the backend runs at `http://localh
 
 Match states carry absolute `questionStartedAt`, `questionEndsAt`, and countdown deadlines. A temporary disconnect changes the match to `PAUSED`, clears timers, and extends the saved deadline by the actual pause duration on reconnect. Expiry becomes an explicit `EXPIRED` outcome; an intentional leave becomes `FORFEIT`. A reconnect token restores the same seat rather than creating a new guest.
 
-The server emits a public question view without answer, explanation, assumptions, provenance, or opponent answers. Reveal and results are the first phases that include solution fields. Late, duplicate, wrong-question, malformed, and client-invented submissions are rejected. C prompts are text-traced against reviewed expected output; FE Arena never executes arbitrary submitted code.
+The server emits a public question view without answer, explanation, assumptions, provenance, or opponent answers. Reveal and results are the first phases that include solution fields. Late, duplicate, wrong-question, malformed, and client-invented submissions are rejected. C prompts show a reviewed, syntax-preserving code block and are graded against curated expected output; FE Arena never compiles or executes arbitrary submitted code. Graph prompts show a deterministic unweighted directed or undirected diagram; BFS/DFS use preorder and displayed node-order neighbor traversal, adjacency returns direct neighbors in displayed node order, reachability follows arrows, and shortest paths count unit-weight edges.
 
 Scores are `1,000` correctness points plus a maximum `300` speed bonus. A wrong answer is zero. Correct count wins; ties compare server-computed total score, then aggregate response time, then remain a draw.
 
@@ -61,7 +61,7 @@ The bank covers:
 11. Recursion
 12. Algorithm analysis and representation
 
-Every item carries an answer, explanation, assumptions, and provenance. Content is validated at module load and in tests for schema shape, unique IDs, option/sequence references, and complete type coverage. New content requires normal PR review plus validation. Migration `supabase/migrations/202603080003_question_bank.sql` creates the server-only table; after applying migrations, `cd backend && npm run seed:questions` idempotently upserts the reviewed bank using `SUPABASE_URL` and `SUPABASE_SECRET_KEY`. If either variable is absent, local development and tests use the in-memory fallback. The public UCF index and supplied reference PDFs are provenance anchors for topic planning only: https://www.cs.ucf.edu/registration/exm/. They are not a license to copy, and FE Arena does not claim to match any future exam format.
+Every item carries an answer, explanation, assumptions, and provenance. Content is validated at module load and in tests for schema shape, unique IDs, option/sequence/graph references, and complete type coverage. Apply the ordered migrations `supabase/migrations/202603080003_question_bank.sql` and `supabase/migrations/202603080004_question_bank_graph.sql` to create and extend the server-only table, then `cd backend && npm run seed:questions` idempotently upserts the reviewed bank when `SUPABASE_URL` and `SUPABASE_SECRET_KEY` are configured. The original 120-question reviewed bank remains intact, with five graph questions added for the next experience. Existing C rows without a stored code remain loadable through the compatibility mapper; new C rows always include curated code. Graph content is presentation-only: users cannot edit graphs or submit graph code. If either Supabase variable is absent, local development and tests use the in-memory fallback. New content requires normal PR review plus validation. The public UCF index and supplied reference PDFs are provenance anchors for topic planning only: https://www.cs.ucf.edu/registration/exm/. They are not a license to copy, and FE Arena does not claim to match any future exam format.
 
 ## Verification
 
@@ -70,7 +70,7 @@ cd backend && npm run typecheck && npm test
 cd ../frontend && npm run lint && npm run build
 ```
 
-The backend tests cover normalization, all five question types, seeded selection, score boundaries, hidden answers, ready/countdown transitions, duplicate-safe service behavior, queue expiry/cancellation, room isolation, and reconnect seat restoration. Production hosting needs a Node process for the backend and a static host/reverse proxy for the Vite build. Runtime match state is intentionally in memory for this MVP; Supabase question loading and terminal persistence use the server-only secret key.
+The backend tests cover normalization, all six question types, Supabase row compatibility, seeded selection, score boundaries, hidden answers, ready/countdown transitions, graph/C lifecycle submissions, duplicate-safe service behavior, queue expiry/cancellation, room isolation, and reconnect seat restoration. Production hosting needs a Node process for the backend and a static host/reverse proxy for the Vite build; runtime match state is intentionally in memory for this MVP. Supabase question loading and terminal persistence use the server-only secret key.
 
 ## Explicit exclusions
 

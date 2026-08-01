@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateScore, ClientEventSchemas, compareScores, gradeQuestion, normalizeAnswer, selectSeededQuestions, ServerEventSchemas, toPublicQuestion, TOPICS, type Question } from "../../shared/domain.js";
+import { calculateScore, ClientEventSchemas, compareScores, gradeQuestion, normalizeAnswer, QuestionSchema, selectSeededQuestions, ServerEventSchemas, toPublicQuestion, TOPICS, type Question } from "../../shared/domain.js";
 import { QUESTION_BANK, validateQuestionBank } from "./data/questions.js";
 import { loadQuestionRepository, questionFromRow, questionToRow } from "./services/question-bank.service.js";
 
@@ -13,15 +13,17 @@ test("normalization is stable and explicit aliases grade short answers", () => {
 
 test("reviewed bank has complete topic/type coverage, valid unique IDs, and hidden public solutions", () => {
   const questions = validateQuestionBank();
-  assert.ok(questions.length >= 100);
+  assert.equal(questions.length, 125);
   assert.equal(new Set(questions.map((question) => question.id)).size, questions.length);
+  assert.equal(questions.filter((question) => question.type === "graph").length, 5);
+  assert.equal(new Set(questions.map((question) => question.type)).size, 6);
   assert.equal(new Set(questions.map((question) => question.topicId)).size, TOPICS.length);
   for (const topic of TOPICS) {
     const topicQuestions = questions.filter((question) => question.topicId === topic.id);
     assert.ok(topicQuestions.length >= 8, topic.id);
-    assert.equal(new Set(topicQuestions.map((question) => question.type)).size, 5, topic.id);
+    assert.ok(new Set(topicQuestions.map((question) => question.type)).size >= 5, topic.id);
   }
-  assert.equal(new Set(questions.map((question) => question.type)).size, 5);
+  assert.equal(new Set(questions.map((question) => question.type)).size, 6);
   for (const question of questions) {
     const publicView = toPublicQuestion(question);
     assert.equal("answer" in publicView, false);
@@ -32,6 +34,12 @@ test("reviewed bank has complete topic/type coverage, valid unique IDs, and hidd
     assert.equal("explanation" in publicView, false);
     assert.equal("assumptions" in publicView, false);
     assert.equal("provenance" in publicView, false);
+    if (question.type === "code-output") assert.equal(publicView.code, question.code);
+    if (question.type === "graph") {
+      assert.deepEqual(publicView.graph, question.graph);
+      assert.equal("reachable" in publicView, false);
+      assert.equal("distance" in publicView, false);
+    }
   }
 });
 
@@ -89,6 +97,46 @@ test("Supabase private content cannot overwrite canonical row fields", () => {
   assert.equal(loaded.type, source.type);
   assert.equal(loaded.prompt, source.prompt);
   assert.equal(loaded.difficulty, source.difficulty);
+});
+
+test("Supabase rows preserve legacy C content and load graph content", async () => {
+  const code = QUESTION_BANK.find((question) => question.type === "code-output")!;
+  assert.equal(code.type, "code-output");
+  if (code.type !== "code-output") return;
+  const storedCode = questionToRow(code);
+  const legacyContent = { ...(storedCode.content as Record<string, unknown>) };
+  delete legacyContent.code;
+  const legacy = questionFromRow({ ...storedCode, prompt: "What line does this C fragment print? int a[3] = {2, 4, 6}; printf(\"%d\", a[1] + a[2]);", content: legacyContent, schema_version: 2, published: true });
+  assert.equal(legacy.type, "code-output");
+  assert.equal(legacy.code, code.code);
+
+  const graph = QUESTION_BANK.find((question) => question.type === "graph")!;
+  const row = { ...questionToRow(graph), schema_version: 3, published: true };
+  const query = {
+    select: () => query,
+    eq: () => query,
+    order: async () => ({ data: [row], error: null }),
+  };
+  const repository = await loadQuestionRepository({ SUPABASE_URL: "https://example.supabase.co", SUPABASE_SECRET_KEY: "service-key" }, { from: () => query } as never);
+  assert.deepEqual(repository.get(graph.id), graph);
+});
+
+test("graph grading supports traversal, adjacency, reachability, and shortest paths", () => {
+  const bfs = QUESTION_BANK.find((item) => item.id === "q-graph-bfs")!;
+  const adjacency = QUESTION_BANK.find((item) => item.id === "q-graph-adjacency")!;
+  const reachability = QUESTION_BANK.find((item) => item.id === "q-graph-reachability")!;
+  const shortest = QUESTION_BANK.find((item) => item.id === "q-graph-shortest")!;
+  assert.equal(gradeQuestion(bfs, { questionId: bfs.id, answer: ["a", "b", "c", "d", "e"] }), true);
+  assert.equal(gradeQuestion(bfs, { questionId: bfs.id, answer: ["a", "c", "b", "d", "e"] }), false);
+  assert.equal(gradeQuestion(adjacency, { questionId: adjacency.id, answer: ["a", "b", "d", "e"] }), true);
+  assert.equal(gradeQuestion(reachability, { questionId: reachability.id, answer: "no" }), true);
+  assert.equal(gradeQuestion(reachability, { questionId: reachability.id, answer: true }), false);
+  assert.equal(gradeQuestion(shortest, { questionId: shortest.id, answer: "3" }), true);
+  assert.equal(gradeQuestion(shortest, { questionId: "q-other", answer: 3 }), false);
+  const graph = QUESTION_BANK.find((item) => item.type === "graph")!;
+  const malformed = structuredClone(graph);
+  malformed.graph.nodes.push({ ...malformed.graph.nodes[0]! });
+  assert.equal(QuestionSchema.safeParse(malformed).success, false);
 });
 
 test("code output and ordered sequence grading do not execute arbitrary code", () => {

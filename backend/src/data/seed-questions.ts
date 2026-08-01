@@ -10,7 +10,7 @@ if (!url || !secretKey) {
 }
 
 const questions = validateQuestionBank(QUESTION_BANK);
-const rows = questions.map((question) => ({ ...questionToRow(question), schema_version: 2, published: true }));
+const rows = questions.map((question) => ({ ...questionToRow(question), schema_version: 3, published: true }));
 const client = createClient(url, secretKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
 const { error } = await client.from("question_bank").upsert(rows, { onConflict: "id" });
 if (error) throw new Error(`Question-bank seed failed: ${error.message}`);

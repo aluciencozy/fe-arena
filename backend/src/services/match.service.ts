@@ -27,7 +27,7 @@ export type SubmissionPublic = {
   submitted: boolean;
   correct: boolean | null;
   score: ScoreBreakdown | null;
-  answer: string | number | string[] | null;
+  answer: string | number | boolean | string[] | null;
 };
 export type RoundHistory = { round: number; question: RevealedQuestion; submissions: Record<string, SubmissionPublic> };
 export type MatchPublicState = {

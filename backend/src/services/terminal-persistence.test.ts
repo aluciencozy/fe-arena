@@ -62,12 +62,16 @@ const setupRoom = () => {
   return { room, guest };
 };
 
-const answerFor = (question: Question): string | number | string[] => {
+const answerFor = (question: Question): string | number | boolean | string[] => {
   if (question.type === "multiple-choice") return question.answer;
   if (question.type === "numeric") return question.answer;
   if (question.type === "short-answer") return question.answers[0]!;
   if (question.type === "code-output") return question.output;
-  return question.answerOrder;
+  if (question.type === "ordered-sequence") return question.answerOrder;
+  if (question.operation === "reachability") return question.reachable!;
+  if (question.operation === "shortest-path") return question.distance!;
+  if (question.operation === "adjacency") return question.adjacentNodes!;
+  return question.answerOrder!;
 };
 
 const startMatch = () => {
