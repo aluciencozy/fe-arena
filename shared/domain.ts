@@ -201,10 +201,9 @@ export const seededShuffle = <T>(items: readonly T[], seed: string | number): T[
 
 export const selectSeededQuestions = (questions: readonly Question[], seed: string | number, count: number, topicIds?: readonly TopicId[]) => {
   const allowed = topicIds?.length ? questions.filter((question) => topicIds.includes(question.topicId)) : [...questions];
-  if (!allowed.length) return [];
+  if (!allowed.length || count <= 0 || allowed.length < count) return [];
   const shuffled = seededShuffle(allowed, seed);
-  // A run must not repeat a question; callers can request fewer rounds than the bank size.
-  return shuffled.slice(0, Math.min(Math.max(0, count), shuffled.length));
+  return shuffled.slice(0, count);
 };
 
 export type MatchScore = { playerId: string; playerName: string; total: number; correct: number; responseMs: number };

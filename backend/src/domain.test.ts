@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { calculateScore, ClientEventSchemas, compareScores, gradeQuestion, normalizeAnswer, selectSeededQuestions, ServerEventSchemas, toPublicQuestion, TOPICS, type Question } from "../../shared/domain.js";
 import { QUESTION_BANK, validateQuestionBank } from "./data/questions.js";
-import { loadQuestionRepository, questionToRow } from "./services/question-bank.service.js";
+import { loadQuestionRepository, questionFromRow, questionToRow } from "./services/question-bank.service.js";
 
 test("normalization is stable and explicit aliases grade short answers", () => {
   assert.equal(normalizeAnswer("  Little–Endian! "), "little endian");
@@ -58,6 +58,7 @@ test("seeded selection is deterministic, topic-filtered, and has no repeated que
   assert.deepEqual(first.map((question) => question.id), second.map((question) => question.id));
   assert.equal(new Set(first.map((question) => question.id)).size, first.length);
   assert.ok(first.every((question) => question.topicId === "stacks" || question.topicId === "queues"));
+  assert.equal(selectSeededQuestions(first, "replay-seed", first.length + 1).length, 0);
 });
 
 test("Supabase rows load private content through the repository without changing public views", async () => {
@@ -72,6 +73,22 @@ test("Supabase rows load private content through the repository without changing
   const loaded = repository.get(source.id)!;
   assert.equal(loaded.explanation, source.explanation);
   assert.equal("answer" in toPublicQuestion(loaded), false);
+});
+
+test("Supabase private content cannot overwrite canonical row fields", () => {
+  const source = QUESTION_BANK.find((question) => question.type === "multiple-choice")!;
+  const row = questionToRow(source);
+  const loaded = questionFromRow({
+    ...row,
+    content: { ...(row.content as Record<string, unknown>), id: "q-forged", topicId: "queues", type: "multiple-choice", prompt: "Forged content prompt", difficulty: "stretch" },
+    schema_version: 2,
+    published: true,
+  });
+  assert.equal(loaded.id, source.id);
+  assert.equal(loaded.topicId, source.topicId);
+  assert.equal(loaded.type, source.type);
+  assert.equal(loaded.prompt, source.prompt);
+  assert.equal(loaded.difficulty, source.difficulty);
 });
 
 test("code output and ordered sequence grading do not execute arbitrary code", () => {

@@ -178,7 +178,8 @@ export const registerHandlers = (io: Server, socket: Socket) => {
   socket.on("solo:start", (payload: unknown) => {
     const input = validate(socket, ClientEventSchemas["solo:start"], payload);
     if (!input) return;
-    startSolo(socket.id, input.topicIds, input.count, input.timerSeconds, (state) => socket.emit("solo:state", output(ServerEventSchemas["solo:state"], state)));
+    const result = startSolo(socket.id, input.topicIds, input.count, input.timerSeconds, (state) => socket.emit("solo:state", output(ServerEventSchemas["solo:state"], state)));
+    if (!result.ok) error(socket, result.error, "SOLO_START_ERROR");
   });
   socket.on("solo:submit", (payload: unknown) => {
     const input = validate(socket, ClientEventSchemas["solo:submit"], payload) as QuestionAttempt | null;

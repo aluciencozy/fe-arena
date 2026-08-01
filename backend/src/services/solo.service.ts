@@ -53,9 +53,11 @@ const finishQuestion = (record: SoloRecord, emit: (state: SoloState) => void, co
 export const startSolo = (sessionId: string, topicIds: TopicId[], count: number, timerSeconds: number, emit: (state: SoloState) => void) => {
   const config: MatchConfig = { topicIds, roundCount: Math.min(5, Math.max(1, count)), questionTimerSeconds: Math.min(PUBLIC_QUESTION_SECONDS, Math.max(30, timerSeconds)) };
   const questions = questionRepository.select(`solo:${sessionId}:${Date.now()}`, config.roundCount, config.topicIds);
+  if (questions.length !== config.roundCount) return { ok: false as const, error: "There are not enough reviewed questions for that topic selection." };
   const record: SoloRecord = { state: initial(), ids: questions.map((question) => question.id), index: 0, timer: undefined, timerSeconds: config.questionTimerSeconds };
   sessions.set(sessionId, record);
   sendQuestion(record, emit);
+  return { ok: true as const };
 };
 export const soloSubmit = (sessionId: string, attempt: QuestionAttempt, emit: (state: SoloState) => void) => {
   const record = sessions.get(sessionId);

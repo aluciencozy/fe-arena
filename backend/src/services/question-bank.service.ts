@@ -51,6 +51,7 @@ export const questionFromRow = (row: QuestionBankRow): Question => {
     throw new Error(`Question ${row?.id ?? "unknown"} has invalid private content.`);
   }
   return QuestionSchema.parse({
+    ...(row.content as Record<string, unknown>),
     id: row.id,
     topicId: row.topic_id,
     type: row.question_type,
@@ -59,7 +60,6 @@ export const questionFromRow = (row: QuestionBankRow): Question => {
     assumptions: row.assumptions,
     provenance: row.provenance,
     difficulty: row.difficulty,
-    ...(row.content as Record<string, unknown>),
   });
 };
 
