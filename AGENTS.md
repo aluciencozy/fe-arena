@@ -18,7 +18,7 @@ Defaults are frontend `http://localhost:5173` and backend `http://localhost:3001
 ## Authoritative boundaries
 
 - Domain contracts and pure grading: `shared/domain.ts`.
-- Reviewed question content, schema checks, and Supabase loader/fallback: `backend/src/data/questions.ts`, `backend/src/services/question-bank.service.ts`, and `supabase/migrations/202603080003_question_bank.sql`.
+- Reviewed question content, schema checks, and Supabase loader/fallback: `backend/src/data/questions.ts`, `backend/src/services/question-bank.service.ts`, and the ordered question-bank migrations in `supabase/migrations/`.
 - Match state machine/deadlines/scoring: `backend/src/services/match.service.ts`.
 - Stable seats/reconnect tokens: `backend/src/services/room.service.ts`.
 - FIFO public queue and five-minute expiry: `backend/src/services/queue.service.ts`.

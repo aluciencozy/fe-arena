@@ -25,7 +25,7 @@ Requirements: Node.js 20+ and npm.
 The frontend runs at `http://localhost:5173`; the backend runs at `http://localhost:3001`. Copy `.env.example` files when changing those defaults:
 
 - `frontend/.env.example`: `VITE_SOCKET_URL`
-- `backend/.env.example`: `PORT`, `FRONTEND_ORIGIN`
+- `backend/.env.example`: `PORT`, `FRONTEND_ORIGIN`, and optional `SUPABASE_URL` plus `SUPABASE_SECRET_KEY` for server-side question-bank loading
 
 ## Architecture
 
@@ -61,7 +61,7 @@ The bank covers:
 11. Recursion
 12. Algorithm analysis and representation
 
-Every item carries an answer, explanation, assumptions, and provenance. Content is validated at module load and in tests for schema shape, unique IDs, option/sequence/graph references, and complete type coverage. Migration `supabase/migrations/202603080003_question_bank.sql` creates the server-only table and `cd backend && npm run seed:questions` idempotently upserts the reviewed bank when `SUPABASE_URL` and `SUPABASE_SECRET_KEY` are configured. Existing C rows without a stored code remain loadable through the compatibility mapper; new C rows always include curated code. Graph content is presentation-only: users cannot edit graphs or submit graph code. New content requires normal PR review plus validation. The public UCF index and supplied reference PDFs are provenance anchors for topic planning only: https://www.cs.ucf.edu/registration/exm/. They are not a license to copy, and FE Arena does not claim to match any future exam format.
+Every item carries an answer, explanation, assumptions, and provenance. Content is validated at module load and in tests for schema shape, unique IDs, option/sequence/graph references, and complete type coverage. Apply the ordered migrations `supabase/migrations/202603080003_question_bank.sql` and `supabase/migrations/202603080004_question_bank_graph.sql` to create and extend the server-only table, then `cd backend && npm run seed:questions` idempotently upserts the reviewed bank when `SUPABASE_URL` and `SUPABASE_SECRET_KEY` are configured. Existing C rows without a stored code remain loadable through the compatibility mapper; new C rows always include curated code. Graph content is presentation-only: users cannot edit graphs or submit graph code. New content requires normal PR review plus validation. The public UCF index and supplied reference PDFs are provenance anchors for topic planning only: https://www.cs.ucf.edu/registration/exm/. They are not a license to copy, and FE Arena does not claim to match any future exam format.
 
 ## Verification
 
