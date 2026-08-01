@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from "node:crypto";
 import {
   calculateScore,
   compareScores,
@@ -14,6 +15,13 @@ import {
 } from "../../../shared/domain.js";
 import { questionRepository, publicQuestion, revealedQuestion } from "./question-bank.service.js";
 import { getMetadata, getSeats, type RoomMetadata } from "./room.service.js";
+import { InMemoryMatchRepository } from "../persistence/in-memory-match.repository.js";
+import {
+  PERSISTENCE_SCHEMA_VERSION,
+  QUESTION_BANK_VERSION,
+  type MatchRepository,
+  type TerminalMatchSnapshot,
+} from "../persistence/match.repository.js";
 
 export type SubmissionPublic = {
   submitted: boolean;
@@ -46,13 +54,27 @@ export type MatchPublicState = {
 type MatchEvents = { emit: (state: MatchPublicState) => void; message: (text: string) => void };
 type MatchRecord = {
   state: MatchPublicState;
+  matchId: string;
+  idempotencyKey: string;
+  startedAt: number;
   seed: string;
   questionIds: string[];
+  roundResponseMs: Record<number, Record<string, number>>;
+  terminalPersisted: boolean;
   timer: ReturnType<typeof setTimeout> | undefined;
   pausedFrom: Exclude<MatchPhase, "PAUSED"> | null;
   pausedAt: number | null;
 };
 const matches = new Map<string, MatchRecord>();
+let matchRepository: MatchRepository = new InMemoryMatchRepository();
+const pendingPersistence = new Set<Promise<unknown>>();
+
+export const setMatchRepository = (repository: MatchRepository) => {
+  matchRepository = repository;
+};
+export const waitForMatchPersistenceForTests = async () => {
+  while (pendingPersistence.size) await Promise.all([...pendingPersistence]);
+};
 
 const emptySubmission = (): SubmissionPublic => ({ submitted: false, correct: null, score: null, answer: null });
 const seatIds = (roomId: string) => getSeats(roomId).map((seat) => seat.seatId);
@@ -90,6 +112,59 @@ const publicSnapshot = (state: MatchPublicState): MatchPublicState => {
 };
 const emit = (record: MatchRecord, events: MatchEvents) => events.emit(publicSnapshot(record.state));
 const configFor = (metadata: RoomMetadata): MatchConfig => metadata.config ?? { topicIds: [], roundCount: DEFAULT_ROUND_COUNT, questionTimerSeconds: PUBLIC_QUESTION_SECONDS };
+const guestSessionOwner = (reconnectToken: string) => createHash("sha256").update(reconnectToken).digest("hex");
+const terminalSnapshot = (record: MatchRecord): TerminalMatchSnapshot | undefined => {
+  const endReason = record.state.endReason;
+  if (!endReason) return undefined;
+  const terminalOutcome = endReason === "completed" && record.state.winnerSeatId === null ? "draw" : endReason;
+  const players = getSeats(record.state.roomId).map((seat) => {
+    const score = record.state.scores[seat.seatId] ?? { total: 0, correct: 0, responseMs: 0 };
+    return {
+      seatId: seat.seatId,
+      guestSessionOwner: guestSessionOwner(seat.reconnectToken),
+      username: seat.name,
+      scoreTotal: score.total,
+      correctCount: score.correct,
+      responseMsTotal: score.responseMs,
+      isWinner: record.state.winnerSeatId === seat.seatId,
+    };
+  });
+  const rounds = record.state.history.map((round) => {
+    const responseMs = record.roundResponseMs[round.round - 1] ?? {};
+    return {
+      roundNumber: round.round,
+      questionId: round.question.id,
+      questionBankVersion: QUESTION_BANK_VERSION,
+      correctness: Object.fromEntries(Object.entries(round.submissions).map(([seatId, submission]) => [seatId, submission.correct])),
+      responseMs: Object.fromEntries(players.map((player) => [player.seatId, responseMs[player.seatId] ?? null])),
+    };
+  });
+  return {
+    matchId: record.matchId,
+    idempotencyKey: record.idempotencyKey,
+    mode: "1v1",
+    source: record.state.source,
+    terminalOutcome,
+    winnerSeatId: record.state.winnerSeatId,
+    config: record.state.config,
+    questionBankVersion: QUESTION_BANK_VERSION,
+    schemaVersion: PERSISTENCE_SCHEMA_VERSION,
+    questionIds: [...record.questionIds],
+    startedAt: new Date(record.startedAt).toISOString(),
+    finishedAt: new Date().toISOString(),
+    players,
+    rounds,
+  };
+};
+const persistTerminal = (record: MatchRecord) => {
+  if (record.terminalPersisted) return;
+  const snapshot = terminalSnapshot(record);
+  if (!snapshot) return;
+  record.terminalPersisted = true;
+  const pending = Promise.resolve().then(() => matchRepository.persistTerminalMatch(snapshot)).catch(() => undefined);
+  pendingPersistence.add(pending);
+  void pending.then(() => pendingPersistence.delete(pending));
+};
 
 export const ensureMatch = (roomId: string, events?: MatchEvents) => {
   const existing = matches.get(roomId);
@@ -107,7 +182,20 @@ export const ensureMatch = (roomId: string, events?: MatchEvents) => {
     question: null, revealedQuestion: null, questionStartedAt: null, questionEndsAt: null, countdownEndsAt: null, pause: null,
     ready: makeReady(roomId), submissions: makeSubmissions(roomId), scores: makeScores(roomId), winnerSeatId: null, endReason: null, history: [],
   };
-  const record: MatchRecord = { state, seed: `${roomId}:${metadata.hostSeatId}`, questionIds: fallbackQuestions.map((question) => question.id), timer: undefined, pausedFrom: null, pausedAt: null };
+  const matchId = randomUUID();
+  const record: MatchRecord = {
+    state,
+    matchId,
+    idempotencyKey: matchId,
+    startedAt: Date.now(),
+    seed: `${roomId}:${metadata.hostSeatId}`,
+    questionIds: fallbackQuestions.map((question) => question.id),
+    roundResponseMs: {},
+    terminalPersisted: false,
+    timer: undefined,
+    pausedFrom: null,
+    pausedAt: null,
+  };
   matches.set(roomId, record);
   if (events) emit(record, events);
   return state;
@@ -158,6 +246,7 @@ const advanceOrFinish = (roomId: string, events: MatchEvents) => {
     const exactTie = Boolean(left && right && left.total === right.total && left.correct === right.correct && left.responseMs === right.responseMs);
     record.state.winnerSeatId = exactTie ? null : left && right ? compareScores(left, right).playerId : left?.playerId ?? null;
     record.state.endReason = "completed";
+    persistTerminal(record);
     emit(record, events);
     return;
   }
@@ -218,6 +307,8 @@ export const toggleReady = (roomId: string, seatId: string, events: MatchEvents)
     record.state.roundIndex = 0;
     record.state.history = [];
     record.state.scores = makeScores(roomId);
+    record.roundResponseMs = {};
+    record.terminalPersisted = false;
     record.state.winnerSeatId = null;
     record.state.endReason = null;
     startCountdown(roomId, events);
@@ -243,6 +334,9 @@ export const submitAnswer = (roomId: string, seatId: string, attempt: QuestionAt
   submission.answer = null;
   const current = record.state.scores[seatId] ?? { total: 0, correct: 0, responseMs: 0 };
   record.state.scores[seatId] = { total: current.total + score.total, correct: current.correct + (correct ? 1 : 0), responseMs: current.responseMs + elapsedMs };
+  const roundTiming = record.roundResponseMs[record.state.roundIndex] ?? {};
+  roundTiming[seatId] = elapsedMs;
+  record.roundResponseMs[record.state.roundIndex] = roundTiming;
   emit(record, events);
   if (allSubmitted(record)) revealRound(roomId, events);
   return { ok: true as const, correct, score };
@@ -253,6 +347,11 @@ export const requestRematch = (roomId: string, seatId: string, events: MatchEven
   if (!record || !["RESULTS", "FORFEIT", "ABANDONED", "EXPIRED"].includes(record.state.phase)) return { ok: false as const, error: "Rematch is only available after a completed match." };
   if (!seatIds(roomId).includes(seatId) || getSeats(roomId).length !== 2) return { ok: false as const, error: "Both guest seats are required for a rematch." };
   record.state.phase = "REMATCH";
+  record.matchId = randomUUID();
+  record.idempotencyKey = record.matchId;
+  record.startedAt = Date.now();
+  record.roundResponseMs = {};
+  record.terminalPersisted = false;
   record.state.ready = makeReady(roomId);
   record.state.question = null;
   record.state.revealedQuestion = null;
@@ -270,6 +369,7 @@ export const leaveMatch = (roomId: string, leavingSeatId: string, reason: "forfe
   record.state.phase = reason === "forfeit" ? "FORFEIT" : reason === "expired" ? "EXPIRED" : "ABANDONED";
   record.state.winnerSeatId = winner;
   record.state.endReason = reason;
+  persistTerminal(record);
   record.state.pause = null;
   record.state.question = null;
   record.state.revealedQuestion = null;
