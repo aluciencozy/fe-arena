@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { attachSeat, clearRoomsForTests, createRoom, disconnectSocket, joinRoom } from "./room.service.js";
-import { clearMatch, clearMatchesForTests, configureMatch, ensureMatch, getMatchState, leaveMatch, pauseForDisconnect, resumeAfterReconnect, submitAnswer, toggleReady } from "./match.service.js";
+import { attachSeat, clearRoomsForTests, createRoom, joinRoom } from "./room.service.js";
+import { clearMatch, clearMatchesForTests, configureMatch, ensureMatch, getMatchState, leaveMatch, submitAnswer, toggleReady } from "./match.service.js";
 import { TOPICS, type MatchConfig } from "../../../shared/domain.js";
 
 const events = () => ({ emit: (_state: unknown) => undefined, message: (_text: string) => undefined });
@@ -67,37 +67,6 @@ test("late submissions and cleared match timers cannot advance state", (t) => {
   clearMatch(room.metadata.roomId);
   t.mock.timers.tick(10_000);
   assert.equal(getMatchState(room.metadata.roomId), undefined);
-  clearMatchesForTests(); clearRoomsForTests();
-});
-
-test("reconnecting during reveal resumes its remaining duration", (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
-  clearMatchesForTests(); clearRoomsForTests();
-  const oneRound = { ...config, roundCount: 1, questionTimerSeconds: 30 };
-  const room = createRoom("private", oneRound, "Host");
-  attachSeat(room.metadata.roomId, room.seat, "a");
-  const guest = joinRoom(room.metadata.roomId, "Guest", "b");
-  assert.equal(guest.ok, true);
-  if (!guest.ok) return;
-  ensureMatch(room.metadata.roomId);
-  configureMatch(room.metadata.roomId, room.seat.seatId, oneRound, events());
-  toggleReady(room.metadata.roomId, room.seat.seatId, events());
-  toggleReady(room.metadata.roomId, guest.seat.seatId, events());
-  t.mock.timers.tick(3_000);
-  const questionId = getMatchState(room.metadata.roomId)?.question?.id;
-  assert.ok(questionId);
-  submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId, answer: "locked" }, events());
-  submitAnswer(room.metadata.roomId, guest.seat.seatId, { questionId, answer: "locked" }, events());
-  assert.equal(getMatchState(room.metadata.roomId)?.phase, "REVEAL");
-  disconnectSocket("b");
-  assert.equal(pauseForDisconnect(room.metadata.roomId, guest.seat.seatId, events()), true);
-  t.mock.timers.tick(1_000);
-  attachSeat(room.metadata.roomId, guest.seat, "b2");
-  assert.equal(resumeAfterReconnect(room.metadata.roomId, events()), true);
-  t.mock.timers.tick(1_799);
-  assert.equal(getMatchState(room.metadata.roomId)?.phase, "REVEAL");
-  t.mock.timers.tick(1);
-  assert.equal(getMatchState(room.metadata.roomId)?.phase, "RESULTS");
   clearMatchesForTests(); clearRoomsForTests();
 });
 

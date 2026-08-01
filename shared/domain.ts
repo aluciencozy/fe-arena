@@ -324,7 +324,7 @@ export const ServerEventSchemas = {
   "queue:matched": z.object({ roomId: z.string().regex(/^[A-Z0-9]{6}$/), metadata: RoomMetadataSchema }),
   "queue:seat": z.object({ roomId: z.string().regex(/^[A-Z0-9]{6}$/), seatId: z.string().uuid(), reconnectToken: z.string().uuid() }),
   "match:state": MatchPublicStateSchema,
-  "match:submission-ack": z.object({ submitted: z.literal(true) }),
+  "match:submission-ack": z.object({ correct: z.boolean(), score: ScoreBreakdownSchema }),
   "chat:message": z.object({ type: z.enum(["system", "user"]), sender: z.string().min(1), text: z.string().min(1).max(280), sentAt: z.number() }),
   "solo:state": SoloStateSchema,
   "server:error": z.object({ code: z.string().min(1), message: z.string().min(1) }),

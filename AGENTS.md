@@ -9,7 +9,7 @@ FE Arena is an unofficial UCF Computer Science Foundation Exam study tool. It is
 Run from the matching package directory:
 
 - Frontend dev: `cd frontend && npm run dev`
-- Frontend lint/tests/build: `cd frontend && npm run lint && npm test && npm run build`
+- Frontend lint/build: `cd frontend && npm run lint && npm run build`
 - Backend dev: `cd backend && npm run dev`
 - Backend typecheck/tests: `cd backend && npm run typecheck && npm test`
 

@@ -63,10 +63,6 @@ export const soloSubmit = (sessionId: string, attempt: QuestionAttempt, emit: (s
   if (!record || !question || record.state.phase !== "QUESTION") return { ok: false as const, error: "Solo practice is not accepting an answer." };
   const parsed = QuestionAttemptSchema.safeParse(attempt);
   if (!parsed.success || parsed.data.questionId !== question.id) return { ok: false as const, error: "That answer does not match the active question." };
-  if (record.state.questionEndsAt !== null && Date.now() >= record.state.questionEndsAt) {
-    finishQuestion(record, emit, false);
-    return { ok: false as const, error: "That question's time has expired." };
-  }
   const correct = gradeQuestion(question, parsed.data);
   const elapsed = Math.max(0, Date.now() - (record.state.questionStartedAt ?? Date.now()));
   finishQuestion(record, emit, correct, calculateScore(correct, elapsed, record.timerSeconds * 1000));
