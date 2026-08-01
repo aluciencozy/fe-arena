@@ -17,17 +17,19 @@ import {
 } from "./match.service.js";
 import { questionRepository } from "./question-bank.service.js";
 import { attachSeat, clearRoomsForTests, createRoom, joinRoom } from "./room.service.js";
-import { type MatchConfig, type Question, type QuestionAttempt } from "../../../shared/domain.js";
+import { ClientEventSchemas, type MatchConfig, type Question, type QuestionAttempt } from "../../../shared/domain.js";
 
 const events = () => ({ emit: (_state: unknown) => undefined, message: (_text: string) => undefined });
 const config: MatchConfig = { topicIds: ["stacks"], roundCount: 1, questionTimerSeconds: 30 };
 
 class RecordingRepository implements MatchRepository {
   readonly snapshots: TerminalMatchSnapshot[] = [];
-  constructor(private readonly fail = false) {}
+  attempts = 0;
+  constructor(private readonly failuresBeforeSuccess = 0) {}
 
   async persistTerminalMatch(snapshot: TerminalMatchSnapshot) {
-    if (this.fail) throw new Error("deterministic database failure");
+    this.attempts += 1;
+    if (this.attempts <= this.failuresBeforeSuccess) throw new Error("deterministic database failure");
     this.snapshots.push(structuredClone(snapshot));
     return { status: "inserted" as const, matchId: snapshot.matchId };
   }
@@ -98,7 +100,7 @@ test("persists every non-normal terminal outcome once", async () => {
   clearRoomsForTests();
 });
 
-test("persists a winning completed result without exposing answer material", async (t) => {
+test("ignores client-supplied scoring fields and persists only server results", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
   const repository = new RecordingRepository();
   setMatchRepository(repository);
@@ -112,7 +114,15 @@ test("persists a winning completed result without exposing answer material", asy
   assert.ok(questionId);
   const question = questionRepository.get(questionId);
   assert.ok(question);
-  assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId, answer: answerFor(question) }, events()).ok, true);
+  const forgedAttempt = ClientEventSchemas["match:submit"].parse({
+    questionId,
+    answer: answerFor(question),
+    correct: false,
+    score: { correctness: 0, speedBonus: 0, total: 0 },
+    responseMs: 300_000,
+  });
+  assert.deepEqual(Object.keys(forgedAttempt).sort(), ["answer", "questionId"]);
+  assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, forgedAttempt, events()).ok, true);
   assert.equal(submitAnswer(room.metadata.roomId, guest.seat.seatId, { questionId, answer: "not-the-answer" }, events()).ok, true);
   t.mock.timers.tick(1_800);
   await waitForMatchPersistenceForTests();
@@ -126,16 +136,38 @@ test("persists a winning completed result without exposing answer material", asy
   clearRoomsForTests();
 });
 
-test("database failure does not change the live terminal result", async () => {
-  const repository = new RecordingRepository(true);
+test("retries transient database failure without changing the live terminal result", async () => {
+  const repository = new RecordingRepository(1);
   setMatchRepository(repository);
   clearMatchesForTests();
   clearRoomsForTests();
   const { room, guest } = setupRoom();
   leaveMatch(room.metadata.roomId, guest.seat.seatId, "forfeit", events());
   await waitForMatchPersistenceForTests();
+  assert.equal(repository.attempts, 2);
+  assert.equal(repository.snapshots.length, 1);
   assert.equal(getMatchState(room.metadata.roomId)?.phase, "FORFEIT");
   assert.equal(getMatchState(room.metadata.roomId)?.winnerSeatId, room.seat.seatId);
+  clearMatchesForTests();
+  clearRoomsForTests();
+});
+
+test("allows a later terminal event to retry after persistence attempts are exhausted", async () => {
+  const repository = new RecordingRepository(3);
+  setMatchRepository(repository);
+  clearMatchesForTests();
+  clearRoomsForTests();
+  const { room, guest } = setupRoom();
+  leaveMatch(room.metadata.roomId, guest.seat.seatId, "forfeit", events());
+  await waitForMatchPersistenceForTests();
+  assert.equal(repository.attempts, 3);
+  assert.equal(repository.snapshots.length, 0);
+  assert.equal(getMatchState(room.metadata.roomId)?.phase, "FORFEIT");
+  assert.equal(getMatchState(room.metadata.roomId)?.winnerSeatId, room.seat.seatId);
+  leaveMatch(room.metadata.roomId, guest.seat.seatId, "forfeit", events());
+  await waitForMatchPersistenceForTests();
+  assert.equal(repository.attempts, 4);
+  assert.equal(repository.snapshots.length, 1);
   clearMatchesForTests();
   clearRoomsForTests();
 });

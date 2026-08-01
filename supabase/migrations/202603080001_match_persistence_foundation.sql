@@ -14,9 +14,6 @@ create table if not exists public.player_identities (
   constraint player_identities_username_length check (char_length(chosen_username) between 1 and 24)
 );
 
-create unique index if not exists player_identities_chosen_username_ci
-  on public.player_identities (lower(chosen_username));
-
 comment on column public.player_identities.guest_session_owner is
   'Opaque server-derived guest owner; do not store the reconnect token itself.';
 comment on column public.player_identities.auth_user_id is

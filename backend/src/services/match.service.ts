@@ -60,7 +60,7 @@ type MatchRecord = {
   seed: string;
   questionIds: string[];
   roundResponseMs: Record<number, Record<string, number>>;
-  terminalPersisted: boolean;
+  terminalPersistence: "idle" | "pending" | "persisted";
   timer: ReturnType<typeof setTimeout> | undefined;
   pausedFrom: Exclude<MatchPhase, "PAUSED"> | null;
   pausedAt: number | null;
@@ -68,6 +68,7 @@ type MatchRecord = {
 const matches = new Map<string, MatchRecord>();
 let matchRepository: MatchRepository = new InMemoryMatchRepository();
 const pendingPersistence = new Set<Promise<unknown>>();
+const TERMINAL_PERSISTENCE_ATTEMPTS = 3;
 
 export const setMatchRepository = (repository: MatchRepository) => {
   matchRepository = repository;
@@ -157,13 +158,24 @@ const terminalSnapshot = (record: MatchRecord): TerminalMatchSnapshot | undefine
   };
 };
 const persistTerminal = (record: MatchRecord) => {
-  if (record.terminalPersisted) return;
+  if (record.terminalPersistence !== "idle") return;
   const snapshot = terminalSnapshot(record);
   if (!snapshot) return;
-  record.terminalPersisted = true;
-  const pending = Promise.resolve().then(() => matchRepository.persistTerminalMatch(snapshot)).catch(() => undefined);
+  record.terminalPersistence = "pending";
+  const repository = matchRepository;
+  const pending = (async () => {
+    for (let attempt = 1; attempt <= TERMINAL_PERSISTENCE_ATTEMPTS; attempt += 1) {
+      try {
+        await repository.persistTerminalMatch(snapshot);
+        record.terminalPersistence = "persisted";
+        return;
+      } catch {
+        if (attempt === TERMINAL_PERSISTENCE_ATTEMPTS) record.terminalPersistence = "idle";
+      }
+    }
+  })();
   pendingPersistence.add(pending);
-  void pending.then(() => pendingPersistence.delete(pending));
+  void pending.finally(() => pendingPersistence.delete(pending));
 };
 
 export const ensureMatch = (roomId: string, events?: MatchEvents) => {
@@ -191,7 +203,7 @@ export const ensureMatch = (roomId: string, events?: MatchEvents) => {
     seed: `${roomId}:${metadata.hostSeatId}`,
     questionIds: fallbackQuestions.map((question) => question.id),
     roundResponseMs: {},
-    terminalPersisted: false,
+    terminalPersistence: "idle",
     timer: undefined,
     pausedFrom: null,
     pausedAt: null,
@@ -308,7 +320,7 @@ export const toggleReady = (roomId: string, seatId: string, events: MatchEvents)
     record.state.history = [];
     record.state.scores = makeScores(roomId);
     record.roundResponseMs = {};
-    record.terminalPersisted = false;
+    record.terminalPersistence = "idle";
     record.state.winnerSeatId = null;
     record.state.endReason = null;
     startCountdown(roomId, events);
@@ -351,7 +363,7 @@ export const requestRematch = (roomId: string, seatId: string, events: MatchEven
   record.idempotencyKey = record.matchId;
   record.startedAt = Date.now();
   record.roundResponseMs = {};
-  record.terminalPersisted = false;
+  record.terminalPersistence = "idle";
   record.state.ready = makeReady(roomId);
   record.state.question = null;
   record.state.revealedQuestion = null;

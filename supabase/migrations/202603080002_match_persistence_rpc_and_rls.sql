@@ -29,7 +29,7 @@ begin
     return 'already_exists';
   end if;
 
-  -- A username remains unique while the opaque guest owner is stable across reconnects.
+  -- The opaque guest owner remains stable across reconnects and may update its username.
   for v_player in select value from jsonb_array_elements(coalesce(p_players, '[]'::jsonb)) loop
     insert into public.player_identities (
       guest_session_owner,
