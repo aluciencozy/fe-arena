@@ -55,12 +55,14 @@ test("seeded selection is deterministic and topic-filtered", () => {
 
 test("Supabase rows preserve legacy C content and load graph content", async () => {
   const code = QUESTION_BANK.find((question) => question.type === "code-output")!;
+  assert.equal(code.type, "code-output");
+  if (code.type !== "code-output") return;
   const storedCode = questionToRow(code);
   const legacyContent = { ...(storedCode.content as Record<string, unknown>) };
   delete legacyContent.code;
-  const legacy = questionFromRow({ ...storedCode, content: legacyContent, schema_version: 2, published: true });
+  const legacy = questionFromRow({ ...storedCode, prompt: "What line does this C fragment print? int a[3] = {2, 4, 6}; printf(\"%d\", a[1] + a[2]);", content: legacyContent, schema_version: 2, published: true });
   assert.equal(legacy.type, "code-output");
-  assert.equal(legacy.code, code.prompt);
+  assert.equal(legacy.code, code.code);
 
   const graph = QUESTION_BANK.find((question) => question.type === "graph")!;
   const row = { ...questionToRow(graph), schema_version: 3, published: true };

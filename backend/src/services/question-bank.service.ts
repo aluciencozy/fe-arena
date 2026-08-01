@@ -13,6 +13,63 @@ import { QUESTION_BANK, validateQuestionBank } from "../data/questions.js";
 
 const reviewedQuestions = validateQuestionBank(QUESTION_BANK);
 
+const LEGACY_C_CODE: Record<string, string> = {
+  "q-array-c-output": `int a[3] = {2, 4, 6};
+printf("%d", a[1] + a[2]);`,
+  "q-recursion-c-output": `void countdown(int n) {
+  if (n == 0) return;
+  printf("%d ", n);
+  countdown(n - 1);
+}
+
+countdown(3);`,
+  "q-array-c-output-2": `int a[4] = {1, 3, 5, 7};
+printf("%d", a[0] + a[3]);`,
+  "q-list-c-output": `struct Node { int value; struct Node *next; };
+struct Node n2 = {9, 0};
+struct Node n1 = {4, &n2};
+printf("%d", n1.next->value);`,
+  "q-stack-c-output": `int top = 0;
+top++;
+top++;
+top--;
+printf("%d", top);`,
+  "q-queue-c-output": `struct Node { int value; struct Node *next; };
+struct Node n3 = {11, 0};
+struct Node n2 = {8, &n3};
+struct Node n1 = {5, &n2};
+struct Node *front = &n1;
+front = front->next;
+printf("%d", front->value);`,
+  "q-tree-c-output": `int left_key = 2;
+int key = 5;
+int right_key = 9;
+printf("%d %d %d ", left_key, key, right_key);`,
+  "q-avl-c-output": `int left_height = 2;
+int right_height = 4;
+int balance = left_height - right_height;
+printf("%d", balance);`,
+  "q-heap-c-output": `int heap[2] = {12, 7};
+printf("%d", heap[0] >= heap[1]);`,
+  "q-hash-c-output": `printf("%d", 29 % 6);`,
+  "q-trie-c-output": `int found_cat = 1;
+int found_can = 0;
+printf("%d", found_cat + found_can);`,
+  "q-sort-c-output": `int x = 3;
+int y = 1;
+if (x > y) printf("sorted");
+else printf("swap");`,
+  "q-recursion-c-output-2": `void f(int n) {
+  if (n == 0) return;
+  f(n - 1);
+  printf("%d ", n);
+}
+
+f(2);`,
+  "q-analysis-c-output": `int x = 2 + 3 * 4;
+printf("%d", x);`,
+};
+
 const makeInMemoryRepository = (questions: readonly Question[]): QuestionRepository => ({
   list: (topicIds) => topicIds?.length ? questions.filter((question) => topicIds.includes(question.topicId)) : [...questions],
   select: (seed, count, topicIds) => selectSeededQuestions(questions, seed, count, topicIds),
@@ -51,7 +108,11 @@ export const questionFromRow = (row: QuestionBankRow): Question => {
     throw new Error(`Question ${row?.id ?? "unknown"} has invalid private content.`);
   }
   const content = { ...(row.content as Record<string, unknown>) };
-  if (row.question_type === "code-output" && typeof content.code !== "string" && typeof row.prompt === "string") content.code = row.prompt;
+  if (row.question_type === "code-output" && typeof content.code !== "string") {
+    const legacyCode = LEGACY_C_CODE[row.id];
+    if (!legacyCode) throw new Error(`Legacy C question ${row.id} has no curated code.`);
+    content.code = legacyCode;
+  }
   return QuestionSchema.parse({
     id: row.id,
     topicId: row.topic_id,

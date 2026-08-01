@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { calculateScore, canConfigureMatch, normalizeAnswer, toPublicQuestion } from "../../shared/domain";
+import { GRAPH_NODE_RADIUS, graphEdgePoints } from "./lib/graph";
 
 test("frontend consumes the shared public-view and grading contract", () => {
   assert.equal(normalizeAnswer("  FIFO! "), "fifo");
@@ -14,4 +15,9 @@ test("public queue never grants host controls to either seated player", () => {
   assert.equal(canConfigureMatch("private", "host-seat", "guest-seat"), false);
   assert.equal(canConfigureMatch("public", "host-seat", "host-seat"), false);
   assert.equal(canConfigureMatch("public", "host-seat", "guest-seat"), false);
+});
+
+test("directed graph edges stop outside the destination node", () => {
+  const points = graphEdgePoints({ x: 62, y: 25 }, { x: 86, y: 50 });
+  assert.ok(Math.abs(Math.hypot(points.x2 - 86, points.y2 - 50) - (GRAPH_NODE_RADIUS + 2)) < 1e-9);
 });
