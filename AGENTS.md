@@ -18,7 +18,7 @@ Defaults are frontend `http://localhost:5173` and backend `http://localhost:3001
 ## Authoritative boundaries
 
 - Domain contracts and pure grading: `shared/domain.ts`.
-- Reviewed file-backed bank and schema checks: `backend/src/data/questions.ts` and `backend/src/services/question-bank.service.ts`.
+- Reviewed question content, schema checks, and Supabase loader/fallback: `backend/src/data/questions.ts`, `backend/src/services/question-bank.service.ts`, and `supabase/migrations/202603080003_question_bank.sql`.
 - Match state machine/deadlines/scoring: `backend/src/services/match.service.ts`.
 - Stable seats/reconnect tokens: `backend/src/services/room.service.ts`.
 - FIFO public queue and five-minute expiry: `backend/src/services/queue.service.ts`.
@@ -31,6 +31,7 @@ Defaults are frontend `http://localhost:5173` and backend `http://localhost:3001
 - Reconnect restores the same guest seat with the session token. Active matches pause both seats for 30 seconds and safely resolve to expiry if the seat does not return.
 - Private config is topic pool, five rounds, and a 30–300 second question timer. Public queue uses all reviewed topics, five rounds, and a five-minute question timer.
 - Add content only with answer, explanation, assumptions, provenance, schema validation, and tests. Graph fixtures are deterministic presentation-only diagrams with bounded BFS/DFS/adjacency/reachability/shortest-path semantics; C fixtures include curated code text and expected output, never executable user code. Reference materials inform topic planning only; never copy exam text or answer keys.
+- Seed Supabase content with `cd backend && npm run seed:questions` when both server-only Supabase variables are configured.
 
 ## Maintaining this file
 

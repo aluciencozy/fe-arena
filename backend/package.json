@@ -6,7 +6,8 @@
   "scripts": {
     "test": "tsx --test src/*.test.ts src/**/*.test.ts",
     "dev": "nodemon --exec tsx index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "seed:questions": "tsx src/data/seed-questions.ts"
   },
   "keywords": [],
   "author": "",

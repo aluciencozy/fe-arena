@@ -30,7 +30,7 @@ The frontend runs at `http://localhost:5173`; the backend runs at `http://localh
 ## Architecture
 
 - `shared/domain.ts` is the framework-free domain boundary. It defines discriminated question types, stable topic IDs, Zod schemas, normalization, grading, seeded selection, score calculation, and tie-breakers.
-- `backend/src/data/questions.ts` is the reviewed file-backed source. `question-bank.service.ts` is the repository boundary intended to be replaced by an account-backed database later without changing match orchestration.
+- `backend/src/data/questions.ts` is the reviewed in-memory fallback. `question-bank.service.ts` loads the same validated content from the server-only Supabase `question_bank` repository when configured, without changing match orchestration.
 - `backend/src/services/match.service.ts` owns the explicit state machine and absolute deadlines. The server selects questions, accepts exactly one submission per seat, grades privately, and calculates timing and scores.
 - `backend/src/services/room.service.ts` owns stable guest seats, reconnect tokens, and room isolation. `queue.service.ts` owns FIFO public matching and expiry. `solo.service.ts` reuses the repository and grading engine without durable history.
 - `backend/src/sockets/handlers.ts` is the validated Socket.IO contract for room, queue, match, chat, reconnect, state-request, solo, and error events. Incoming payloads are parsed with Zod before services run.
@@ -61,7 +61,7 @@ The bank covers:
 11. Recursion
 12. Algorithm analysis and representation
 
-Every item carries an answer, explanation, assumptions, and provenance. Content is validated at module load and in tests for schema shape, unique IDs, option/sequence/graph references, and complete type coverage. Graph content is presentation-only: users cannot edit graphs or submit graph code. The file-backed bank remains behind `question-bank.service.ts`, preserving the seam for the Supabase-backed content model. New content requires normal PR review plus validation. The public UCF index and supplied reference PDFs are provenance anchors for topic planning only: https://www.cs.ucf.edu/registration/exm/. They are not a license to copy, and FE Arena does not claim to match any future exam format.
+Every item carries an answer, explanation, assumptions, and provenance. Content is validated at module load and in tests for schema shape, unique IDs, option/sequence/graph references, and complete type coverage. Migration `supabase/migrations/202603080003_question_bank.sql` creates the server-only table and `cd backend && npm run seed:questions` idempotently upserts the reviewed bank when `SUPABASE_URL` and `SUPABASE_SECRET_KEY` are configured. Existing C rows without a stored code remain loadable through the compatibility mapper; new C rows always include curated code. Graph content is presentation-only: users cannot edit graphs or submit graph code. New content requires normal PR review plus validation. The public UCF index and supplied reference PDFs are provenance anchors for topic planning only: https://www.cs.ucf.edu/registration/exm/. They are not a license to copy, and FE Arena does not claim to match any future exam format.
 
 ## Verification
 
@@ -70,7 +70,7 @@ cd backend && npm run typecheck && npm test
 cd ../frontend && npm run lint && npm run build
 ```
 
-The backend tests cover normalization, all five question types, seeded selection, score boundaries, hidden answers, ready/countdown transitions, duplicate-safe service behavior, queue expiry/cancellation, room isolation, and reconnect seat restoration. Production hosting needs a Node process for the backend and a static host/reverse proxy for the Vite build; runtime match state is intentionally in memory for this MVP.
+The backend tests cover normalization, all six question types, Supabase row compatibility, seeded selection, score boundaries, hidden answers, ready/countdown transitions, graph/C lifecycle submissions, duplicate-safe service behavior, queue expiry/cancellation, room isolation, and reconnect seat restoration. Production hosting needs a Node process for the backend and a static host/reverse proxy for the Vite build; runtime match state is intentionally in memory for this MVP.
 
 ## Explicit exclusions
 

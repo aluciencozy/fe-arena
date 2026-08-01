@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { calculateScore, ClientEventSchemas, compareScores, gradeQuestion, normalizeAnswer, QuestionSchema, selectSeededQuestions, ServerEventSchemas, toPublicQuestion, TOPICS, type Question } from "../../shared/domain.js";
 import { QUESTION_BANK, validateQuestionBank } from "./data/questions.js";
+import { loadQuestionRepository, questionFromRow, questionToRow } from "./services/question-bank.service.js";
 
 test("normalization is stable and explicit aliases grade short answers", () => {
   assert.equal(normalizeAnswer("  Little–Endian! "), "little endian");
@@ -10,7 +11,7 @@ test("normalization is stable and explicit aliases grade short answers", () => {
   assert.equal(gradeQuestion(question, { questionId: question.id, answer: "cat" }), false);
 });
 
-test("all five discriminated question types validate and public views hide solutions", () => {
+test("all six discriminated question types validate and public views hide solutions", () => {
   const questions = validateQuestionBank();
   assert.equal(new Set(questions.map((question) => question.type)).size, 6);
   assert.equal(new Set(questions.map((question) => question.topicId)).size, TOPICS.length);
@@ -50,6 +51,26 @@ test("seeded selection is deterministic and topic-filtered", () => {
   const second = selectSeededQuestions(QUESTION_BANK, "replay-seed", 5, ["stacks", "queues"]);
   assert.deepEqual(first.map((question) => question.id), second.map((question) => question.id));
   assert.ok(first.every((question) => question.topicId === "stacks" || question.topicId === "queues"));
+});
+
+test("Supabase rows preserve legacy C content and load graph content", async () => {
+  const code = QUESTION_BANK.find((question) => question.type === "code-output")!;
+  const storedCode = questionToRow(code);
+  const legacyContent = { ...(storedCode.content as Record<string, unknown>) };
+  delete legacyContent.code;
+  const legacy = questionFromRow({ ...storedCode, content: legacyContent, schema_version: 2, published: true });
+  assert.equal(legacy.type, "code-output");
+  assert.equal(legacy.code, code.prompt);
+
+  const graph = QUESTION_BANK.find((question) => question.type === "graph")!;
+  const row = { ...questionToRow(graph), schema_version: 3, published: true };
+  const query = {
+    select: () => query,
+    eq: () => query,
+    order: async () => ({ data: [row], error: null }),
+  };
+  const repository = await loadQuestionRepository({ SUPABASE_URL: "https://example.supabase.co", SUPABASE_SECRET_KEY: "service-key" }, { from: () => query } as never);
+  assert.deepEqual(repository.get(graph.id), graph);
 });
 
 test("graph grading supports traversal, adjacency, reachability, and shortest paths", () => {

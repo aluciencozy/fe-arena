@@ -2,10 +2,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { attachSeat, clearRoomsForTests, createRoom, joinRoom } from "./room.service.js";
 import { clearMatch, clearMatchesForTests, configureMatch, ensureMatch, getMatchState, leaveMatch, submitAnswer, toggleReady } from "./match.service.js";
-import { TOPICS, type MatchConfig } from "../../../shared/domain.js";
+import { QUESTION_BANK } from "../data/questions.js";
+import { inMemoryQuestionRepository, setQuestionRepository, type QuestionRepository } from "./question-bank.service.js";
+import { TOPICS, type MatchConfig, type Question } from "../../../shared/domain.js";
 
 const events = () => ({ emit: (_state: unknown) => undefined, message: (_text: string) => undefined });
 const config: MatchConfig = { topicIds: ["stacks", "queues"], roundCount: 5, questionTimerSeconds: 60 };
+
+const fixedQuestionRepository = (questions: readonly Question[]): QuestionRepository => ({
+  list: () => [...questions],
+  select: (_seed, count) => questions.slice(0, count),
+  get: (id) => questions.find((question) => question.id === id),
+});
 
 test("match transitions through question, reveal, and results with locked private submissions", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
@@ -43,6 +51,52 @@ test("match transitions through question, reveal, and results with locked privat
   t.mock.timers.tick(1_800);
   assert.equal(getMatchState(room.metadata.roomId)?.phase, "RESULTS");
   clearMatch(room.metadata.roomId); clearMatchesForTests(); clearRoomsForTests();
+});
+
+test("graph and C submissions stay server-authoritative through the match lifecycle", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
+  clearMatchesForTests(); clearRoomsForTests();
+  const graph = QUESTION_BANK.find((question) => question.id === "q-graph-bfs");
+  const code = QUESTION_BANK.find((question) => question.id === "q-array-c-output");
+  assert.ok(graph?.type === "graph");
+  assert.ok(code?.type === "code-output");
+  if (graph?.type !== "graph" || code?.type !== "code-output") return;
+  setQuestionRepository(fixedQuestionRepository([graph, code]));
+  const oneMatch = { topicIds: ["arrays-memory"], roundCount: 2, questionTimerSeconds: 30 } as MatchConfig;
+  try {
+    const room = createRoom("private", oneMatch, "Host");
+    attachSeat(room.metadata.roomId, room.seat, "host-socket");
+    const guest = joinRoom(room.metadata.roomId, "Guest", "guest-socket");
+    assert.equal(guest.ok, true);
+    if (!guest.ok) return;
+    ensureMatch(room.metadata.roomId);
+    toggleReady(room.metadata.roomId, room.seat.seatId, events());
+    toggleReady(room.metadata.roomId, guest.seat.seatId, events());
+    t.mock.timers.tick(3_000);
+
+    const first = getMatchState(room.metadata.roomId)?.question;
+    assert.equal(first?.id, graph.id);
+    assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId: "q-wrong", answer: graph.answerOrder! }, events()).ok, false);
+    assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId: graph.id, answer: ["a", "unknown", "c", "d", "e"] }, events()).ok, true);
+    assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId: graph.id, answer: graph.answerOrder! }, events()).ok, false);
+    assert.equal(submitAnswer(room.metadata.roomId, guest.seat.seatId, { questionId: graph.id, answer: graph.answerOrder! }, events()).ok, true);
+
+    t.mock.timers.tick(1_800);
+    t.mock.timers.tick(1_800);
+    t.mock.timers.tick(3_000);
+    const second = getMatchState(room.metadata.roomId)?.question;
+    assert.equal(second?.id, code.id);
+    assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId: "q-wrong", answer: code.output }, events()).ok, false);
+    assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId: code.id, answer: code.output }, events()).ok, true);
+    assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId: code.id, answer: code.output }, events()).ok, false);
+    t.mock.timers.tick(30_000);
+    assert.equal(getMatchState(room.metadata.roomId)?.phase, "REVEAL");
+    assert.equal(submitAnswer(room.metadata.roomId, guest.seat.seatId, { questionId: code.id, answer: code.output }, events()).ok, false);
+    clearMatch(room.metadata.roomId);
+  } finally {
+    setQuestionRepository(inMemoryQuestionRepository);
+    clearMatchesForTests(); clearRoomsForTests();
+  }
 });
 
 test("late submissions and cleared match timers cannot advance state", (t) => {
