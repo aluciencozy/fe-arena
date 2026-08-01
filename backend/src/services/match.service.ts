@@ -183,10 +183,10 @@ export const ensureMatch = (roomId: string, events?: MatchEvents) => {
   const metadata = getMetadata(roomId);
   if (!metadata) return undefined;
   const config = configFor(metadata);
-  const questions = questionRepository.select(`${roomId}:${metadata.hostSeatId}`, config.roundCount, config.topicIds);
-  const fallbackQuestions = questions.length ? questions : questionRepository.select(roomId, config.roundCount);
+  const selectedQuestions = questionRepository.select(`${roomId}:${metadata.hostSeatId}`, config.roundCount, config.topicIds);
+  const questions = selectedQuestions.length === config.roundCount ? selectedQuestions : [];
   const state: MatchPublicState = {
-    roomId, source: metadata.source, phase: "LOBBY", config, roundIndex: 0, totalRounds: fallbackQuestions.length,
+    roomId, source: metadata.source, phase: "LOBBY", config, roundIndex: 0, totalRounds: config.roundCount,
     question: null, revealedQuestion: null, questionStartedAt: null, questionEndsAt: null, countdownEndsAt: null, pause: null,
     ready: makeReady(roomId), submissions: makeSubmissions(roomId), scores: makeScores(roomId), winnerSeatId: null, endReason: null, history: [],
   };
@@ -197,7 +197,7 @@ export const ensureMatch = (roomId: string, events?: MatchEvents) => {
     idempotencyKey: matchId,
     startedAt: Date.now(),
     seed: `${roomId}:${metadata.hostSeatId}`,
-    questionIds: fallbackQuestions.map((question) => question.id),
+    questionIds: questions.map((question) => question.id),
     roundResponseMs: {},
     terminalPersistence: "idle",
     timer: undefined,
@@ -294,11 +294,12 @@ export const configureMatch = (roomId: string, seatId: string, config: MatchConf
   if (!record || !metadata || metadata.hostSeatId !== seatId) return { ok: false as const, error: "Only the host can change match settings." };
   if (!(record.state.phase === "LOBBY" || record.state.phase === "SETUP" || record.state.phase === "REMATCH")) return { ok: false as const, error: "Settings can only change before a round begins." };
   if (!config.topicIds.length || !config.roundCount) return { ok: false as const, error: "Choose at least one topic." };
+  const questions = questionRepository.select(`${record.seed}:${JSON.stringify(config)}`, config.roundCount, config.topicIds);
+  if (questions.length !== config.roundCount) return { ok: false as const, error: "There are not enough reviewed questions for that topic selection." };
   record.state.config = config;
   record.state.phase = "SETUP";
-  record.questionIds = questionRepository.select(`${record.seed}:${JSON.stringify(config)}`, config.roundCount, config.topicIds).map((question) => question.id);
-  if (!record.questionIds.length) return { ok: false as const, error: "There are no reviewed questions for that topic selection." };
-  record.state.totalRounds = record.questionIds.length;
+  record.questionIds = questions.map((question) => question.id);
+  record.state.totalRounds = config.roundCount;
   record.state.ready = makeReady(roomId);
   emit(record, events);
   return { ok: true as const, state: record.state };
@@ -309,6 +310,7 @@ export const toggleReady = (roomId: string, seatId: string, events: MatchEvents)
   if (!record) return { ok: false as const, error: "Match not found." };
   if (!(record.state.phase === "LOBBY" || record.state.phase === "SETUP" || record.state.phase === "READY" || record.state.phase === "REMATCH")) return { ok: false as const, error: "Ready status is locked right now." };
   if (getSeats(roomId).length !== 2) return { ok: false as const, error: "Waiting for a second guest." };
+  if (record.questionIds.length !== record.state.config.roundCount) return { ok: false as const, error: "There are not enough reviewed questions for this match." };
   record.state.ready[seatId] = !record.state.ready[seatId];
   record.state.phase = "READY";
   if (seatIds(roomId).every((id) => record.state.ready[id])) {

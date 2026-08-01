@@ -4,12 +4,13 @@ import express from "express";
 import { createServer } from "node:http";
 import { Server } from "socket.io";
 import { TOPICS } from "../shared/domain.js";
-import { questionBankStats } from "./src/services/question-bank.service.js";
+import { loadQuestionRepository, questionBankStats, setQuestionRepository } from "./src/services/question-bank.service.js";
 import { createMatchRepository } from "./src/persistence/index.js";
 import { setMatchRepository } from "./src/services/match.service.js";
 import { registerHandlers } from "./src/sockets/handlers.js";
 
 setMatchRepository(createMatchRepository());
+setQuestionRepository(await loadQuestionRepository());
 
 const app = express();
 app.use(cors({ origin: process.env.FRONTEND_ORIGIN ?? "http://localhost:5173" }));
