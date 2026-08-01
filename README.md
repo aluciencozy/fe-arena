@@ -25,7 +25,7 @@ Requirements: Node.js 20+ and npm.
 The frontend runs at `http://localhost:5173`; the backend runs at `http://localhost:3001`. Copy `.env.example` files when changing those defaults:
 
 - `frontend/.env.example`: `VITE_SOCKET_URL`
-- `backend/.env.example`: `PORT`, `FRONTEND_ORIGIN`
+- `backend/.env.example`: `PORT`, `FRONTEND_ORIGIN`, and optional `SUPABASE_URL` plus `SUPABASE_SECRET_KEY` for server-side question-bank loading
 
 ## Architecture
 
