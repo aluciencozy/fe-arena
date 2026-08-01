@@ -12,8 +12,8 @@ export const useArenaSocket = (roomId: string, playerName: string) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [errorNotice, setErrorNotice] = useState("");
   const [connection, setConnection] = useState<"connecting" | "connected" | "disconnected">("connecting");
-  const [lastSubmission, setLastSubmission] = useState<{ correct: boolean; total: number } | null>(null);
-  const clearSubmission = useCallback(() => setLastSubmission(null), []);
+  const [lastSubmission, setLastSubmission] = useState(false);
+  const clearSubmission = useCallback(() => setLastSubmission(false), []);
 
   useEffect(() => {
     if (!roomId || !playerName) return;
@@ -32,7 +32,7 @@ export const useArenaSocket = (roomId: string, playerName: string) => {
     const onChat = (message: Omit<ChatMessage, "id">) => addMessage(message);
     const onError = (payload: { message?: string } | string) => setErrorNotice(typeof payload === "string" ? payload : payload.message ?? "Something went wrong.");
     const onReconnectFailed = (payload?: { message?: string }) => { clearStoredToken(roomId); setErrorNotice(payload?.message ?? "The guest seat expired. The match ended safely."); setTimeout(() => navigate("/", { replace: true }), 1800); };
-    const onAck = (payload: { correct: boolean; score: { total: number } }) => setLastSubmission({ correct: payload.correct, total: payload.score.total });
+    const onAck = (payload: { submitted: true }) => setLastSubmission(payload.submitted);
     socket.on("connect", onConnect); socket.on("disconnect", onDisconnect); socket.on("room:session", onSession); socket.on("room:state", onRoom); socket.on("match:state", onMatch); socket.on("chat:message", onChat); socket.on("server:error", onError); socket.on("room:reconnect-failed", onReconnectFailed); socket.on("match:submission-ack", onAck);
     connectSocket();
     if (socket.connected) join();

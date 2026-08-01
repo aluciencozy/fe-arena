@@ -49,6 +49,7 @@ type MatchRecord = {
   seed: string;
   questionIds: string[];
   timer: ReturnType<typeof setTimeout> | undefined;
+  phaseEndsAt: number | null;
   pausedFrom: Exclude<MatchPhase, "PAUSED"> | null;
   pausedAt: number | null;
 };
@@ -64,6 +65,7 @@ const makeSubmissions = (roomId: string) => Object.fromEntries(getSeats(roomId).
 const clearTimer = (record: MatchRecord) => {
   if (record.timer) clearTimeout(record.timer);
   record.timer = undefined;
+  record.phaseEndsAt = null;
 };
 const syncSeats = (record: MatchRecord) => {
   const ids = new Set(seatIds(record.state.roomId));
@@ -107,7 +109,7 @@ export const ensureMatch = (roomId: string, events?: MatchEvents) => {
     question: null, revealedQuestion: null, questionStartedAt: null, questionEndsAt: null, countdownEndsAt: null, pause: null,
     ready: makeReady(roomId), submissions: makeSubmissions(roomId), scores: makeScores(roomId), winnerSeatId: null, endReason: null, history: [],
   };
-  const record: MatchRecord = { state, seed: `${roomId}:${metadata.hostSeatId}`, questionIds: fallbackQuestions.map((question) => question.id), timer: undefined, pausedFrom: null, pausedAt: null };
+  const record: MatchRecord = { state, seed: `${roomId}:${metadata.hostSeatId}`, questionIds: fallbackQuestions.map((question) => question.id), timer: undefined, phaseEndsAt: null, pausedFrom: null, pausedAt: null };
   matches.set(roomId, record);
   if (events) emit(record, events);
   return state;
@@ -124,6 +126,7 @@ const startCountdown = (roomId: string, events: MatchEvents) => {
   record.state.question = null;
   record.state.revealedQuestion = null;
   emit(record, events);
+  record.phaseEndsAt = record.state.countdownEndsAt;
   record.timer = setTimeout(() => startQuestion(roomId, events), 3000);
 };
 const startQuestion = (roomId: string, events: MatchEvents) => {
@@ -140,6 +143,7 @@ const startQuestion = (roomId: string, events: MatchEvents) => {
   record.state.questionEndsAt = now + record.state.config.questionTimerSeconds * 1000;
   record.state.submissions = makeSubmissions(roomId);
   emit(record, events);
+  record.phaseEndsAt = record.state.questionEndsAt;
   record.timer = setTimeout(() => revealRound(roomId, events), record.state.config.questionTimerSeconds * 1000);
 };
 
@@ -169,6 +173,7 @@ const advanceOrFinish = (roomId: string, events: MatchEvents) => {
   record.state.countdownEndsAt = null;
   record.state.revealedQuestion = record.state.history.at(-1)?.question ?? null;
   emit(record, events);
+  record.phaseEndsAt = Date.now() + 1800;
   record.timer = setTimeout(() => startCountdown(roomId, events), 1800);
 };
 
@@ -186,6 +191,7 @@ const revealRound = (roomId: string, events: MatchEvents) => {
   record.state.countdownEndsAt = null;
   record.state.history.push({ round: record.state.roundIndex + 1, question: revealed, submissions: structuredClone(record.state.submissions) });
   emit(record, events);
+  record.phaseEndsAt = Date.now() + 1800;
   record.timer = setTimeout(() => advanceOrFinish(roomId, events), 1800);
 };
 
@@ -270,7 +276,7 @@ export const leaveMatch = (roomId: string, leavingSeatId: string, reason: "forfe
   const record = matches.get(roomId);
   if (!record) return;
   clearTimer(record);
-  const winner = seatIds(roomId).find((id) => id !== leavingSeatId) ?? null;
+  const winner = reason === "abandoned" ? null : seatIds(roomId).find((id) => id !== leavingSeatId) ?? null;
   record.state.phase = reason === "forfeit" ? "FORFEIT" : reason === "expired" ? "EXPIRED" : "ABANDONED";
   record.state.winnerSeatId = winner;
   record.state.endReason = reason;
@@ -289,7 +295,9 @@ export const pauseForDisconnect = (roomId: string, seatId: string, events: Match
   const seatName = getSeats(roomId).find((seat) => seat.seatId === seatId)?.name;
   const phase = record?.state.phase;
   if (!record || !seatName || (phase !== "COUNTDOWN" && phase !== "QUESTION" && phase !== "REVEAL")) return false;
+  const phaseEndsAt = record.phaseEndsAt;
   clearTimer(record);
+  record.phaseEndsAt = phaseEndsAt;
   record.pausedFrom = phase;
   record.pausedAt = Date.now();
   record.state.phase = "PAUSED";
@@ -307,9 +315,10 @@ export const resumeAfterReconnect = (roomId: string, events: MatchEvents) => {
   if (record.state.questionStartedAt !== null) record.state.questionStartedAt += pausedMs;
   if (record.state.questionEndsAt !== null) record.state.questionEndsAt += pausedMs;
   if (record.state.countdownEndsAt !== null) record.state.countdownEndsAt += pausedMs;
+  if (record.phaseEndsAt !== null) record.phaseEndsAt += pausedMs;
   record.state.phase = record.pausedFrom;
   record.state.pause = null;
-  const remaining = record.state.phase === "COUNTDOWN" ? (record.state.countdownEndsAt ?? Date.now()) - Date.now() : (record.state.questionEndsAt ?? Date.now()) - Date.now();
+  const remaining = (record.phaseEndsAt ?? Date.now()) - Date.now();
   record.pausedFrom = null;
   record.pausedAt = null;
   const action = record.state.phase === "COUNTDOWN" ? () => startQuestion(roomId, events) : record.state.phase === "QUESTION" ? () => revealRound(roomId, events) : () => advanceOrFinish(roomId, events);
