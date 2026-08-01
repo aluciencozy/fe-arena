@@ -74,4 +74,4 @@ The backend tests cover normalization, all five question types, seeded selection
 
 ## Explicit exclusions
 
-No accounts, database, durable history, rankings, payments, public profiles, AI grading, invasive anti-cheat, or arbitrary code execution are included in this pass.
+No accounts, user-facing match history, rankings, payments, public profiles, AI grading, invasive anti-cheat, or arbitrary code execution are included in this pass.
