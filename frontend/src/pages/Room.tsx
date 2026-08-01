@@ -1,663 +1,74 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import YouTube, { type YouTubeEvent } from "react-youtube";
-import Fuse from "fuse.js";
-import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import {
-  ArrowLeft,
-  Check,
-  ChevronDown,
-  Clipboard,
-  Clock3,
-  Home,
-  MessageCircle,
-  RotateCcw,
-  Send,
-  SkipForward,
-  Trophy,
-  UserRound,
-  WifiOff,
-  X,
-  Zap,
-} from "lucide-react";
-import { AppSettings } from "@/components/AppSettings";
-import { Toast } from "@/components/Toast";
-import { Button } from "@/components/ui/button";
-import { useSocket } from "@/hooks/useSocket";
-import { playSound } from "@/lib/sound";
-import { getCountdownSeconds, shouldPlayCountdownCue } from "@/lib/timers";
-import { useGameStateStore, useGameStore } from "@/store/gameStore";
-import { getAnimePlaylistLabel } from "../../../shared/playlist";
-import type { AnimePlaylist, AnswerOption, RoundResult, UnifiedMessage } from "@/types";
+import { ArrowLeft, Check, ChevronDown, CircleHelp, Clock3, Copy, LogOut, MessageCircle, RotateCcw, Send, ShieldAlert, Trophy, Users, WifiOff, X, Zap } from "lucide-react";
+import { useArenaSocket } from "@/hooks/useSocket";
+import { useGameStore } from "@/store/gameStore";
+import { TOPICS, type PublicQuestion, type TopicId } from "../../../shared/domain";
+import type { MatchPublicState } from "@/types";
 
-const normalizeRoomCode = (value: string) =>
-  value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
-
-const activePhases = new Set(["COUNTDOWN", "PLAYING", "GRACE_PERIOD", "REVEAL"]);
-
-const Room = () => {
+const codeOf = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+export default function Room() {
   const { id } = useParams();
+  const roomId = codeOf(id ?? "");
   const navigate = useNavigate();
-  const roomCode = normalizeRoomCode(id ?? "");
-  const playerName = useGameStore((state) => state.playerName);
-  const volume = useGameStore((state) => state.volume);
-  const musicMuted = useGameStore((state) => state.musicMuted);
-  const phase = useGameStateStore((state) => state.phase);
-  const playlist = useGameStateStore((state) => state.playlist);
-  const currentRound = useGameStateStore((state) => state.currentRound);
-  const health = useGameStateStore((state) => state.health);
-  const pendingDamage = useGameStateStore((state) => state.pendingDamage);
-  const currentVideoId = useGameStateStore((state) => state.currentVideoID);
-  const currentVideoDurationSeconds = useGameStateStore((state) => state.currentVideoDurationSeconds);
-  const videoStartTime = useGameStateStore((state) => state.videoStartTime);
-  const roundStartTime = useGameStateStore((state) => state.roundStartTime);
-  const countdownEndsAt = useGameStateStore((state) => state.countdownEndsAt);
-  const roundEndsAt = useGameStateStore((state) => state.roundEndsAt);
-  const ready = useGameStateStore((state) => state.ready);
-  const winner = useGameStateStore((state) => state.winner);
-  const revealedAnswer = useGameStateStore((state) => state.revealedAnswer);
-  const roundResult = useGameStateStore((state) => state.roundResult);
-  const matchHistory = useGameStateStore((state) => state.matchHistory);
-  const guessedCorrectly = useGameStateStore((state) => state.guessedCorrectly);
-  const skipVotes = useGameStateStore((state) => state.skipVotes);
-  const answerOptions = useGameStateStore((state) => state.answerOptions);
-  const connectionPause = useGameStateStore((state) => state.connectionPause);
-
-  const {
-    players,
-    messages,
-    errorNotice,
-    guessCooldownEndsAt,
-    connectionState,
-    sendChatMessage,
-    sendGuess,
-    setReady,
-    voteToSkip,
-    leaveRoom,
-  } = useSocket(roomCode, playerName);
-
+  const name = useGameStore((state) => state.playerName);
+  const room = useGameStore((state) => state.room);
+  const match = useGameStore((state) => state.match);
+  const seatId = useGameStore((state) => state.seatId);
+  const clearSession = useGameStore((state) => state.clearSession);
+  const api = useArenaSocket(roomId, name);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatText, setChatText] = useState("");
+  const [answer, setAnswer] = useState<string | number | string[]>("");
+  const [ordered, setOrdered] = useState<string[]>([]);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [selectedTopics, setSelectedTopics] = useState<TopicId[]>(["arrays-memory", "linked-lists", "stacks", "queues", "binary-trees", "sorting", "recursion", "analysis-mathematics"]);
+  const [timer, setTimer] = useState(90);
+  const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(() => Date.now());
-  const [inputValue, setInputValue] = useState("");
-  const [suggestionIndex, setSuggestionIndex] = useState(0);
-  const [activityOpen, setActivityOpen] = useState(false);
-  const [activityInput, setActivityInput] = useState("");
-  const [leaveOpen, setLeaveOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [copyMessage, setCopyMessage] = useState("");
-  const playerRef = useRef<YouTubeEvent["target"] | null>(null);
-  const guessInputRef = useRef<HTMLInputElement>(null);
-  const previousPhase = useRef(phase);
-  const previousCountdown = useRef<number | null>(null);
-  const previousCorrectCount = useRef(guessedCorrectly.length);
-  const previousMessageCount = useRef(messages.length);
-  const [unreadCount, setUnreadCount] = useState(0);
 
-  const opponentName = players.find((name) => name !== playerName) ?? null;
-  const selfReady = Boolean(ready[playerName]);
-  const opponentReady = opponentName ? Boolean(ready[opponentName]) : false;
-  const hasTimer = countdownEndsAt !== null || roundEndsAt !== null || guessCooldownEndsAt > now || connectionPause?.expiresAt;
-  const countdownSeconds = getCountdownSeconds(countdownEndsAt, now);
-  const roundSeconds = roundEndsAt ? Math.max(0, Math.ceil((roundEndsAt - now) / 1000)) : null;
-  const reconnectSeconds = connectionPause?.expiresAt ? Math.max(0, Math.ceil((connectionPause.expiresAt - now) / 1000)) : null;
-  const playerVolume = musicMuted || volume === 0 ? 0 : Math.max(1, Math.round((volume / 100) ** 2 * 100));
-  const alreadyCorrect = guessedCorrectly.includes(playerName);
-  const alreadySkipped = skipVotes.includes(playerName);
-  const canGuess = (phase === "PLAYING" || phase === "GRACE_PERIOD") && !alreadyCorrect && !connectionPause;
+  useEffect(() => { if (!name || !roomId) navigate("/", { replace: true }); }, [name, navigate, roomId]);
+  useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 250); return () => window.clearInterval(id); }, []);
+  const seats = room?.seats ?? [];
+  const self = seats.find((seat) => seat.seatId === seatId);
+  const opponent = seats.find((seat) => seat.seatId !== seatId);
+  const host = room?.metadata.hostSeatId === seatId;
+  const isSubmitted = seatId ? Boolean(match?.submissions[seatId]?.submitted) : false;
+  const seconds = match?.phase === "COUNTDOWN" ? Math.max(0, Math.ceil(((match.countdownEndsAt ?? now) - now) / 1000)) : match?.questionEndsAt ? Math.max(0, Math.ceil((match.questionEndsAt - now) / 1000)) : null;
+  const configure = () => { if (selectedTopics.length) { api.clearSubmission(); api.configure({ topicIds: selectedTopics, roundCount: 5, questionTimerSeconds: timer }); } setSettingsOpen(false); };
+  const leave = () => { if (window.confirm(match && ["COUNTDOWN", "QUESTION", "REVEAL", "PAUSED"].includes(match.phase) ? "Leave and forfeit this match? Your opponent will win." : "Leave this room?")) { api.leave(); clearSession(); navigate("/", { replace: true }); } };
+  const sendChat = (event: React.FormEvent) => { event.preventDefault(); if (!chatText.trim()) return; api.sendChat(chatText); setChatText(""); };
+  const copy = async () => { try { await navigator.clipboard.writeText(roomId); setCopied(true); setTimeout(() => setCopied(false), 1200); } catch { /* clipboard is optional */ } };
+  const submit = () => { if (!match?.question || isSubmitted || match.phase !== "QUESTION") return; const value = match.question.type === "ordered-sequence" ? ordered : answer; api.clearSubmission(); api.submit({ questionId: match.question.id, answer: value }); };
 
-  const fuse = useMemo(
-    () => new Fuse(answerOptions, {
-      keys: [{ name: "canonicalTitle", weight: 0.65 }, { name: "searchTerms", weight: 0.35 }],
-      threshold: 0.4,
-      ignoreLocation: true,
-    }),
-    [answerOptions],
-  );
-  const suggestions = useMemo(() => {
-    if (!canGuess || inputValue.trim().length < 2) return [];
-    return fuse.search(inputValue.trim()).slice(0, 5).map((result) => result.item);
-  }, [canGuess, fuse, inputValue]);
-  const selectedSuggestion = suggestions[Math.min(suggestionIndex, suggestions.length - 1)];
-  const recentActivity = messages
-    .filter((message) => message.type === "USER")
-    .slice(-2)
-    .reverse();
+  if (!name || !roomId) return null;
+  return <div className="min-h-screen bg-ink text-cream"><header className="sticky top-0 z-30 border-b border-line bg-ink/95 backdrop-blur"><div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-8"><button className="icon-button" onClick={leave} aria-label="Leave room"><ArrowLeft size={17} /></button><div className="min-w-0 flex-1"><p className="eyebrow">{match ? phaseLabel(match.phase) : "connecting"} · {match?.source === "public" ? "public queue" : "private 1v1"}</p><p className="truncate font-mono text-sm text-muted">{self?.name ?? name} <span className="text-line">vs</span> {opponent?.name ?? "open seat"}</p></div><button className="code-pill" onClick={copy}><span>{roomId}</span>{copied ? <Check size={14} /> : <Copy size={14} />}</button><button className="icon-button relative" onClick={() => setChatOpen((open) => !open)} aria-label="Toggle chat"><MessageCircle size={17} />{api.messages.length > 0 && <span className="badge">{Math.min(99, api.messages.length)}</span>}</button><button className="button button-danger hidden sm:flex" onClick={leave}><LogOut size={14} /> leave</button></div></header>
+    {api.connection !== "connected" && !match?.pause && <div className="border-b border-gold/20 bg-gold/10 px-4 py-2 text-center font-mono text-xs text-gold"><WifiOff className="mr-2 inline" size={14} />reconnecting to the server…</div>}
+    <main className="mx-auto max-w-7xl px-4 py-6 sm:px-8 sm:py-10">{api.errorNotice && <div className="notice-error mb-5"><ShieldAlert size={16} />{api.errorNotice}</div>}{!match ? <Loading /> : match.phase === "LOBBY" || match.phase === "SETUP" || match.phase === "READY" || match.phase === "REMATCH" ? <Lobby match={match} seatId={seatId} host={host} self={self?.name ?? name} opponent={opponent?.name} selectedTopics={selectedTopics} timer={timer} setSelectedTopics={setSelectedTopics} setTimer={setTimer} settingsOpen={settingsOpen} setSettingsOpen={setSettingsOpen} onConfigure={configure} onReady={api.ready} /> : match.phase === "COUNTDOWN" ? <Countdown seconds={seconds ?? 3} round={match.roundIndex + 1} /> : match.phase === "QUESTION" ? <QuestionStage match={match} seatId={seatId} opponent={opponent?.name} seconds={seconds} answer={answer} setAnswer={setAnswer} ordered={ordered} setOrdered={setOrdered} submitted={isSubmitted} submit={submit} lastSubmission={api.lastSubmission} /> : match.phase === "REVEAL" ? <Reveal match={match} /> : match.phase === "PAUSED" ? <Paused pause={match.pause} now={now} /> : <Results match={match} selfSeatId={seatId} onRematch={api.rematch} onHome={leave} />}</main>
+    <Chat open={chatOpen} messages={api.messages} value={chatText} setValue={setChatText} onClose={() => setChatOpen(false)} onSend={sendChat} self={self?.name ?? name} />
+  </div>;
+}
 
-  useEffect(() => {
-    if (!roomCode || !playerName) {
-      navigate("/", { replace: true });
-      return;
-    }
-    if (id !== roomCode) navigate(`/room/${roomCode}`, { replace: true });
-  }, [id, navigate, playerName, roomCode]);
+const Lobby = ({ match, seatId, host, self, opponent, selectedTopics, timer, setSelectedTopics, setTimer, settingsOpen, setSettingsOpen, onConfigure, onReady }: { match: MatchPublicState; seatId: string | null; host: boolean; self: string; opponent?: string; selectedTopics: TopicId[]; timer: number; setSelectedTopics: (topics: TopicId[]) => void; setTimer: (timer: number) => void; settingsOpen: boolean; setSettingsOpen: (open: boolean) => void; onConfigure: () => void; onReady: () => void }) => <section className="mx-auto max-w-5xl py-6 sm:py-14"><div className="text-center"><p className="eyebrow text-gold">{match.phase === "REMATCH" ? "new round" : "room lobby"}</p><h1 className="display mt-3 text-5xl sm:text-7xl">lock in.</h1><p className="mx-auto mt-4 max-w-lg text-muted">Both guests ready up when the pool and timer feel right. Five rounds. One server clock.</p><button className="code-pill mx-auto mt-6" onClick={() => navigator.clipboard.writeText(match.roomId)}>{match.roomId} <Copy size={14} /></button></div><div className="mt-10 grid gap-4 sm:grid-cols-2"><SeatCard label="you" name={self} ready={Boolean(seatId && match.ready[seatId])} /><SeatCard label="opponent" name={opponent ?? "waiting for a guest"} ready={Boolean(opponent && Object.entries(match.ready).find(([id]) => id !== seatId)?.[1])} empty={!opponent} /></div>{host && <div className="panel mt-5 p-5"><button className="flex w-full items-center justify-between text-left" onClick={() => setSettingsOpen(!settingsOpen)}><span><span className="eyebrow text-gold">host controls</span><span className="mt-1 block font-semibold">{selectedTopics.length} topics · {timer}s per question</span></span><ChevronDown className={settingsOpen ? "rotate-180 text-gold" : "text-muted"} size={17} /></button>{settingsOpen && <div className="mt-5 border-t border-line pt-5"><div className="grid gap-2 sm:grid-cols-2">{TOPICS.map((topic) => <button key={topic.id} className={`topic-chip ${selectedTopics.includes(topic.id) ? "topic-chip-active" : ""}`} onClick={() => setSelectedTopics(selectedTopics.includes(topic.id) ? selectedTopics.filter((item) => item !== topic.id) : [...selectedTopics, topic.id])}>{topic.label}{selectedTopics.includes(topic.id) && <Check size={14} />}</button>)}</div><div className="mt-4 flex items-center gap-3"><span className="text-sm text-muted">Timer</span><select className="field w-auto" value={timer} onChange={(event) => setTimer(Number(event.target.value))}><option value={60}>60 sec</option><option value={90}>90 sec</option><option value={120}>120 sec</option><option value={300}>5 min</option></select><button className="button button-primary ml-auto" onClick={onConfigure}>save settings</button></div></div>}</div>}<button className="button button-primary mx-auto mt-7 flex min-w-64" disabled={!opponent} onClick={onReady}><Check size={16} /> {seatId && match.ready[seatId] ? "unready" : "ready up"}</button></section>;
 
-  useEffect(() => {
-    if (!hasTimer) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 250);
-    return () => window.clearInterval(timer);
-  }, [hasTimer]);
+const SeatCard = ({ label, name, ready, empty }: { label: string; name: string; ready: boolean; empty?: boolean }) => <article className={`panel p-6 ${empty ? "border-dashed" : ""}`}><div className="flex items-center justify-between"><span className="grid size-11 place-items-center rounded-full border border-line bg-ink text-gold"><Users size={19} /></span><span className={`status-pill ${ready ? "status-good" : ""}`}>{ready ? "ready" : empty ? "open seat" : "not ready"}</span></div><p className="eyebrow mt-8">{label}</p><p className={`mt-2 text-xl font-semibold ${empty ? "text-muted" : ""}`}>{name}</p></article>;
 
-  useEffect(() => {
-    playerRef.current?.setVolume(playerVolume);
-  }, [playerVolume]);
+const Countdown = ({ seconds, round }: { seconds: number; round: number }) => <section className="mx-auto flex min-h-[65vh] max-w-xl flex-col items-center justify-center text-center"><p className="eyebrow text-gold">round {round} of 5</p><p className="display mt-4 text-[9rem] leading-none text-gold">{seconds}</p><p className="mt-5 text-muted">Get your scratch paper ready. The next prompt is coming.</p></section>;
 
-  useEffect(() => {
-    if (connectionPause) {
-      playerRef.current?.pauseVideo();
-      return;
-    }
-    if (phase !== "PLAYING" && phase !== "GRACE_PERIOD") {
-      playerRef.current = null;
-      return;
-    }
-    if (roundStartTime && playerRef.current) {
-      const elapsed = Math.max(0, (Date.now() - roundStartTime) / 1000);
-      const rawTime = videoStartTime + elapsed;
-      const syncTime = currentVideoDurationSeconds ? rawTime % currentVideoDurationSeconds : rawTime;
-      playerRef.current.seekTo(syncTime, true);
-      playerRef.current.playVideo();
-    }
-  }, [connectionPause, currentVideoDurationSeconds, phase, roundStartTime, videoStartTime]);
+const QuestionStage = ({ match, seatId, opponent, seconds, answer, setAnswer, ordered, setOrdered, submitted, submit, lastSubmission }: { match: MatchPublicState; seatId: string | null; opponent?: string; seconds: number | null; answer: string | number | string[]; setAnswer: (answer: string | number | string[]) => void; ordered: string[]; setOrdered: (items: string[]) => void; submitted: boolean; submit: () => void; lastSubmission: { correct: boolean; total: number } | null }) => { const question = match.question; if (!question) return null; const opponentSeat = Object.keys(match.submissions).find((id) => id !== seatId); const opponentSubmitted = opponentSeat ? match.submissions[opponentSeat]?.submitted : false; return <section className="mx-auto max-w-4xl py-3 sm:py-8"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="eyebrow text-gold">question {match.roundIndex + 1} / {match.totalRounds}</p><p className="mt-1 text-sm text-muted">{topicName(question.topicId)} · {question.difficulty}</p></div><div className={`timer ${seconds !== null && seconds <= 10 ? "timer-hot" : ""}`}><Clock3 size={16} />{seconds ?? "--"}s</div></div><div className="mt-10 grid gap-8 lg:grid-cols-[1fr_18rem]"><article className="panel p-6 sm:p-9"><div className="flex items-start justify-between gap-5"><h1 className="text-2xl font-semibold leading-snug sm:text-4xl">{question.prompt}</h1><span className="type-pill">{typeLabel(question.type)}</span></div><AnswerControl question={question} answer={answer} setAnswer={setAnswer} ordered={ordered} setOrdered={setOrdered} disabled={submitted} /><button className="button button-primary mt-8 w-full" disabled={submitted || !hasAnswer(question, answer, ordered)} onClick={submit}>{submitted ? <><Check size={16} /> answer locked</> : <><Zap size={16} /> submit answer</>}</button>{lastSubmission && <p className="mt-4 text-center text-sm text-muted" role="status">Server received your answer. {lastSubmission.correct ? "Correctness confirmed." : "Keep going; reveal is after the round."}</p>}</article><aside className="space-y-3"><MiniScore label="you" name="your score" score={seatId ? match.scores[seatId]?.total ?? 0 : 0} submitted={submitted} /><MiniScore label="opponent" name={opponent ?? "opponent"} score={opponentSeat ? match.scores[opponentSeat]?.total ?? 0 : 0} submitted={opponentSubmitted} /><div className="notice-info"><CircleHelp size={16} /><p>Correctness is worth <strong>1,000</strong>. Speed can add up to 300.</p></div></aside></div></section>; };
 
-  useEffect(() => {
-    if (messages.length > previousMessageCount.current && !activityOpen) {
-      const unreadMessages = messages
-        .slice(previousMessageCount.current)
-        .filter(
-          (message) =>
-            message.type === "USER" && message.sender !== playerName,
-        );
-      if (unreadMessages.length > 0) {
-        setUnreadCount((count) => count + unreadMessages.length);
-      }
-    }
-    previousMessageCount.current = messages.length;
-  }, [activityOpen, messages, playerName]);
+const AnswerControl = ({ question, answer, setAnswer, ordered, setOrdered, disabled }: { question: PublicQuestion; answer: string | number | string[]; setAnswer: (answer: string | number | string[]) => void; ordered: string[]; setOrdered: (items: string[]) => void; disabled: boolean }) => { if (question.type === "multiple-choice") return <div className="mt-9 grid gap-3">{question.options?.map((option) => <button key={option.id} disabled={disabled} className={`answer-option ${answer === option.id ? "answer-option-active" : ""}`} onClick={() => setAnswer(option.id)}><span className="option-key">{option.id}</span><span>{option.label}</span></button>)}</div>; if (question.type === "ordered-sequence") return <div className="mt-9"><p className="field-label">tap items in order</p><div className="mt-3 grid gap-2">{question.items?.map((item) => <button key={item.id} disabled={disabled || ordered.includes(item.id)} className={`answer-option ${ordered.includes(item.id) ? "opacity-40" : ""}`} onClick={() => setOrdered([...ordered, item.id])}><span className="option-key">{ordered.indexOf(item.id) + 1 || "·"}</span>{item.label}</button>)}</div>{ordered.length > 0 && <button className="mt-3 text-xs text-muted underline" onClick={() => setOrdered([])}>reset order</button>}</div>; if (question.type === "code-output") return <textarea disabled={disabled} className="field mt-9 min-h-32 font-mono" value={typeof answer === "string" ? answer : ""} onChange={(event) => setAnswer(event.target.value)} placeholder="write the output, one line at a time" />; return <input disabled={disabled} type={question.type === "numeric" ? "number" : "text"} className="field mt-9 text-lg" value={typeof answer === "string" || typeof answer === "number" ? answer : ""} onChange={(event) => setAnswer(question.type === "numeric" ? event.target.value : event.target.value)} placeholder={question.unit ? `answer in ${question.unit}` : "type your answer"} />; };
+const hasAnswer = (question: PublicQuestion, answer: string | number | string[], ordered: string[]) => question.type === "ordered-sequence" ? ordered.length === (question.orderLength ?? question.items?.length ?? 0) : String(answer).trim().length > 0;
+const MiniScore = ({ label, name, score, submitted }: { label: string; name: string; score: number; submitted: boolean }) => <div className="panel p-4"><div className="flex items-center justify-between"><span className="eyebrow">{label}</span>{submitted && <Check className="text-green-300" size={15} />}</div><p className="mt-2 truncate text-sm text-muted">{name}</p><p className="mt-2 font-mono text-xl text-gold">{score.toLocaleString()}</p></div>;
 
-  useEffect(() => {
-    if (previousPhase.current === phase) return;
-    if (phase === "PLAYING") playSound("round-start");
-    if (phase === "REVEAL") playSound("reveal");
-    if (phase === "GAME_OVER") playSound(winner === playerName ? "victory" : "defeat");
-    previousPhase.current = phase;
-  }, [phase, playerName, winner]);
+const Reveal = ({ match }: { match: MatchPublicState }) => <section className="mx-auto flex min-h-[65vh] max-w-2xl flex-col justify-center text-center"><p className="eyebrow text-gold">round reveal · {match.history.at(-1)?.round ?? match.roundIndex + 1}</p><h1 className="display mt-3 text-5xl">the answer was</h1><div className="panel mt-8 p-7 text-left"><p className="text-2xl font-semibold text-gold">{match.revealedQuestion ? formatAnswer(match.revealedQuestion.answer) : "Answer unavailable"}</p><p className="mt-5 leading-7 text-muted">{match.revealedQuestion?.explanation}</p><p className="mt-4 text-xs text-muted">Assumptions: {match.revealedQuestion?.assumptions.join(" · ")}</p></div><p className="mt-7 text-sm text-muted">Next round is loading…</p></section>;
 
-  useEffect(() => {
-    if (
-      shouldPlayCountdownCue(
-        phase,
-        countdownSeconds,
-        previousCountdown.current,
-      )
-    ) {
-      playSound("countdown");
-    }
-    previousCountdown.current = countdownSeconds;
-  }, [countdownSeconds, phase]);
+const Paused = ({ pause, now }: { pause: MatchPublicState["pause"]; now: number }) => <section className="mx-auto flex min-h-[65vh] max-w-xl flex-col items-center justify-center text-center"><WifiOff className="text-gold" size={34} /><p className="eyebrow mt-6 text-gold">match paused</p><h1 className="display mt-3 text-4xl">waiting for {pause?.seatName ?? "a guest"}</h1><p className="mt-4 text-muted">Both players are paused. Timers resume only when the guest reconnects.</p><p className="mt-7 font-mono text-2xl text-gold">{pause ? Math.max(0, Math.ceil((pause.expiresAt - now) / 1000)) : 0}s</p></section>;
 
-  useEffect(() => {
-    if (guessedCorrectly.length > previousCorrectCount.current) playSound("correct");
-    previousCorrectCount.current = guessedCorrectly.length;
-  }, [guessedCorrectly.length]);
-
-  useEffect(() => {
-    if (!activityOpen && (phase === "PLAYING" || phase === "GRACE_PERIOD")) {
-      window.requestAnimationFrame(() => guessInputRef.current?.focus());
-    }
-  }, [activityOpen, phase]);
-
-  useEffect(() => {
-    if (!roundResult?.damageDealt) return;
-    playSound("damage");
-  }, [roundResult]);
-
-  const onPlayerReady = (event: YouTubeEvent) => {
-    playerRef.current = event.target;
-    event.target.setVolume(playerVolume);
-    if (!roundStartTime) return;
-    const elapsed = Math.max(0, (Date.now() - roundStartTime) / 1000);
-    const rawTime = videoStartTime + elapsed;
-    const syncTime = currentVideoDurationSeconds ? rawTime % currentVideoDurationSeconds : rawTime;
-    event.target.seekTo(syncTime, true);
-    if (!connectionPause) event.target.playVideo();
-  };
-
-  const submitInput = (value: string) => {
-    const message = value.trim();
-    if (!message) return;
-    if (sendGuess(message)) {
-      setInputValue("");
-      playSound("confirm");
-    }
-    window.requestAnimationFrame(() => guessInputRef.current?.focus());
-  };
-
-  const submit = (event: React.FormEvent) => {
-    event.preventDefault();
-    submitInput(selectedSuggestion?.canonicalTitle ?? inputValue);
-  };
-
-  const submitLobbyMessage = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (sendChatMessage(inputValue)) {
-      setInputValue("");
-      playSound("confirm");
-    }
-  };
-
-  const copyCode = async () => {
-    try {
-      await navigator.clipboard.writeText(roomCode);
-      setCopyMessage("copied");
-      playSound("copy");
-    } catch {
-      setCopyMessage("copy failed");
-    }
-    window.setTimeout(() => setCopyMessage(""), 1800);
-  };
-
-  const requestLeave = () => {
-    if (activePhases.has(phase) && phase !== "GAME_OVER") setLeaveOpen(true);
-    else exitRoom();
-  };
-
-  const toggleActivity = () => {
-    if (activityOpen) {
-      setActivityOpen(false);
-      window.requestAnimationFrame(() => guessInputRef.current?.focus());
-      return;
-    }
-    setUnreadCount(0);
-    setActivityOpen(true);
-  };
-
-  const closeActivity = () => {
-    setActivityOpen(false);
-    window.requestAnimationFrame(() => guessInputRef.current?.focus());
-  };
-
-  useEffect(() => {
-    if (!activityOpen) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeActivity();
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  });
-
-  const exitRoom = () => {
-    leaveRoom();
-    playSound("navigate");
-    navigate("/");
-  };
-
-  if (!roomCode || !playerName) return null;
-
-  return (
-    <MotionConfig reducedMotion="user">
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <header className="relative z-40 border-b border-border bg-background/95">
-        <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 sm:px-6">
-          <button type="button" onClick={requestLeave} className="interactive flex size-10 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:text-foreground" aria-label="Go home">
-            <Home size={17} />
-          </button>
-          <div className="min-w-0 flex-1">
-            <p className="ui-label">anime · {getAnimePlaylistLabel(playlist)} playlist</p>
-            <p className="ui-title truncate text-sm">{phaseLabel(phase)}</p>
-          </div>
-          <button type="button" onClick={copyCode} className="interactive hidden items-center gap-3 rounded-md border border-border bg-card px-3 py-2 sm:flex">
-            <span className="font-mono text-xs uppercase tracking-[0.18em]">{roomCode}</span>
-            <Clipboard className="text-muted-foreground" size={14} />
-            <span className="sr-only" aria-live="polite">{copyMessage}</span>
-          </button>
-          <div>
-            <button type="button" onClick={toggleActivity} className="interactive relative flex size-10 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:text-foreground" aria-label={unreadCount > 0 ? `Open chat, ${unreadCount} unread messages` : "Toggle activity"}>
-              <MessageCircle size={17} />
-              <AnimatePresence initial={false}>
-                {unreadCount > 0 && (
-                  <motion.span
-                    initial={{ opacity: 0, scale: 0.7 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.7 }}
-                    className="absolute -right-1.5 -top-1.5 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 font-mono text-[9px] leading-4 text-primary-foreground"
-                    aria-hidden="true"
-                  >
-                    {Math.min(99, unreadCount)}
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </button>
-          </div>
-          <AppSettings />
-        </div>
-      </header>
-
-      {connectionState !== "connected" && !connectionPause && (
-        <div role="status" className="flex items-center justify-center gap-2 border-b border-warning/30 bg-warning/10 px-4 py-2 font-mono text-xs lowercase text-warning">
-          <WifiOff size={14} /> reconnecting to the server…
-        </div>
-      )}
-
-      <div className="relative mx-auto flex w-full max-w-7xl flex-1 overflow-hidden">
-        <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 sm:py-8">
-          {phase === "LOBBY" ? (
-            <Lobby
-              roomCode={roomCode}
-              playlist={playlist}
-              playerName={playerName}
-              opponentName={opponentName}
-              selfReady={selfReady}
-              opponentReady={opponentReady}
-              inputValue={inputValue}
-              setInputValue={setInputValue}
-              onSubmit={submitLobbyMessage}
-              onReady={() => { playSound("confirm"); setReady(); }}
-              onCopy={copyCode}
-              copyMessage={copyMessage}
-              recentActivity={recentActivity}
-              unreadCount={unreadCount}
-              onOpenActivity={toggleActivity}
-            />
-          ) : phase === "COUNTDOWN" ? (
-            <Countdown seconds={countdownSeconds ?? 3} />
-          ) : phase === "REVEAL" ? (
-            <RoundReveal result={roundResult} revealedAnswer={revealedAnswer} playerName={playerName} detailsOpen={detailsOpen} setDetailsOpen={setDetailsOpen} />
-          ) : phase === "GAME_OVER" ? (
-            <GameOver
-              winner={winner}
-              playerName={playerName}
-              health={health}
-              players={Object.keys(health)}
-              history={matchHistory}
-              historyOpen={historyOpen}
-              setHistoryOpen={setHistoryOpen}
-              onHome={exitRoom}
-              onRematch={() => { playSound("confirm"); setReady(); }}
-            />
-          ) : (
-            <GameStage
-              currentRound={currentRound}
-              roundSeconds={roundSeconds}
-              playerName={playerName}
-              opponentName={opponentName}
-              health={health}
-              pendingDamage={pendingDamage}
-              guessedCorrectly={guessedCorrectly}
-              inputValue={inputValue}
-              inputRef={guessInputRef}
-              setInputValue={(value) => { setInputValue(value); setSuggestionIndex(0); }}
-              submit={submit}
-              suggestions={suggestions}
-              selectedIndex={suggestionIndex}
-              setSelectedIndex={setSuggestionIndex}
-              submitSuggestion={(suggestion) => {
-                if (guessCooldownEndsAt > now) {
-                  setInputValue(suggestion.canonicalTitle);
-                  window.requestAnimationFrame(() => guessInputRef.current?.focus());
-                  return;
-                }
-                submitInput(suggestion.canonicalTitle);
-              }}
-              disabled={!canGuess}
-              cooldown={Math.max(0, (guessCooldownEndsAt - now) / 1000)}
-              canSkip={phase === "PLAYING" && players.length === 2}
-              skipVotes={skipVotes.length}
-              alreadySkipped={alreadySkipped}
-              onSkip={() => { playSound("select"); voteToSkip(); }}
-              error={errorNotice}
-              recentActivity={recentActivity}
-              unreadCount={unreadCount}
-              onOpenActivity={toggleActivity}
-            />
-          )}
-        </main>
-
-        <ActivityPanel
-          open={activityOpen}
-          onClose={closeActivity}
-          messages={messages}
-          playerName={playerName}
-          value={activityInput}
-          onChange={setActivityInput}
-          onSend={() => {
-            if (sendChatMessage(activityInput)) {
-              setActivityInput("");
-              playSound("confirm");
-            }
-          }}
-        />
-      </div>
-
-      <div className="pointer-events-none absolute size-px overflow-hidden opacity-0">
-        {(phase === "PLAYING" || phase === "GRACE_PERIOD") && currentVideoId && (
-          <YouTube videoId={currentVideoId} opts={{ width: "1", height: "1", playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, modestbranding: 1, rel: 0 } }} onReady={onPlayerReady} onEnd={(event) => { event.target.seekTo(0, true); event.target.playVideo(); }} />
-        )}
-      </div>
-
-      {connectionPause && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background/90 p-5">
-          <section className="surface-raised event-enter max-w-md p-7 text-center">
-            <WifiOff className="mx-auto text-warning" size={28} />
-            <p className="ui-label mt-5">match paused</p>
-            <h2 className="ui-title mt-2 text-2xl">waiting for {connectionPause.playerName}</h2>
-            <p className="mt-4 leading-6 text-muted-foreground">Music and timers are paused for both players. The match will resume automatically if they reconnect.</p>
-            <p className="mt-6 font-mono text-lg text-warning">{reconnectSeconds ?? 0}s</p>
-          </section>
-        </div>
-      )}
-
-      {leaveOpen && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-background/80 p-5" role="dialog" aria-modal="true" aria-labelledby="leave-title">
-          <section className="surface-raised max-w-sm p-6">
-            <p className="ui-label">leave active match</p>
-            <h2 id="leave-title" className="ui-title mt-2 text-2xl">forfeit and go home?</h2>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">Your opponent will win this match. This cannot be undone.</p>
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <Button variant="outline" onClick={() => setLeaveOpen(false)} className="rounded-md font-mono text-xs lowercase">stay</Button>
-              <Button onClick={exitRoom} className="rounded-md bg-destructive font-mono text-xs lowercase text-background">leave match</Button>
-            </div>
-          </section>
-        </div>
-      )}
-      <Toast message={copyMessage === "copied" ? "Room code copied." : ""} onDismiss={() => setCopyMessage("")} />
-    </div>
-    </MotionConfig>
-  );
-};
-
-const Lobby = ({ roomCode, playlist, playerName, opponentName, selfReady, opponentReady, inputValue, setInputValue, onSubmit, onReady, onCopy, copyMessage, recentActivity, unreadCount, onOpenActivity }: {
-  roomCode: string; playlist: AnimePlaylist; playerName: string; opponentName: string | null; selfReady: boolean; opponentReady: boolean; inputValue: string; setInputValue: (value: string) => void; onSubmit: (event: React.FormEvent) => void; onReady: () => void; onCopy: () => void; copyMessage: string; recentActivity: UnifiedMessage[]; unreadCount: number; onOpenActivity: () => void;
-}) => (
-  <section className="page-enter mx-auto flex min-h-[calc(100vh-8rem)] max-w-4xl flex-col justify-center">
-    <div className="text-center">
-      <p className="ui-label">private lobby · {getAnimePlaylistLabel(playlist)} playlist</p>
-      <h1 className="ui-title mt-2 text-3xl sm:text-5xl">ready when you are</h1>
-      <button type="button" onClick={onCopy} className="interactive mx-auto mt-5 flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 font-mono text-xs uppercase tracking-[0.2em]">
-        {roomCode}<Clipboard size={14} /><span className="normal-case tracking-normal text-muted-foreground">{copyMessage}</span>
-      </button>
-    </div>
-    <div className="mt-10 grid gap-4 sm:grid-cols-2">
-      <PlayerCard name={playerName} label="you" ready={selfReady} />
-      <PlayerCard name={opponentName ?? "waiting for a player"} label="opponent" ready={opponentReady} empty={!opponentName} />
-    </div>
-    <div className="mx-auto mt-8 w-full max-w-lg">
-      <Button type="button" disabled={!opponentName} onClick={onReady} className={`h-12 w-full rounded-md font-mono text-sm lowercase ${selfReady ? "bg-secondary text-foreground" : "bg-primary text-primary-foreground"}`}>
-        <Check size={16} /> {selfReady ? "unready" : "ready up"}
-      </Button>
-      <form onSubmit={onSubmit} className="mt-4 flex gap-2">
-        <input value={inputValue} onChange={(event) => setInputValue(event.target.value)} placeholder="send a lobby message" className="h-10 min-w-0 flex-1 rounded-md border border-border bg-input px-3 text-sm outline-none focus:border-primary" />
-        <Button size="icon" variant="outline" className="size-10 rounded-md" aria-label="Send message"><Send size={15} /></Button>
-      </form>
-      <RecentActivity messages={recentActivity} unreadCount={unreadCount} playerName={playerName} onOpen={onOpenActivity} />
-    </div>
-  </section>
-);
-
-const PlayerCard = ({ name, label, ready, empty = false }: { name: string; label: string; ready: boolean; empty?: boolean }) => (
-  <article className={`surface p-6 ${empty ? "border-dashed" : ""}`}>
-    <div className="flex items-start justify-between gap-4">
-      <span className="flex size-11 items-center justify-center rounded-md border border-border bg-input text-muted-foreground"><UserRound size={20} /></span>
-      <span className={`rounded-full border px-2 py-1 font-mono text-[10px] lowercase ${ready ? "border-success/40 bg-success/10 text-success" : "border-border text-muted-foreground"}`}>{ready ? "ready" : empty ? "open seat" : "not ready"}</span>
-    </div>
-    <p className="ui-label mt-8">{label}</p>
-    <h2 className={`mt-1 truncate text-xl font-semibold ${empty ? "text-muted-foreground" : ""}`}>{name}</h2>
-  </article>
-);
-
-const Countdown = ({ seconds }: { seconds: number }) => (
-  <section className="page-enter flex min-h-[calc(100vh-10rem)] flex-col items-center justify-center text-center">
-    <p className="ui-label">get ready</p>
-    <p key={seconds} className="event-enter ui-title mt-4 text-8xl text-primary sm:text-9xl">{seconds}</p>
-    <p className="mt-5 text-muted-foreground">The first track is about to begin.</p>
-  </section>
-);
-
-const GameStage = ({ currentRound, roundSeconds, playerName, opponentName, health, pendingDamage, guessedCorrectly, inputValue, inputRef, setInputValue, submit, suggestions, selectedIndex, setSelectedIndex, submitSuggestion, disabled, cooldown, canSkip, skipVotes, alreadySkipped, onSkip, error, recentActivity, unreadCount, onOpenActivity }: {
-  currentRound: number; roundSeconds: number | null; playerName: string; opponentName: string | null; health: Record<string, number>; pendingDamage: Record<string, number>; guessedCorrectly: string[]; inputValue: string; inputRef: React.RefObject<HTMLInputElement | null>; setInputValue: (value: string) => void; submit: (event: React.FormEvent) => void; suggestions: AnswerOption[]; selectedIndex: number; setSelectedIndex: React.Dispatch<React.SetStateAction<number>>; submitSuggestion: (suggestion: AnswerOption) => void; disabled: boolean; cooldown: number; canSkip: boolean; skipVotes: number; alreadySkipped: boolean; onSkip: () => void; error: string; recentActivity: UnifiedMessage[]; unreadCount: number; onOpenActivity: () => void;
-}) => (
-  <section className="page-enter mx-auto max-w-5xl">
-    <div className="grid gap-3 sm:grid-cols-2">
-      <HealthCard label="you" name={playerName} hp={health[playerName] ?? 5000} pending={pendingDamage[playerName] ?? 0} correct={guessedCorrectly.includes(playerName)} />
-      <HealthCard label="opponent" name={opponentName ?? "waiting"} hp={opponentName ? health[opponentName] ?? 5000 : 0} pending={opponentName ? pendingDamage[opponentName] ?? 0 : 0} correct={opponentName ? guessedCorrectly.includes(opponentName) : false} />
-    </div>
-    <div className="mx-auto mt-10 max-w-2xl text-center sm:mt-16">
-      <div className="flex items-center justify-center gap-5 font-mono text-xs lowercase text-muted-foreground">
-        <span>round {currentRound + 1}</span>
-        <span className={`flex items-center gap-2 text-base ${roundSeconds !== null && roundSeconds <= 5 ? "text-warning" : "text-foreground"}`}><Clock3 size={15} /> {roundSeconds ?? "--"}s</span>
-      </div>
-      <h1 className="ui-title mt-5 text-3xl sm:text-5xl">name this soundtrack</h1>
-      <p className="mt-3 text-sm text-muted-foreground">Type an anime title. Suggestions appear after two characters.</p>
-      {canSkip && <button type="button" disabled={alreadySkipped} onClick={onSkip} className="interactive mt-6 inline-flex items-center gap-2 font-mono text-xs lowercase text-muted-foreground hover:text-foreground disabled:opacity-50"><SkipForward size={14} /> {alreadySkipped ? `skip vote sent (${skipVotes}/2)` : `vote to skip (${skipVotes}/2)`}</button>}
-      <form onSubmit={submit} className={`relative text-left ${canSkip ? "mt-4" : "mt-8"}`}>
-        <input
-          ref={inputRef}
-          autoFocus
-          value={inputValue}
-          disabled={disabled}
-          onChange={(event) => setInputValue(event.target.value)}
-          onKeyDown={(event) => {
-            if (!suggestions.length) return;
-            if (event.key === "ArrowDown") { event.preventDefault(); setSelectedIndex((index) => (index + 1) % suggestions.length); }
-            if (event.key === "ArrowUp") { event.preventDefault(); setSelectedIndex((index) => (index - 1 + suggestions.length) % suggestions.length); }
-          }}
-          placeholder={disabled ? "answer locked" : "start typing an anime title"}
-          className="h-14 w-full rounded-md border border-border bg-input px-5 pr-16 text-base outline-none transition-colors placeholder:text-muted-foreground focus:border-primary disabled:cursor-not-allowed disabled:opacity-60 sm:h-16 sm:text-lg"
-          role="combobox"
-          aria-expanded={suggestions.length > 0}
-        />
-        <button disabled={disabled || cooldown > 0} className="absolute right-2 top-2 flex h-10 min-w-10 items-center justify-center rounded-md bg-primary px-2 font-mono text-xs text-primary-foreground disabled:bg-secondary disabled:text-muted-foreground sm:top-3" aria-label={cooldown > 0 ? `Next guess in ${cooldown.toFixed(1)} seconds` : "Submit guess"}>{cooldown > 0 ? cooldown.toFixed(1) : <ArrowLeft className="rotate-180" size={17} />}</button>
-        {suggestions.length > 0 && (
-          <div className="surface-raised quiet-scrollbar absolute inset-x-0 top-full z-30 mt-2 max-h-80 overflow-y-auto p-2">
-            {suggestions.map((suggestion, index) => (
-              <button key={suggestion.id} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => submitSuggestion(suggestion)} className={`interactive flex w-full items-center gap-3 rounded-md p-2 text-left ${index === selectedIndex ? "bg-accent" : "hover:bg-muted"}`}>
-                <div className="relative size-12 shrink-0 overflow-hidden rounded-md"><img src={suggestion.coverImageUrl} alt="" className="h-full w-full object-cover opacity-65" /><div className="absolute inset-0 bg-background/30" /></div>
-                <div className="min-w-0"><p className="truncate font-medium">{suggestion.canonicalTitle}</p><p className="ui-label mt-1 truncate">{suggestion.romajiName ?? suggestion.nativeName ?? "anime title"}</p></div>
-              </button>
-            ))}
-          </div>
-        )}
-      </form>
-      {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
-      <RecentActivity messages={recentActivity} unreadCount={unreadCount} playerName={playerName} onOpen={onOpenActivity} />
-    </div>
-  </section>
-);
-
-const RecentActivity = ({ messages, unreadCount, playerName, onOpen }: { messages: UnifiedMessage[]; unreadCount: number; playerName: string; onOpen: () => void }) => (
-  <button type="button" onClick={onOpen} className="interactive mt-3 flex min-h-16 w-full items-center gap-3 overflow-hidden rounded-md border border-border bg-card px-3 py-2 text-left hover:bg-secondary">
-    <MessageCircle className="shrink-0 text-primary" size={15} />
-    <span className="relative flex min-w-0 flex-1 flex-col gap-1 overflow-hidden">
-      <AnimatePresence initial={false} mode="popLayout">
-        {messages.length > 0 ? messages.map((message, index) => (
-          <motion.span
-            layout="position"
-            key={message.id}
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: index === 0 ? 1 : 0.55, y: 0 }}
-            exit={{ opacity: 0, y: 12 }}
-            transition={{ duration: 0.24, ease: "easeOut" }}
-            className="block min-w-0 truncate text-sm text-muted-foreground"
-          >
-            <span className="font-mono text-xs lowercase text-foreground">{message.type === "SYSTEM" ? "system" : message.sender === playerName ? "you" : message.sender}:</span> {message.text}
-          </motion.span>
-        )) : (
-          <motion.span key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-sm text-muted-foreground">No activity yet</motion.span>
-        )}
-      </AnimatePresence>
-    </span>
-    <span className="shrink-0 font-mono text-[10px] lowercase text-muted-foreground">{unreadCount > 0 ? `${unreadCount} unread` : "open chat"}</span>
-  </button>
-);
-
-const HealthCard = ({ label, name, hp, pending, correct }: { label: string; name: string; hp: number; pending: number; correct: boolean }) => {
-  const percentage = Math.max(0, Math.min(100, (hp / 5000) * 100));
-  return <article className="surface p-4 sm:p-5">
-    <div className="flex items-center justify-between gap-3"><div className="min-w-0"><p className="ui-label">{label}</p><p className="truncate font-medium">{name}</p></div><div className="text-right"><p className="font-mono text-sm">{hp.toLocaleString()} hp</p>{pending > 0 && <p className="ui-label text-warning">{pending} potential</p>}</div></div>
-    <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-input"><div className="h-full bg-primary transition-[width] duration-500" style={{ width: `${percentage}%` }} /></div>
-    {correct && <p className="mt-3 flex items-center gap-2 font-mono text-xs lowercase text-success"><Check size={13} /> answer locked</p>}
-  </article>;
-};
-
-const RoundReveal = ({ result, revealedAnswer, playerName, detailsOpen, setDetailsOpen }: { result: RoundResult | null; revealedAnswer: string | null; playerName: string; detailsOpen: boolean; setDetailsOpen: (open: boolean) => void }) => {
-  const tookDamage = result?.damagedPlayer === playerName;
-  const dealtDamage = result?.damagedPlayer && result.damagedPlayer !== playerName;
-  const outcome = result?.isTie ? "draw" : tookDamage ? "you took damage" : dealtDamage ? "direct hit" : "round complete";
-  return <section className="event-enter mx-auto flex min-h-[calc(100vh-10rem)] max-w-3xl flex-col justify-center">
-    <div className="surface-raised p-6 sm:p-10">
-      <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between"><div><p className="ui-label">round reveal</p><h1 className="ui-title mt-2 text-4xl sm:text-5xl">{outcome}</h1></div><div className={`flex items-center gap-2 font-mono text-lg ${tookDamage ? "text-destructive" : dealtDamage ? "text-success" : "text-muted-foreground"}`}><Zap size={18} />{result?.damageDealt ?? 0} hp</div></div>
-      <div className="mt-10 border-l-2 border-primary pl-5"><p className="ui-label">the answer</p><h2 className="mt-2 text-2xl font-semibold sm:text-3xl">{result?.canonicalTitle ?? revealedAnswer ?? "Answer unavailable"}</h2><p className="mt-2 text-muted-foreground">{result?.trackTitle ?? "Unknown track title"}</p></div>
-      <button type="button" onClick={() => setDetailsOpen(!detailsOpen)} className="interactive mt-8 flex items-center gap-2 font-mono text-xs lowercase text-muted-foreground hover:text-foreground">details <ChevronDown className={detailsOpen ? "rotate-180" : ""} size={14} /></button>
-      {detailsOpen && <div className="page-enter mt-4 grid gap-4 rounded-md border border-border bg-background/40 p-4 text-sm sm:grid-cols-2"><Detail label="romaji" value={result?.romajiName ?? "not available"} /><Detail label="native title" value={result?.nativeName ?? "not available"} />{Object.entries(result?.damageByPlayer ?? {}).map(([name, damage]) => <Detail key={name} label={`${name} potential`} value={`${damage} damage`} />)}</div>}
-      <p className="ui-label mt-8 text-center">next round starting shortly</p>
-    </div>
-  </section>;
-};
-
-const Detail = ({ label, value }: { label: string; value: string }) => <div><p className="ui-label">{label}</p><p className="mt-1">{value}</p></div>;
-
-const GameOver = ({ winner, playerName, health, players, history, historyOpen, setHistoryOpen, onHome, onRematch }: { winner: string | null; playerName: string; health: Record<string, number>; players: string[]; history: RoundResult[]; historyOpen: boolean; setHistoryOpen: (open: boolean) => void; onHome: () => void; onRematch: () => void }) => {
-  const won = winner === playerName;
-  return <section className="event-enter mx-auto max-w-3xl py-6 sm:py-12">
-    <div className="text-center"><Trophy className={`mx-auto ${won ? "text-warning" : "text-muted-foreground"}`} size={32} /><p className="ui-label mt-5">match complete</p><h1 className="ui-title mt-2 text-5xl sm:text-7xl">{won ? "victory" : winner ? "defeat" : "draw"}</h1><p className="mt-4 text-muted-foreground">{winner ? `${winner} wins the match.` : "No winner this time."}</p></div>
-    <div className="mt-10 grid gap-3 sm:grid-cols-2">{players.map((name) => <HealthCard key={name} label={name === playerName ? "you" : "opponent"} name={name} hp={health[name] ?? 0} pending={0} correct={false} />)}</div>
-    <div className="mt-6 grid grid-cols-2 gap-3"><Button variant="outline" onClick={onHome} className="h-12 rounded-md font-mono text-xs lowercase"><Home size={15} /> home</Button><Button onClick={onRematch} className="h-12 rounded-md font-mono text-xs lowercase"><RotateCcw size={15} /> rematch</Button></div>
-    {history.length > 0 && <div className="mt-8"><button type="button" onClick={() => setHistoryOpen(!historyOpen)} className="interactive flex w-full items-center justify-between border-b border-border py-3 font-mono text-xs lowercase text-muted-foreground"><span>round history · {history.length}</span><ChevronDown className={historyOpen ? "rotate-180" : ""} size={14} /></button>{historyOpen && <div className="page-enter mt-3 grid gap-2">{history.map((result, index) => <article key={`${result.titleId}-${index}`} className="rounded-md border border-border bg-card p-4"><div className="flex justify-between gap-4"><div className="min-w-0"><p className="ui-label">round {index + 1}</p><p className="mt-1 truncate font-medium">{result.canonicalTitle}</p><p className="mt-1 truncate text-sm text-muted-foreground">{result.trackTitle ?? "Unknown track"}</p></div><span className="shrink-0 font-mono text-xs text-muted-foreground">{result.damageDealt} hp</span></div></article>)}</div>}</div>}
-  </section>;
-};
-
-const ActivityPanel = ({ open, onClose, messages, playerName, value, onChange, onSend }: {
-  open: boolean;
-  onClose: () => void;
-  messages: Array<{ id: string; type: "SYSTEM" | "USER"; sender?: string; text: string }>;
-  playerName: string;
-  value: string;
-  onChange: (value: string) => void;
-  onSend: () => void;
-}) => (
-  <>
-    <button type="button" onClick={onClose} aria-label="Close activity" className={`fixed inset-0 top-16 z-40 bg-background/70 transition-opacity lg:bg-transparent ${open ? "opacity-100" : "pointer-events-none opacity-0"}`} />
-    <aside aria-hidden={!open} inert={!open} className={`fixed bottom-0 right-0 top-16 z-50 flex w-[min(23rem,92vw)] flex-col border border-border bg-card shadow-2xl transition-transform duration-200 ${open ? "translate-x-0" : "translate-x-full"}`}>
-      <div className="flex h-16 items-center justify-between border-b border-border px-5">
-        <div><p className="ui-label">room activity</p><h2 className="ui-title text-base">messages</h2></div>
-        <button type="button" onClick={onClose} className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"><X size={16} /></button>
-      </div>
-      <div className="quiet-scrollbar flex flex-1 flex-col gap-3 overflow-y-auto p-4">
-        {messages.length === 0 ? (
-          <div className="m-auto text-center"><MessageCircle className="mx-auto text-muted-foreground" size={22} /><p className="mt-3 text-sm text-muted-foreground">Nothing here yet.</p></div>
-        ) : messages.slice(-50).map((message) => message.type === "SYSTEM" ? (
-          <div key={message.id} className="rounded-md bg-muted px-3 py-2 text-center font-mono text-[11px] lowercase text-muted-foreground">{message.text}</div>
-        ) : (
-          <div key={message.id} className={`max-w-[88%] ${message.sender === playerName ? "self-end" : "self-start"}`}><p className="ui-label mb-1">{message.sender === playerName ? "you" : message.sender}</p><p className="rounded-md border border-border bg-background px-3 py-2 text-sm leading-5">{message.text}</p></div>
-        ))}
-      </div>
-      <form onSubmit={(event) => { event.preventDefault(); onSend(); }} className="flex gap-2 border-t border-border p-3">
-        <input key={open ? "open" : "closed"} autoFocus={open} value={value} onChange={(event) => onChange(event.target.value)} placeholder="send a message" className="h-9 min-w-0 flex-1 rounded-md border border-border bg-input px-3 text-sm outline-none focus:border-primary" />
-        <button className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground" aria-label="Send message"><Send size={14} /></button>
-      </form>
-    </aside>
-  </>
-);
-
-const phaseLabel = (phase: string) => ({ LOBBY: "lobby", COUNTDOWN: "starting soon", PLAYING: "now playing", GRACE_PERIOD: "final guesses", REVEAL: "round reveal", GAME_OVER: "match complete", ROUND_END: "round complete" }[phase] ?? phase.toLowerCase());
-
-export default Room;
+const Results = ({ match, selfSeatId, onRematch, onHome }: { match: MatchPublicState; selfSeatId: string | null; onRematch: () => void; onHome: () => void }) => { const winner = match.winnerSeatId; const won = winner === selfSeatId; return <section className="mx-auto max-w-4xl py-6 sm:py-12"><div className="text-center"><Trophy className="mx-auto text-gold" size={34} /><p className="eyebrow mt-6 text-gold">{match.endReason === "completed" ? "five-round results" : "match outcome"}</p><h1 className="display mt-3 text-6xl">{winner ? won ? "you win" : "good fight" : "draw"}</h1><p className="mt-4 text-muted">Correctness leads. Speed breaks ties only after correct answers are counted.</p></div><div className="mt-10 grid gap-3 sm:grid-cols-2">{Object.entries(match.scores).map(([id, score]) => <article key={id} className={`panel p-5 ${id === selfSeatId ? "border-gold/50" : ""}`}><p className="eyebrow">{id === selfSeatId ? "you" : "opponent"}</p><p className="mt-2 font-mono text-3xl text-gold">{score.total.toLocaleString()}</p><p className="mt-2 text-sm text-muted">{score.correct} correct · {score.responseMs ? `${(score.responseMs / 1000).toFixed(1)}s response time` : "no responses"}</p></article>)}</div><div className="mt-8 flex flex-wrap justify-center gap-3"><button className="button button-primary" onClick={onRematch}><RotateCcw size={16} /> rematch</button><button className="button button-ghost" onClick={onHome}><LogOut size={16} /> leave room</button></div><div className="mt-10 space-y-2"><p className="eyebrow">round review</p>{match.history.map((round) => <details key={round.round} className="panel group p-4"><summary className="flex cursor-pointer list-none items-center justify-between"><span><span className="eyebrow">round {round.round}</span><span className="ml-4 font-medium">{round.question.prompt}</span></span><ChevronDown className="group-open:rotate-180" size={16} /></summary><div className="mt-4 border-t border-line pt-4 text-sm"><p className="text-gold">Answer: {formatAnswer(round.question.answer)}</p><p className="mt-2 text-muted">{round.question.explanation}</p><p className="mt-3 text-xs text-muted">Assumptions: {round.question.assumptions.join(" · ")}</p></div></details>)}</div></section>; };
+const formatAnswer = (answer: string | number | string[]) => Array.isArray(answer) ? answer.join(" → ") : String(answer);
+const Chat = ({ open, messages, value, setValue, onClose, onSend, self }: { open: boolean; messages: Array<{ id: string; type: "system" | "user"; sender: string; text: string }>; value: string; setValue: (value: string) => void; onClose: () => void; onSend: (event: React.FormEvent) => void; self: string }) => <aside className={`fixed bottom-0 right-0 top-16 z-40 flex w-[min(24rem,94vw)] flex-col border-l border-line bg-panel shadow-2xl transition-transform ${open ? "translate-x-0" : "translate-x-full"}`}><div className="flex items-center justify-between border-b border-line p-5"><div><p className="eyebrow text-gold">secondary channel</p><h2 className="font-semibold">room chat</h2></div><button className="icon-button" onClick={onClose} aria-label="Close chat"><X size={16} /></button></div><div className="flex-1 space-y-3 overflow-y-auto p-4">{messages.length === 0 ? <p className="mt-8 text-center text-sm text-muted">No messages yet.</p> : messages.map((message) => <div key={message.id} className={message.type === "system" ? "rounded bg-ink p-3 text-center text-xs text-muted" : message.sender === self ? "ml-6" : "mr-6"}><p className="eyebrow">{message.sender === self ? "you" : message.sender}</p><p className="mt-1 rounded border border-line bg-ink p-3 text-sm">{message.text}</p></div>)}</div><form className="flex gap-2 border-t border-line p-3" onSubmit={onSend}><input className="field min-w-0" maxLength={280} value={value} onChange={(event) => setValue(event.target.value)} placeholder="message (1/sec)" /><button className="button button-primary px-3" aria-label="Send"><Send size={15} /></button></form></aside>;
+const Loading = () => <section className="mx-auto flex min-h-[65vh] max-w-xl flex-col items-center justify-center text-center"><div className="spinner" /><p className="eyebrow mt-6">joining secure guest seat</p><p className="mt-3 text-muted">Syncing the room state…</p></section>;
+const phaseLabel = (phase: string) => ({ LOBBY: "lobby", SETUP: "setup", READY: "ready check", REMATCH: "rematch lobby", COUNTDOWN: "countdown", QUESTION: "live question", REVEAL: "reveal", RESULTS: "results", PAUSED: "paused", FORFEIT: "forfeit", ABANDONED: "abandoned", EXPIRED: "expired" }[phase] ?? phase.toLowerCase());
+const topicName = (id: string) => TOPICS.find((topic) => topic.id === id)?.label ?? id;
+const typeLabel = (type: string) => ({ "multiple-choice": "selected response", numeric: "numeric", "short-answer": "short answer", "code-output": "C trace", "ordered-sequence": "ordered sequence" }[type] ?? type);

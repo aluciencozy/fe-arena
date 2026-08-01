@@ -1,173 +1,129 @@
 import { randomUUID } from "node:crypto";
-import type {
-  AnimePlaylist,
-  GameMode,
-  RoomMetadata,
-  RoomSource,
-} from "../types/index.js";
+import type { MatchConfig, MatchSource } from "../../../shared/domain.js";
 
-// Hold the rooms and the players in them
-const rooms = new Map<string, string[]>();
-const roomMetadata = new Map<string, RoomMetadata>();
+export type RoomSeat = {
+  seatId: string;
+  name: string;
+  reconnectToken: string;
+  socketId: string | null;
+  connected: boolean;
+};
 
-// Hold the user sessions to track which socket is in which room and their username
-type UserSession = { roomId: string; username: string; reconnectToken: string };
-const userSessions = new Map<string, UserSession>();
-const reconnectReservations = new Map<string, UserSession>();
+export type RoomMetadata = {
+  roomId: string;
+  source: MatchSource;
+  hostSeatId: string;
+  config: MatchConfig;
+};
 
-// Utility functions to manage rooms and user sessions
-export const getUserSession = (socketId: string) => userSessions.get(socketId);
-export const getRoomMetadata = (roomId: string) =>
-  roomMetadata.get(roomId.trim().toUpperCase());
+type RoomRecord = { metadata: RoomMetadata; seats: RoomSeat[] };
+const rooms = new Map<string, RoomRecord>();
+const socketSeats = new Map<string, { roomId: string; seatId: string }>();
+const tokenSeats = new Map<string, { roomId: string; seatId: string }>();
 
-// Get the list of players in a room, or an empty array if the room doesn't exist
-export const getPlayersInRoom = (roomId: string) => rooms.get(roomId) || [];
+const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const roomCode = () => Array.from({ length: 6 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
+const normalizeRoomId = (roomId: string) => roomId.trim().toUpperCase();
 
-const makeRoomCode = () => {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
+export const generateRoomId = () => {
+  let id = roomCode();
+  while (rooms.has(id)) id = roomCode();
+  return id;
+};
 
-  for (let index = 0; index < 6; index += 1) {
-    code += alphabet[Math.floor(Math.random() * alphabet.length)];
+export const createRoom = (source: MatchSource, config: MatchConfig, hostName: string) => {
+  const seat: RoomSeat = { seatId: randomUUID(), name: hostName.trim(), reconnectToken: randomUUID(), socketId: null, connected: false };
+  const metadata: RoomMetadata = { roomId: generateRoomId(), source, hostSeatId: seat.seatId, config };
+  rooms.set(metadata.roomId, { metadata, seats: [seat] });
+  tokenSeats.set(seat.reconnectToken, { roomId: metadata.roomId, seatId: seat.seatId });
+  return { metadata, seat };
+};
+
+export const getRoom = (roomId: string) => rooms.get(normalizeRoomId(roomId));
+export const getMetadata = (roomId: string) => getRoom(roomId)?.metadata;
+export const getSeats = (roomId: string) => getRoom(roomId)?.seats ?? [];
+export const getSeat = (roomId: string, seatId: string) => getRoom(roomId)?.seats.find((seat) => seat.seatId === seatId);
+export const getSeatForSocket = (socketId: string) => {
+  const location = socketSeats.get(socketId);
+  return location ? getSeat(location.roomId, location.seatId) : undefined;
+};
+export const getRoomForSocket = (socketId: string) => socketSeats.get(socketId)?.roomId;
+
+export const attachSeat = (roomId: string, seat: RoomSeat, socketId: string) => {
+  const record = getRoom(roomId);
+  if (!record) return false;
+  if (seat.socketId) socketSeats.delete(seat.socketId);
+  seat.socketId = socketId;
+  seat.connected = true;
+  socketSeats.set(socketId, { roomId: record.metadata.roomId, seatId: seat.seatId });
+  return true;
+};
+
+export const joinRoom = (roomIdInput: string, nameInput: string, socketId: string) => {
+  const roomId = normalizeRoomId(roomIdInput);
+  const record = rooms.get(roomId);
+  const name = nameInput.trim();
+  if (!record) return { ok: false as const, error: "That room code was not found." };
+  const existingSocket = getRoomForSocket(socketId);
+  if (existingSocket) return { ok: false as const, error: "This browser is already seated in a match." };
+  const sameName = record.seats.find((seat) => seat.name.toLocaleLowerCase() === name.toLocaleLowerCase());
+  if (sameName) return { ok: false as const, error: "That guest name is already in this room." };
+  if (record.seats.length >= 2) return { ok: false as const, error: "This private match already has two guests." };
+  const seat: RoomSeat = { seatId: randomUUID(), name, reconnectToken: randomUUID(), socketId, connected: true };
+  record.seats.push(seat);
+  socketSeats.set(socketId, { roomId, seatId: seat.seatId });
+  tokenSeats.set(seat.reconnectToken, { roomId, seatId: seat.seatId });
+  return { ok: true as const, seat, metadata: record.metadata };
+};
+
+export const reconnectRoom = (roomIdInput: string, token: string, socketId: string) => {
+  const roomId = normalizeRoomId(roomIdInput);
+  const location = tokenSeats.get(token);
+  const current = socketSeats.get(socketId);
+  if (!location || location.roomId !== roomId || (current && (current.roomId !== roomId || current.seatId !== location.seatId))) return { ok: false as const, error: "That guest seat is no longer available." };
+  const seat = getSeat(roomId, location.seatId);
+  const metadata = getMetadata(roomId);
+  if (!seat || !metadata) return { ok: false as const, error: "That match has expired." };
+  if (seat.socketId && seat.socketId !== socketId) return { ok: false as const, error: "That guest seat is connected elsewhere." };
+  attachSeat(roomId, seat, socketId);
+  return { ok: true as const, seat, metadata };
+};
+
+export const disconnectSocket = (socketId: string) => {
+  const location = socketSeats.get(socketId);
+  if (!location) return null;
+  socketSeats.delete(socketId);
+  const seat = getSeat(location.roomId, location.seatId);
+  if (!seat) return null;
+  seat.socketId = null;
+  seat.connected = false;
+  return { roomId: location.roomId, seat };
+};
+
+export const removeSeat = (roomIdInput: string, seatId: string) => {
+  const roomId = normalizeRoomId(roomIdInput);
+  const record = rooms.get(roomId);
+  if (!record) return null;
+  const index = record.seats.findIndex((seat) => seat.seatId === seatId);
+  if (index < 0) return null;
+  const [seat] = record.seats.splice(index, 1);
+  if (!seat) return null;
+  if (seat.socketId) socketSeats.delete(seat.socketId);
+  tokenSeats.delete(seat.reconnectToken);
+  if (record.seats.length === 0) rooms.delete(roomId);
+  return { roomId, seat, remaining: record.seats };
+};
+
+export const removeRoom = (roomIdInput: string) => {
+  const roomId = normalizeRoomId(roomIdInput);
+  const record = rooms.get(roomId);
+  if (!record) return;
+  for (const seat of record.seats) {
+    if (seat.socketId) socketSeats.delete(seat.socketId);
+    tokenSeats.delete(seat.reconnectToken);
   }
-
-  return code;
+  rooms.delete(roomId);
 };
 
-export const generateUniqueRoomId = () => {
-  let roomId = makeRoomCode();
-
-  while (rooms.has(roomId) || roomMetadata.has(roomId)) {
-    roomId = makeRoomCode();
-  }
-
-  return roomId;
-};
-
-export const createRoom = ({
-  mode,
-  playlist = "standard",
-  source,
-  selectedTitleIds,
-}: {
-  mode: GameMode;
-  playlist?: AnimePlaylist;
-  source: RoomSource;
-  selectedTitleIds: string[];
-}) => {
-  const roomId = generateUniqueRoomId();
-
-  rooms.set(roomId, []);
-  roomMetadata.set(roomId, {
-    roomId,
-    mode,
-    playlist,
-    source,
-    selectedTitleIds,
-  });
-
-  return roomMetadata.get(roomId) as RoomMetadata;
-};
-
-export const addPlayerToRoom = (
-  roomId: string,
-  username: string,
-  socketId: string,
-): { ok: true; currentPlayers: string[]; isNewPlayer: boolean; reconnectToken: string } | { ok: false; error: string } => {
-  const normalizedRoomId = roomId.trim().toUpperCase();
-  const normalizedUsername = username.trim();
-  const existingSession = userSessions.get(socketId);
-
-  if (
-    existingSession?.roomId === normalizedRoomId &&
-    existingSession.username.toLowerCase() === normalizedUsername.toLowerCase()
-  ) {
-    return {
-      ok: true,
-      currentPlayers: rooms.get(normalizedRoomId) || [existingSession.username],
-      isNewPlayer: false,
-      reconnectToken: existingSession.reconnectToken,
-    };
-  }
-
-  if (!rooms.has(normalizedRoomId)) {
-    return { ok: false, error: "That room code was not found." };
-  }
-
-  // If the room exists, add the player to it if they are not already in it
-  const players = rooms.get(normalizedRoomId) as string[];
-
-  const matchingPlayer = players.find(
-    (player) => player.toLowerCase() === normalizedUsername.toLowerCase(),
-  );
-
-  if (matchingPlayer) {
-    return { ok: false, error: "That username is already taken in this room." };
-  }
-
-  if (players.length >= 2) {
-    return { ok: false, error: "This room already has 2 players." };
-  }
-
-  players.push(normalizedUsername);
-  const reconnectToken = randomUUID();
-  userSessions.set(socketId, {
-    roomId: normalizedRoomId,
-    username: normalizedUsername,
-    reconnectToken,
-  });
-  return { ok: true, currentPlayers: players, isNewPlayer: true, reconnectToken };
-};
-
-export const reservePlayerForReconnect = (socketId: string) => {
-  const session = userSessions.get(socketId);
-  if (!session) return null;
-  userSessions.delete(socketId);
-  reconnectReservations.set(session.reconnectToken, session);
-  return session;
-};
-
-export const restorePlayerFromReconnect = (
-  reconnectToken: string,
-  socketId: string,
-  requestedRoomId: string,
-) => {
-  const session = reconnectReservations.get(reconnectToken);
-  if (!session || session.roomId !== requestedRoomId.trim().toUpperCase()) return null;
-  reconnectReservations.delete(reconnectToken);
-  userSessions.set(socketId, session);
-  return session;
-};
-
-export const expireReconnectReservation = (reconnectToken: string) => {
-  const session = reconnectReservations.get(reconnectToken);
-  if (!session) return null;
-  reconnectReservations.delete(reconnectToken);
-  return removePlayer(session);
-};
-
-const removePlayer = ({ roomId, username }: Pick<UserSession, "roomId" | "username">) => {
-  const players = rooms.get(roomId) ?? [];
-  const updatedPlayers = players.filter((player) => player !== username);
-  if (updatedPlayers.length === 0) {
-    rooms.delete(roomId);
-    roomMetadata.delete(roomId);
-  } else {
-    rooms.set(roomId, updatedPlayers);
-  }
-  return { roomId, username, updatedPlayers };
-};
-
-export const removePlayerFromRoom = (
-  socketId: string,
-): { roomId: string; username: string; updatedPlayers: string[] } | null => {
-  // Get user's session to find out which room they are in and their username
-  const session = getUserSession(socketId);
-
-  if (!session) return null; // Safe check if there's no session for the socket
-
-  // Grab the roomId, username, and current players in the room, then filter out removed player
-  userSessions.delete(socketId);
-  reconnectReservations.delete(session.reconnectToken);
-  return removePlayer(session);
-};
+export const seatNames = (roomId: string) => getSeats(roomId).map((seat) => seat.name);
+export const clearRoomsForTests = () => { rooms.clear(); socketSeats.clear(); tokenSeats.clear(); };

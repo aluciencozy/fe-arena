@@ -1,57 +1,31 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  addPlayerToRoom,
-  createRoom,
-  expireReconnectReservation,
-  getPlayersInRoom,
-  removePlayerFromRoom,
-  reservePlayerForReconnect,
-  restorePlayerFromReconnect,
-} from "./room.service.js";
+import { attachSeat, clearRoomsForTests, createRoom, disconnectSocket, getSeats, joinRoom, reconnectRoom, removeSeat } from "./room.service.js";
+import { TOPICS, type MatchConfig } from "../../../shared/domain.js";
 
-test("a private room retains the host's playlist for joining players", () => {
-  const room = createRoom({
-    mode: "anime",
-    playlist: "op-ed",
-    source: "private",
-    selectedTitleIds: ["anilist-16498-shingeki-no-kyojin"],
-  });
+const config: MatchConfig = { topicIds: [TOPICS[0].id], roundCount: 5, questionTimerSeconds: 60 };
 
-  assert.equal(room.playlist, "op-ed");
-  assert.equal("difficulty" in room, false);
-  assert.equal(addPlayerToRoom(room.roomId, "Host", "playlist-host").ok, true);
-  assert.equal(addPlayerToRoom(room.roomId, "Guest", "playlist-guest").ok, true);
-
-  removePlayerFromRoom("playlist-host");
-  removePlayerFromRoom("playlist-guest");
-});
-
-test("a reconnect token reclaims the reserved player seat", () => {
-  const room = createRoom({ mode: "anime", source: "private", selectedTitleIds: ["test"] });
-  const joined = addPlayerToRoom(room.roomId, "Mina", "socket-a");
+test("stable guest seats restore with the reconnect token", () => {
+  clearRoomsForTests();
+  const created = createRoom("private", config, "Host");
+  attachSeat(created.metadata.roomId, created.seat, "socket-host");
+  const joined = joinRoom(created.metadata.roomId, "Guest", "socket-guest");
   assert.equal(joined.ok, true);
   if (!joined.ok) return;
-
-  const reservation = reservePlayerForReconnect("socket-a");
-  assert.equal(reservation?.username, "Mina");
-  assert.deepEqual(getPlayersInRoom(room.roomId), ["Mina"]);
-
-  const restored = restorePlayerFromReconnect(joined.reconnectToken, "socket-b", room.roomId);
-  assert.equal(restored?.username, "Mina");
-  assert.deepEqual(getPlayersInRoom(room.roomId), ["Mina"]);
-  removePlayerFromRoom("socket-b");
+  const detached = disconnectSocket("socket-guest");
+  assert.equal(detached?.seat.seatId, joined.seat.seatId);
+  const restored = reconnectRoom(created.metadata.roomId, joined.seat.reconnectToken, "socket-guest-new");
+  assert.equal(restored.ok, true);
+  assert.equal(getSeats(created.metadata.roomId).map((seat) => seat.name).join(","), "Host,Guest");
+  clearRoomsForTests();
 });
 
-test("an expired reconnect reservation releases the player seat", () => {
-  const room = createRoom({ mode: "anime", source: "private", selectedTitleIds: ["test"] });
-  const joined = addPlayerToRoom(room.roomId, "Ren", "socket-c");
-  assert.equal(joined.ok, true);
-  if (!joined.ok) return;
-
-  reservePlayerForReconnect("socket-c");
-  const removal = expireReconnectReservation(joined.reconnectToken);
-  assert.equal(removal?.username, "Ren");
-  assert.deepEqual(getPlayersInRoom(room.roomId), []);
-  assert.equal(restorePlayerFromReconnect(joined.reconnectToken, "socket-d", room.roomId), null);
+test("removing a seat cannot touch a different room", () => {
+  clearRoomsForTests();
+  const first = createRoom("private", config, "One");
+  const second = createRoom("private", config, "Two");
+  const removed = removeSeat(first.metadata.roomId, first.seat.seatId);
+  assert.equal(removed?.roomId, first.metadata.roomId);
+  assert.equal(getSeats(second.metadata.roomId)[0]?.name, "Two");
+  clearRoomsForTests();
 });

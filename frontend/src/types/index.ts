@@ -1,121 +1,17 @@
-export interface UnifiedMessage {
-  id: string;
-  type: "SYSTEM" | "USER";
-  sender?: string;
-  text: string;
-  timestamp: number;
-}
+import type { MatchConfig, MatchPhase, MatchSource, PublicQuestion, QuestionAttempt, QuestionType, RevealedQuestion, ScoreBreakdown, TopicId } from "../../../shared/domain";
+export type { MatchConfig, MatchPhase, MatchSource, PublicQuestion, QuestionAttempt, QuestionType, RevealedQuestion, ScoreBreakdown, TopicId };
+export type { TOPICS } from "../../../shared/domain";
 
-export type GameMode = "anime" | "video-game";
-import type { AnimePlaylist, AnimeTrackCategory } from "../../../shared/playlist";
-export type { AnimePlaylist, AnimeTrackCategory } from "../../../shared/playlist";
-export type RoomSource = "private" | "queue";
-
-export interface AnswerAlias {
-  value: string;
-  match: "exact" | "fuzzy";
-}
-
-export interface AnswerOption {
-  id: string;
-  canonicalTitle: string;
-  romajiName: string | null;
-  nativeName: string | null;
-  coverImageUrl: string;
-  searchTerms: string[];
-}
-
-export interface CatalogTrack {
-  id: string;
-  videoId: string;
-  title?: string;
-  durationSeconds?: number;
-  viewCount?: number | null;
-  easyModeRank?: number;
-  category: AnimeTrackCategory;
-}
-
-export interface CatalogTitle {
-  id: string;
-  mode: GameMode;
-  name: string;
-  canonicalTitle: string;
-  romajiName?: string | null;
-  nativeName?: string | null;
-  coverImageUrl: string;
-  answerAliases: AnswerAlias[];
-  tracks: CatalogTrack[];
-}
-
-export interface RoundResult {
-  canonicalTitle: string;
-  trackTitle: string | null;
-  titleId: string;
-  romajiName: string | null;
-  nativeName: string | null;
-  damageByPlayer: Record<string, number>;
-  damageDealt: number;
-  damagedPlayer: string | null;
-  winner: string | null;
-  isTie: boolean;
-}
-
-export interface RoomMetadata {
-  roomId: string;
-  mode: GameMode;
-  playlist: AnimePlaylist;
-  source: RoomSource;
-  selectedTitleIds: string[];
-}
-
-export interface PlayerState {
-  playerName: string;
-  volume: number;
-  sfxVolume: number;
-  musicMuted: boolean;
-  sfxMuted: boolean;
-  setPlayerName: (name: string) => void;
-  setVolume: (volume: number) => void;
-  setSfxVolume: (volume: number) => void;
-  setMusicMuted: (muted: boolean) => void;
-  setSfxMuted: (muted: boolean) => void;
-}
-
-export interface GameState {
-  playlist: AnimePlaylist;
-  phase:
-    | "LOBBY"
-    | "COUNTDOWN"
-    | "PLAYING"
-    | "ROUND_END"
-    | "GAME_OVER"
-    | "GRACE_PERIOD"
-    | "REVEAL";
-  currentRound: number;
-  health: Record<string, number>;
-  pendingDamage: Record<string, number>;
-  currentVideoID: string | null;
-  videoStartTime: number;
-  currentVideoDurationSeconds: number | null;
-  roundStartTime: number | null;
-  countdownEndsAt: number | null;
-  roundEndsAt: number | null;
-  guessedCorrectly: string[];
-  firstGuessStreaks: Record<string, number>;
-  skipVotes: string[];
-  ready: Record<string, boolean>;
-  winner: string | null;
-  revealedAnswer: string | null;
-  roundResult: RoundResult | null;
-  matchHistory: RoundResult[];
-  playlistIndex: number;
-  answerOptions: AnswerOption[];
-  connectionPause: {
-    playerName: string;
-    expiresAt: number;
-  } | null;
-}
-
-export interface GameStore extends GameState {
-  setGameState: (newState: Partial<GameState>) => void;
-}
+export type RoomMetadata = { roomId: string; source: MatchSource; hostSeatId: string; config: MatchConfig };
+export type RoomSeat = { seatId: string; name: string; connected: boolean };
+export type RoomState = { metadata: RoomMetadata; seats: RoomSeat[] };
+export type SubmissionPublic = { submitted: boolean; correct: boolean | null; score: ScoreBreakdown | null; answer: string | number | string[] | null };
+export type RoundHistory = { round: number; question: RevealedQuestion; submissions: Record<string, SubmissionPublic> };
+export type MatchPublicState = {
+  roomId: string; source: MatchSource; phase: MatchPhase; config: MatchConfig; roundIndex: number; totalRounds: number;
+  question: PublicQuestion | null; revealedQuestion: RevealedQuestion | null; questionStartedAt: number | null; questionEndsAt: number | null;
+  countdownEndsAt: number | null; pause: { seatName: string; expiresAt: number } | null; ready: Record<string, boolean>;
+  submissions: Record<string, SubmissionPublic>; scores: Record<string, { total: number; correct: number; responseMs: number }>;
+  winnerSeatId: string | null; endReason: "completed" | "forfeit" | "abandoned" | "expired" | null; history: RoundHistory[];
+};
+export type ChatMessage = { type: "system" | "user"; sender: string; text: string; sentAt: number; id: string };

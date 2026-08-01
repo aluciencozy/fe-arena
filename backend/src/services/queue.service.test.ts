@@ -1,36 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { enqueuePlayer, removeFromQueue } from "./queue.service.js";
+import { clearQueueForTests, dequeue, enqueue, publicConfig } from "./queue.service.js";
 
-test("matchmaking partitions players by mode and playlist", () => {
-  assert.deepEqual(
-    enqueuePlayer("op-ed-a", "OP ED A", "anime", "op-ed"),
-    { status: "waiting" },
-  );
-  assert.deepEqual(
-    enqueuePlayer("easy-a", "Easy A", "anime", "easy"),
-    { status: "waiting" },
-  );
-  assert.deepEqual(
-    enqueuePlayer("standard-a", "Standard A", "anime", "standard"),
-    { status: "waiting" },
-  );
+test("public queue matches FIFO entries and uses fixed five-minute settings", () => {
+  clearQueueForTests();
+  const first = enqueue({ socketId: "socket-a", username: "Ada", queuedAt: 10 });
+  assert.equal(first.status, "waiting");
+  if (first.status === "waiting") assert.equal(first.expiresAt, 300010);
+  const second = enqueue({ socketId: "socket-b", username: "Grace", queuedAt: 20 });
+  assert.equal(second.status, "matched");
+  if (second.status === "matched") assert.equal(second.opponent.username, "Ada");
+  assert.equal(publicConfig.questionTimerSeconds, 300);
+  assert.equal(publicConfig.roundCount, 5);
+  clearQueueForTests();
+});
 
-  const easyMatch = enqueuePlayer("easy-b", "Easy B", "anime", "easy");
-  assert.equal(easyMatch.status, "matched");
-  if (easyMatch.status === "matched") {
-    assert.equal(easyMatch.opponent.username, "Easy A");
-    assert.equal(easyMatch.opponent.playlist, "easy");
-  }
-
-  const opEdMatch = enqueuePlayer("op-ed-b", "OP ED B", "anime", "op-ed");
-  assert.equal(opEdMatch.status, "matched");
-  if (opEdMatch.status === "matched") {
-    assert.equal(opEdMatch.opponent.username, "OP ED A");
-    assert.equal(opEdMatch.opponent.playlist, "op-ed");
-  }
-
-  removeFromQueue("standard-a");
-  removeFromQueue("easy-b");
-  removeFromQueue("op-ed-b");
+test("queue leave is idempotent", () => {
+  clearQueueForTests();
+  enqueue({ socketId: "socket-a", username: "Ada", queuedAt: Date.now() });
+  assert.equal(dequeue("socket-a"), true);
+  assert.equal(dequeue("socket-a"), false);
+  clearQueueForTests();
 });
