@@ -1,39 +1,21 @@
-import express from "express";
-import { createServer } from "http";
-import { Server } from "socket.io";
+import "dotenv/config";
 import cors from "cors";
-
-import { registerRoomHandler } from "./src/sockets/room.handlers.js";
-import { registerGameHandler } from "./src/sockets/game.handlers.js";
+import express from "express";
+import { createServer } from "node:http";
+import { Server } from "socket.io";
+import { TOPICS } from "../shared/domain.js";
+import { questionBankStats } from "./src/services/question-bank.service.js";
+import { registerHandlers } from "./src/sockets/handlers.js";
 
 const app = express();
-app.use(cors()); // Allows standard REST API requests
+app.use(cors({ origin: process.env.FRONTEND_ORIGIN ?? "http://localhost:5173" }));
+app.get("/", (_request, response) => response.json({ name: "FE Arena", disclaimer: "Unofficial study tool; not affiliated with UCF." }));
+app.get("/api/topics", (_request, response) => response.json({ topics: TOPICS }));
+app.get("/api/question-bank", (_request, response) => response.json({ ...questionBankStats(), provenance: "Original content informed by public reference materials; answers are never exposed by this endpoint." }));
 
 const httpServer = createServer(app);
+const io = new Server(httpServer, { cors: { origin: process.env.FRONTEND_ORIGIN ?? "http://localhost:5173", methods: ["GET", "POST"] } });
+io.on("connection", (socket) => registerHandlers(io, socket));
 
-// Initialize Socket.io and configure CORS specifically for WebSockets
-const io = new Server(httpServer, {
-  cors: {
-    origin: "http://localhost:5173", // Vite frontend URL
-    methods: ["GET", "POST"],
-  },
-});
-
-// Listen for incoming connections
-io.on("connection", (socket) => {
-  console.log(`User connected: ${socket.id}`);
-
-  // Register handlers for room and game events for this socket connection
-  registerRoomHandler(io, socket);
-  registerGameHandler(io, socket);
-
-  // Listen for disconnections
-  socket.on("disconnect", () => {
-    console.log(`User disconnected: ${socket.id}`);
-  });
-});
-
-const PORT = 3001;
-httpServer.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
-});
+const port = Number(process.env.PORT ?? 3001);
+httpServer.listen(port, () => console.log(`FE Arena server listening on http://localhost:${port}`));

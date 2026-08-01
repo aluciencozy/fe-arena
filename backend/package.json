@@ -4,13 +4,8 @@
   "description": "",
   "main": "index.ts",
   "scripts": {
-    "generate:catalog": "node ../scripts/generate-anilist-catalog.mjs",
-    "generate:franchise-checklist": "node ../scripts/generate-anime-franchise-checklist.mjs",
-    "refresh:catalog": "node ../scripts/refresh-youtube-catalog.mjs",
-    "predev": "npm run generate:catalog",
-    "test": "tsx --test src/**/*.test.ts",
+    "test": "tsx --test src/*.test.ts src/**/*.test.ts",
     "dev": "nodemon --exec tsx index.ts",
-    "pretypecheck": "npm run generate:catalog",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [],
@@ -27,6 +22,7 @@
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/node": "^26.1.2",
     "nodemon": "^3.1.14",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2"

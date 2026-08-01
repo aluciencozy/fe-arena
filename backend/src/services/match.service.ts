@@ -1,0 +1,358 @@
+import {
+  calculateScore,
+  compareScores,
+  gradeQuestion,
+  DEFAULT_ROUND_COUNT,
+  PAUSE_SECONDS,
+  PUBLIC_QUESTION_SECONDS,
+  type MatchConfig,
+  type MatchPhase,
+  type PublicQuestion,
+  type QuestionAttempt,
+  type RevealedQuestion,
+  type ScoreBreakdown,
+} from "../../../shared/domain.js";
+import { questionRepository, publicQuestion, revealedQuestion } from "./question-bank.service.js";
+import { getMetadata, getSeats, type RoomMetadata } from "./room.service.js";
+
+export type SubmissionPublic = {
+  submitted: boolean;
+  correct: boolean | null;
+  score: ScoreBreakdown | null;
+  answer: string | number | string[] | null;
+};
+export type RoundHistory = { round: number; question: RevealedQuestion; submissions: Record<string, SubmissionPublic> };
+export type MatchPublicState = {
+  roomId: string;
+  source: RoomMetadata["source"];
+  phase: MatchPhase;
+  config: MatchConfig;
+  roundIndex: number;
+  totalRounds: number;
+  question: PublicQuestion | null;
+  revealedQuestion: RevealedQuestion | null;
+  questionStartedAt: number | null;
+  questionEndsAt: number | null;
+  countdownEndsAt: number | null;
+  pause: { seatName: string; expiresAt: number } | null;
+  ready: Record<string, boolean>;
+  submissions: Record<string, SubmissionPublic>;
+  scores: Record<string, { total: number; correct: number; responseMs: number }>;
+  winnerSeatId: string | null;
+  endReason: "completed" | "forfeit" | "abandoned" | "expired" | null;
+  history: RoundHistory[];
+};
+
+type MatchEvents = { emit: (state: MatchPublicState) => void; message: (text: string) => void };
+type MatchRecord = {
+  state: MatchPublicState;
+  seed: string;
+  questionIds: string[];
+  timer: ReturnType<typeof setTimeout> | undefined;
+  phaseEndsAt: number | null;
+  pausedFrom: Exclude<MatchPhase, "PAUSED"> | null;
+  pausedAt: number | null;
+  disconnectDeadlines: Map<string, number>;
+};
+const matches = new Map<string, MatchRecord>();
+
+const emptySubmission = (): SubmissionPublic => ({ submitted: false, correct: null, score: null, answer: null });
+const seatIds = (roomId: string) => getSeats(roomId).map((seat) => seat.seatId);
+const namesById = (roomId: string) => Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, seat.name]));
+const makeScores = (roomId: string) => Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, { total: 0, correct: 0, responseMs: 0 }]));
+const makeReady = (roomId: string) => Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, false]));
+const makeSubmissions = (roomId: string) => Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, emptySubmission()]));
+
+const clearTimer = (record: MatchRecord) => {
+  if (record.timer) clearTimeout(record.timer);
+  record.timer = undefined;
+  record.phaseEndsAt = null;
+};
+const syncSeats = (record: MatchRecord) => {
+  const ids = new Set(seatIds(record.state.roomId));
+  for (const id of Object.keys(record.state.ready)) if (!ids.has(id)) delete record.state.ready[id];
+  for (const id of Object.keys(record.state.scores)) if (!ids.has(id)) delete record.state.scores[id];
+  for (const id of Object.keys(record.state.submissions)) if (!ids.has(id)) delete record.state.submissions[id];
+  for (const id of ids) {
+    record.state.ready[id] ??= false;
+    record.state.scores[id] ??= { total: 0, correct: 0, responseMs: 0 };
+    record.state.submissions[id] ??= emptySubmission();
+  }
+};
+const publicSnapshot = (state: MatchPublicState): MatchPublicState => {
+  const safeState = structuredClone(state);
+  if (["COUNTDOWN", "QUESTION", "PAUSED"].includes(safeState.phase)) {
+    for (const submission of Object.values(safeState.submissions)) {
+      submission.correct = null;
+      submission.score = null;
+      submission.answer = null;
+    }
+    for (const playerId of Object.keys(safeState.scores)) safeState.scores[playerId] = { total: 0, correct: 0, responseMs: 0 };
+  }
+  return safeState;
+};
+const emit = (record: MatchRecord, events: MatchEvents) => events.emit(publicSnapshot(record.state));
+const configFor = (metadata: RoomMetadata): MatchConfig => metadata.config ?? { topicIds: [], roundCount: DEFAULT_ROUND_COUNT, questionTimerSeconds: PUBLIC_QUESTION_SECONDS };
+const syncPause = (record: MatchRecord) => {
+  const disconnected = getSeats(record.state.roomId)
+    .filter((seat) => !seat.connected)
+    .map((seat) => ({ seat, expiresAt: record.disconnectDeadlines.get(seat.seatId) }))
+    .filter((entry): entry is { seat: (typeof entry)["seat"]; expiresAt: number } => entry.expiresAt !== undefined)
+    .sort((left, right) => left.expiresAt - right.expiresAt);
+  for (const seatId of record.disconnectDeadlines.keys()) {
+    if (!disconnected.some(({ seat }) => seat.seatId === seatId)) record.disconnectDeadlines.delete(seatId);
+  }
+  const next = disconnected[0];
+  record.state.pause = next ? { seatName: next.seat.name, expiresAt: next.expiresAt } : null;
+  return Boolean(next);
+};
+
+export const ensureMatch = (roomId: string, events?: MatchEvents) => {
+  const existing = matches.get(roomId);
+  if (existing) {
+    if (["LOBBY", "SETUP", "READY", "REMATCH"].includes(existing.state.phase)) syncSeats(existing);
+    return existing.state;
+  }
+  const metadata = getMetadata(roomId);
+  if (!metadata) return undefined;
+  const config = configFor(metadata);
+  const questions = questionRepository.select(`${roomId}:${metadata.hostSeatId}`, config.roundCount, config.topicIds);
+  const fallbackQuestions = questions.length ? questions : questionRepository.select(roomId, config.roundCount);
+  const state: MatchPublicState = {
+    roomId, source: metadata.source, phase: "LOBBY", config, roundIndex: 0, totalRounds: fallbackQuestions.length,
+    question: null, revealedQuestion: null, questionStartedAt: null, questionEndsAt: null, countdownEndsAt: null, pause: null,
+    ready: makeReady(roomId), submissions: makeSubmissions(roomId), scores: makeScores(roomId), winnerSeatId: null, endReason: null, history: [],
+  };
+  const record: MatchRecord = { state, seed: `${roomId}:${metadata.hostSeatId}`, questionIds: fallbackQuestions.map((question) => question.id), timer: undefined, phaseEndsAt: null, pausedFrom: null, pausedAt: null, disconnectDeadlines: new Map() };
+  matches.set(roomId, record);
+  if (events) emit(record, events);
+  return state;
+};
+
+const questionFor = (record: MatchRecord) => questionRepository.get(record.questionIds[record.state.roundIndex] ?? "");
+const startCountdown = (roomId: string, events: MatchEvents) => {
+  const record = matches.get(roomId);
+  if (!record) return;
+  clearTimer(record);
+  const now = Date.now();
+  record.state.phase = "COUNTDOWN";
+  record.state.countdownEndsAt = now + 3000;
+  record.state.question = null;
+  record.state.revealedQuestion = null;
+  emit(record, events);
+  record.phaseEndsAt = record.state.countdownEndsAt;
+  record.timer = setTimeout(() => startQuestion(roomId, events), 3000);
+};
+const startQuestion = (roomId: string, events: MatchEvents) => {
+  const record = matches.get(roomId);
+  const question = record && questionFor(record);
+  if (!record || !question || record.state.phase !== "COUNTDOWN") return;
+  clearTimer(record);
+  const now = Date.now();
+  record.state.phase = "QUESTION";
+  record.state.countdownEndsAt = null;
+  record.state.question = publicQuestion(question);
+  record.state.revealedQuestion = null;
+  record.state.questionStartedAt = now;
+  record.state.questionEndsAt = now + record.state.config.questionTimerSeconds * 1000;
+  record.state.submissions = makeSubmissions(roomId);
+  emit(record, events);
+  record.phaseEndsAt = record.state.questionEndsAt;
+  record.timer = setTimeout(() => revealRound(roomId, events), record.state.config.questionTimerSeconds * 1000);
+};
+
+const advanceOrFinish = (roomId: string, events: MatchEvents) => {
+  const record = matches.get(roomId);
+  if (!record) return;
+  if (record.state.roundIndex + 1 >= record.state.totalRounds) {
+    clearTimer(record);
+    record.state.phase = "RESULTS";
+    record.state.question = null;
+    record.state.questionStartedAt = null;
+    record.state.questionEndsAt = null;
+    record.state.countdownEndsAt = null;
+    const scores = Object.entries(record.state.scores).map(([playerId, score]) => ({ playerId, playerName: namesById(roomId)[playerId] ?? playerId, ...score }));
+    const [left, right] = scores;
+    const exactTie = Boolean(left && right && left.total === right.total && left.correct === right.correct && left.responseMs === right.responseMs);
+    record.state.winnerSeatId = exactTie ? null : left && right ? compareScores(left, right).playerId : left?.playerId ?? null;
+    record.state.endReason = "completed";
+    emit(record, events);
+    return;
+  }
+  record.state.roundIndex += 1;
+  record.state.phase = "REVEAL";
+  record.state.question = null;
+  record.state.questionStartedAt = null;
+  record.state.questionEndsAt = null;
+  record.state.countdownEndsAt = null;
+  record.state.revealedQuestion = record.state.history.at(-1)?.question ?? null;
+  emit(record, events);
+  record.phaseEndsAt = Date.now() + 1800;
+  record.timer = setTimeout(() => startCountdown(roomId, events), 1800);
+};
+
+const revealRound = (roomId: string, events: MatchEvents) => {
+  const record = matches.get(roomId);
+  const question = record && questionFor(record);
+  if (!record || !question || (record.state.phase !== "QUESTION" && record.state.phase !== "PAUSED")) return;
+  clearTimer(record);
+  const revealed = revealedQuestion(question);
+  record.state.phase = "REVEAL";
+  record.state.question = null;
+  record.state.revealedQuestion = revealed;
+  record.state.questionStartedAt = null;
+  record.state.questionEndsAt = null;
+  record.state.countdownEndsAt = null;
+  record.state.history.push({ round: record.state.roundIndex + 1, question: revealed, submissions: structuredClone(record.state.submissions) });
+  emit(record, events);
+  record.phaseEndsAt = Date.now() + 1800;
+  record.timer = setTimeout(() => advanceOrFinish(roomId, events), 1800);
+};
+
+const allSubmitted = (record: MatchRecord) => seatIds(record.state.roomId).length === 2 && Object.values(record.state.submissions).every((submission) => submission.submitted);
+
+export const configureMatch = (roomId: string, seatId: string, config: MatchConfig, events: MatchEvents) => {
+  const record = matches.get(roomId) ?? (ensureMatch(roomId) && matches.get(roomId));
+  const metadata = getMetadata(roomId);
+  if (!record || !metadata || metadata.hostSeatId !== seatId) return { ok: false as const, error: "Only the host can change match settings." };
+  if (!(record.state.phase === "LOBBY" || record.state.phase === "SETUP" || record.state.phase === "REMATCH")) return { ok: false as const, error: "Settings can only change before a round begins." };
+  if (!config.topicIds.length || !config.roundCount) return { ok: false as const, error: "Choose at least one topic." };
+  record.state.config = config;
+  record.state.phase = "SETUP";
+  record.questionIds = questionRepository.select(`${record.seed}:${JSON.stringify(config)}`, config.roundCount, config.topicIds).map((question) => question.id);
+  if (!record.questionIds.length) return { ok: false as const, error: "There are no reviewed questions for that topic selection." };
+  record.state.totalRounds = record.questionIds.length;
+  record.state.ready = makeReady(roomId);
+  emit(record, events);
+  return { ok: true as const, state: record.state };
+};
+
+export const toggleReady = (roomId: string, seatId: string, events: MatchEvents) => {
+  const record = matches.get(roomId) ?? (ensureMatch(roomId) && matches.get(roomId));
+  if (!record) return { ok: false as const, error: "Match not found." };
+  if (!(record.state.phase === "LOBBY" || record.state.phase === "SETUP" || record.state.phase === "READY" || record.state.phase === "REMATCH")) return { ok: false as const, error: "Ready status is locked right now." };
+  if (getSeats(roomId).length !== 2) return { ok: false as const, error: "Waiting for a second guest." };
+  record.state.ready[seatId] = !record.state.ready[seatId];
+  record.state.phase = "READY";
+  if (seatIds(roomId).every((id) => record.state.ready[id])) {
+    record.state.roundIndex = 0;
+    record.state.history = [];
+    record.state.scores = makeScores(roomId);
+    record.state.winnerSeatId = null;
+    record.state.endReason = null;
+    startCountdown(roomId, events);
+  } else emit(record, events);
+  return { ok: true as const, state: record.state };
+};
+
+export const submitAnswer = (roomId: string, seatId: string, attempt: QuestionAttempt, events: MatchEvents) => {
+  const record = matches.get(roomId);
+  const question = record && questionFor(record);
+  if (!record || !question || record.state.phase !== "QUESTION") return { ok: false as const, error: "Answers are not being accepted right now." };
+  const submission = record.state.submissions[seatId];
+  if (!submission) return { ok: false as const, error: "You are not seated in this match." };
+  if (submission.submitted) return { ok: false as const, error: "Your answer is already locked for this question." };
+  if (attempt.questionId !== question.id) return { ok: false as const, error: "That question is no longer active." };
+  if (record.state.questionEndsAt !== null && Date.now() >= record.state.questionEndsAt) {
+    revealRound(roomId, events);
+    return { ok: false as const, error: "That question's time has expired." };
+  }
+  // Grading happens only here, on the server, against the private repository record.
+  const correct = gradeQuestion(question, attempt);
+  const elapsedMs = Math.max(0, Date.now() - (record.state.questionStartedAt ?? Date.now()));
+  const score = calculateScore(correct, elapsedMs, record.state.config.questionTimerSeconds * 1000);
+  submission.submitted = true;
+  submission.correct = correct;
+  submission.score = score;
+  submission.answer = null;
+  const current = record.state.scores[seatId] ?? { total: 0, correct: 0, responseMs: 0 };
+  record.state.scores[seatId] = { total: current.total + score.total, correct: current.correct + (correct ? 1 : 0), responseMs: current.responseMs + elapsedMs };
+  emit(record, events);
+  if (allSubmitted(record)) revealRound(roomId, events);
+  return { ok: true as const, correct, score };
+};
+
+export const requestRematch = (roomId: string, seatId: string, events: MatchEvents) => {
+  const record = matches.get(roomId);
+  if (!record || !["RESULTS", "FORFEIT", "ABANDONED", "EXPIRED"].includes(record.state.phase)) return { ok: false as const, error: "Rematch is only available after a completed match." };
+  if (!seatIds(roomId).includes(seatId) || getSeats(roomId).length !== 2) return { ok: false as const, error: "Both guest seats are required for a rematch." };
+  record.state.phase = "REMATCH";
+  record.state.ready = makeReady(roomId);
+  record.state.question = null;
+  record.state.revealedQuestion = null;
+  record.state.winnerSeatId = null;
+  record.state.endReason = null;
+  emit(record, events);
+  return { ok: true as const };
+};
+
+export const leaveMatch = (roomId: string, leavingSeatId: string, reason: "forfeit" | "abandoned" | "expired", events: MatchEvents) => {
+  const record = matches.get(roomId);
+  if (!record) return;
+  clearTimer(record);
+  const winner = reason === "abandoned" ? null : seatIds(roomId).find((id) => id !== leavingSeatId) ?? null;
+  record.state.phase = reason === "forfeit" ? "FORFEIT" : reason === "expired" ? "EXPIRED" : "ABANDONED";
+  record.state.winnerSeatId = winner;
+  record.state.endReason = reason;
+  record.disconnectDeadlines.clear();
+  record.state.pause = null;
+  record.state.question = null;
+  record.state.revealedQuestion = null;
+  record.state.questionStartedAt = null;
+  record.state.questionEndsAt = null;
+  record.state.countdownEndsAt = null;
+  emit(record, events);
+  events.message(winner ? `${winner === leavingSeatId ? "A guest" : "Your opponent"} left; the match is over.` : "The match ended because the room was abandoned.");
+};
+
+export const pauseForDisconnect = (roomId: string, seatId: string, events: MatchEvents) => {
+  const record = matches.get(roomId);
+  const seatName = getSeats(roomId).find((seat) => seat.seatId === seatId)?.name;
+  const phase = record?.state.phase;
+  if (!record || !seatName || (phase !== "COUNTDOWN" && phase !== "QUESTION" && phase !== "REVEAL" && phase !== "PAUSED")) return false;
+  if (phase !== "PAUSED") {
+    const phaseEndsAt = record.phaseEndsAt;
+    clearTimer(record);
+    record.phaseEndsAt = phaseEndsAt;
+    record.pausedFrom = phase;
+    record.pausedAt = Date.now();
+    record.state.phase = "PAUSED";
+  }
+  record.disconnectDeadlines.set(seatId, Date.now() + PAUSE_SECONDS * 1000);
+  syncPause(record);
+  emit(record, events);
+  events.message(`${seatName} disconnected. Both guests are paused for ${PAUSE_SECONDS} seconds.`);
+  return true;
+};
+
+export const resumeAfterReconnect = (roomId: string, events: MatchEvents) => {
+  const record = matches.get(roomId);
+  if (!record || record.state.phase !== "PAUSED" || !record.pausedFrom || record.pausedAt === null) return false;
+  if (syncPause(record)) {
+    emit(record, events);
+    return false;
+  }
+  const pausedMs = Math.max(0, Date.now() - record.pausedAt);
+  if (record.state.questionStartedAt !== null) record.state.questionStartedAt += pausedMs;
+  if (record.state.questionEndsAt !== null) record.state.questionEndsAt += pausedMs;
+  if (record.state.countdownEndsAt !== null) record.state.countdownEndsAt += pausedMs;
+  if (record.phaseEndsAt !== null) record.phaseEndsAt += pausedMs;
+  record.state.phase = record.pausedFrom;
+  record.disconnectDeadlines.clear();
+  record.state.pause = null;
+  const remaining = (record.phaseEndsAt ?? Date.now()) - Date.now();
+  record.pausedFrom = null;
+  record.pausedAt = null;
+  const action = record.state.phase === "COUNTDOWN" ? () => startQuestion(roomId, events) : record.state.phase === "QUESTION" ? () => revealRound(roomId, events) : () => advanceOrFinish(roomId, events);
+  record.timer = setTimeout(action, Math.max(0, remaining));
+  emit(record, events);
+  events.message("Guest reconnected. The match is live again.");
+  return true;
+};
+
+export const getMatchState = (roomId: string) => {
+  const record = matches.get(roomId);
+  return record ? publicSnapshot(record.state) : undefined;
+};
+export const clearMatch = (roomId: string) => { const record = matches.get(roomId); if (record) clearTimer(record); matches.delete(roomId); };
+export const clearMatchesForTests = () => { for (const record of matches.values()) clearTimer(record); matches.clear(); };

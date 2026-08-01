@@ -1,28 +1,6 @@
-import { io, type Socket } from "socket.io-client";
+import { io } from "socket.io-client";
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL ?? "http://localhost:3001";
-let pendingDisconnect: number | undefined;
-
-export const socket: Socket = io(SOCKET_URL, {
-  autoConnect: false,
-});
-
-export const connectSocket = () => {
-  if (pendingDisconnect) {
-    window.clearTimeout(pendingDisconnect);
-    pendingDisconnect = undefined;
-  }
-
-  socket.connect();
-};
-
-export const scheduleSocketDisconnect = () => {
-  if (pendingDisconnect) {
-    window.clearTimeout(pendingDisconnect);
-  }
-
-  pendingDisconnect = window.setTimeout(() => {
-    socket.disconnect();
-    pendingDisconnect = undefined;
-  }, 250);
-};
+export const socket = io(import.meta.env.VITE_SOCKET_URL ?? "http://localhost:3001", { autoConnect: false, transports: ["websocket", "polling"] });
+let disconnectTimer: ReturnType<typeof window.setTimeout> | undefined;
+export const connectSocket = () => { if (disconnectTimer) window.clearTimeout(disconnectTimer); if (!socket.connected) socket.connect(); };
+export const scheduleSocketDisconnect = () => { if (disconnectTimer) window.clearTimeout(disconnectTimer); disconnectTimer = window.setTimeout(() => { if (!window.location.pathname.startsWith("/room/")) socket.disconnect(); }, 250); };

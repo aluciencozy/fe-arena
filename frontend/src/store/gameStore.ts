@@ -1,104 +1,33 @@
 import { create } from "zustand";
-import type { PlayerState, GameStore, GameState } from "../types";
+import type { MatchPublicState, RoomState } from "@/types";
 
-const DEFAULT_VOLUME = 35;
-const VOLUME_STORAGE_KEY = "guess-the-ost-volume";
-const SFX_VOLUME_STORAGE_KEY = "guess-the-ost-sfx-volume";
-const MUSIC_MUTED_STORAGE_KEY = "guess-the-ost-music-muted";
-const SFX_MUTED_STORAGE_KEY = "guess-the-ost-sfx-muted";
-const USERNAME_STORAGE_KEY = "guess-the-ost-username";
+const NAME_KEY = "fe-arena-guest-name";
+const TOKEN_KEY = "fe-arena-seat-token";
+const DEFAULT_NAME = "";
+const readName = () => typeof window === "undefined" ? DEFAULT_NAME : window.localStorage.getItem(NAME_KEY) ?? DEFAULT_NAME;
 
-const clampVolume = (volume: number) => {
-  if (!Number.isFinite(volume)) return DEFAULT_VOLUME;
-  return Math.max(0, Math.min(100, volume));
+export type AppStore = {
+  playerName: string;
+  room: RoomState | null;
+  match: MatchPublicState | null;
+  seatId: string | null;
+  reconnectToken: string | null;
+  setPlayerName: (name: string) => void;
+  setRoom: (room: RoomState) => void;
+  setMatch: (match: MatchPublicState) => void;
+  setSession: (seatId: string, token: string, roomId: string) => void;
+  clearSession: () => void;
 };
+const tokenFor = (roomId: string) => typeof window === "undefined" ? null : window.sessionStorage.getItem(`${TOKEN_KEY}:${roomId}`);
+export const storedTokenForRoom = tokenFor;
 
-const getStoredVolume = () => {
-  if (typeof window === "undefined") return DEFAULT_VOLUME;
-  const storedVolume = window.localStorage.getItem(VOLUME_STORAGE_KEY);
-  if (storedVolume === null) return DEFAULT_VOLUME;
-  return clampVolume(Number(storedVolume));
-};
-
-const getStoredUsername = () => {
-  if (typeof window === "undefined") return "";
-  const storedUsername = window.localStorage.getItem(USERNAME_STORAGE_KEY);
-  if (storedUsername === null) return "";
-
-  const normalizedUsername = storedUsername.trim().slice(0, 18);
-  if (normalizedUsername !== storedUsername) {
-    window.localStorage.setItem(USERNAME_STORAGE_KEY, normalizedUsername);
-  }
-
-  return normalizedUsername;
-};
-
-const normalizeUsername = (name: string) => name.trim().slice(0, 18);
-
-export const useGameStore = create<PlayerState>((set) => ({
-  playerName: getStoredUsername(),
-  volume: getStoredVolume(),
-  sfxVolume: (() => {
-    if (typeof window === "undefined") return 45;
-    const stored = window.localStorage.getItem(SFX_VOLUME_STORAGE_KEY);
-    return stored === null ? 45 : clampVolume(Number(stored));
-  })(),
-  musicMuted: typeof window !== "undefined" && window.localStorage.getItem(MUSIC_MUTED_STORAGE_KEY) === "true",
-  sfxMuted: typeof window !== "undefined" && window.localStorage.getItem(SFX_MUTED_STORAGE_KEY) === "true",
-  setPlayerName: (name: string) => {
-    const normalizedUsername = normalizeUsername(name);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(USERNAME_STORAGE_KEY, normalizedUsername);
-    }
-    set({ playerName: normalizedUsername });
-  },
-  setVolume: (volume: number) => {
-    const clampedVolume = clampVolume(volume);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(VOLUME_STORAGE_KEY, String(clampedVolume));
-    }
-    set({ volume: clampedVolume });
-  },
-  setSfxVolume: (volume: number) => {
-    const clampedVolume = clampVolume(volume);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(SFX_VOLUME_STORAGE_KEY, String(clampedVolume));
-    }
-    set({ sfxVolume: clampedVolume });
-  },
-  setMusicMuted: (muted: boolean) => {
-    if (typeof window !== "undefined") window.localStorage.setItem(MUSIC_MUTED_STORAGE_KEY, String(muted));
-    set({ musicMuted: muted });
-  },
-  setSfxMuted: (muted: boolean) => {
-    if (typeof window !== "undefined") window.localStorage.setItem(SFX_MUTED_STORAGE_KEY, String(muted));
-    set({ sfxMuted: muted });
-  },
+export const useGameStore = create<AppStore>((set) => ({
+  playerName: readName(), room: null, match: null, seatId: null, reconnectToken: null,
+  setPlayerName: (name) => { const normalized = name.trim().slice(0, 24); if (typeof window !== "undefined") window.localStorage.setItem(NAME_KEY, normalized); set({ playerName: normalized }); },
+  setRoom: (room) => set({ room }),
+  setMatch: (match) => set({ match }),
+  setSession: (seatId, token, roomId) => { if (typeof window !== "undefined") window.sessionStorage.setItem(`${TOKEN_KEY}:${roomId}`, token); set({ seatId, reconnectToken: token }); },
+  clearSession: () => set({ seatId: null, reconnectToken: null, room: null, match: null }),
 }));
 
-export const useGameStateStore = create<GameStore>((set) => ({
-  playlist: "standard",
-  phase: "LOBBY",
-  currentRound: 0,
-  health: {},
-  pendingDamage: {},
-  currentVideoID: null,
-  videoStartTime: 0,
-  currentVideoDurationSeconds: null,
-  roundStartTime: null,
-  countdownEndsAt: null,
-  roundEndsAt: null,
-  guessedCorrectly: [],
-  firstGuessStreaks: {},
-  skipVotes: [],
-  ready: {},
-  winner: null,
-  revealedAnswer: null,
-  roundResult: null,
-  matchHistory: [],
-  playlistIndex: 0,
-  answerOptions: [],
-  connectionPause: null,
-  setGameState: (newState: Partial<GameState>) =>
-    set((state) => ({ ...state, ...newState })),
-}));
+export const clearStoredToken = (roomId: string) => { if (typeof window !== "undefined") window.sessionStorage.removeItem(`${TOKEN_KEY}:${roomId}`); };

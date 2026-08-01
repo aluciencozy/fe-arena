@@ -1,47 +1,33 @@
-import type { AnimePlaylist, GameMode } from "../types/index.js";
+import { PUBLIC_QUEUE_MAX_WAIT_SECONDS, PUBLIC_QUESTION_SECONDS, DEFAULT_ROUND_COUNT, TOPICS, type MatchConfig } from "../../../shared/domain.js";
 
-interface QueueEntry {
-  socketId: string;
-  username: string;
-  mode: GameMode;
-  playlist: AnimePlaylist;
-}
+export type QueueEntry = { socketId: string; username: string; queuedAt: number };
+const entries: QueueEntry[] = [];
+const queueTimers = new Map<string, ReturnType<typeof setTimeout>>();
+export const publicConfig: MatchConfig = { topicIds: TOPICS.map((topic) => topic.id), roundCount: DEFAULT_ROUND_COUNT, questionTimerSeconds: PUBLIC_QUESTION_SECONDS };
 
-const queues = new Map<string, QueueEntry[]>();
-
-const getQueueKey = (mode: GameMode, playlist: AnimePlaylist) =>
-  `${mode}:${playlist}`;
-
-export const removeFromQueue = (socketId: string) => {
-  for (const [key, entries] of queues) {
-    const filtered = entries.filter((entry) => entry.socketId !== socketId);
-    if (filtered.length === entries.length) continue;
-
-    queues.set(key, filtered);
-    return true;
-  }
-
-  return false;
-};
-
-export const enqueuePlayer = (
-  socketId: string,
-  username: string,
-  mode: GameMode,
-  playlist: AnimePlaylist = "standard",
-): { status: "waiting" } | { status: "matched"; opponent: QueueEntry } => {
-  removeFromQueue(socketId);
-
-  const queueKey = getQueueKey(mode, playlist);
-  const queue = queues.get(queueKey) || [];
-  const opponent = queue.shift();
-  queues.set(queueKey, queue);
-
+export const enqueue = (entry: QueueEntry, onExpire?: () => void) => {
+  dequeue(entry.socketId);
+  const opponent = entries.shift();
   if (opponent) {
-    return { status: "matched", opponent };
+    const timer = queueTimers.get(opponent.socketId);
+    if (timer) clearTimeout(timer);
+    queueTimers.delete(opponent.socketId);
+    return { status: "matched" as const, opponent };
   }
-
-  queue.push({ socketId, username, mode, playlist });
-  queues.set(queueKey, queue);
-  return { status: "waiting" };
+  entries.push(entry);
+  const timer = setTimeout(() => { if (dequeue(entry.socketId)) onExpire?.(); }, PUBLIC_QUEUE_MAX_WAIT_SECONDS * 1000);
+  queueTimers.set(entry.socketId, timer);
+  return { status: "waiting" as const, expiresAt: entry.queuedAt + PUBLIC_QUEUE_MAX_WAIT_SECONDS * 1000 };
 };
+
+export const dequeue = (socketId: string) => {
+  const index = entries.findIndex((entry) => entry.socketId === socketId);
+  if (index < 0) return false;
+  entries.splice(index, 1);
+  const timer = queueTimers.get(socketId);
+  if (timer) clearTimeout(timer);
+  queueTimers.delete(socketId);
+  return true;
+};
+export const queuePosition = (socketId: string) => entries.findIndex((entry) => entry.socketId === socketId) + 1;
+export const clearQueueForTests = () => { for (const timer of queueTimers.values()) clearTimeout(timer); entries.length = 0; queueTimers.clear(); };

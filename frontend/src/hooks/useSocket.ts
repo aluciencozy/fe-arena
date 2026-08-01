@@ -1,189 +1,52 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { UnifiedMessage, GameState } from "../types/";
-import { useGameStateStore } from "@/store/gameStore";
 import { connectSocket, scheduleSocketDisconnect, socket } from "@/lib/socket";
+import { clearStoredToken, storedTokenForRoom, useGameStore } from "@/store/gameStore";
+import type { ChatMessage, MatchPublicState, RoomState } from "@/types";
 
-const MAX_MESSAGE_CAPACITY = 100; // Maximum number of messages to keep in state
-
-export const useSocket = (roomCode: string, playerName: string) => {
-  const [players, setPlayers] = useState<string[]>([]); // State to hold the current players in room
-  const [messages, setMessages] = useState<UnifiedMessage[]>([]); // State to hold chat messages
+export const useArenaSocket = (roomId: string, playerName: string) => {
+  const navigate = useNavigate();
+  const setRoom = useGameStore((state) => state.setRoom);
+  const setMatch = useGameStore((state) => state.setMatch);
+  const setSession = useGameStore((state) => state.setSession);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [errorNotice, setErrorNotice] = useState("");
-  const [guessCooldownEndsAt, setGuessCooldownEndsAt] = useState(0);
-  const [connectionState, setConnectionState] = useState<
-    "connecting" | "connected" | "disconnected"
-  >("connecting");
-  const navigate = useNavigate(); // Hook to programmatically navigate between routes
+  const [connection, setConnection] = useState<"connecting" | "connected" | "disconnected">("connecting");
+  const [lastSubmission, setLastSubmission] = useState(false);
+  const clearSubmission = useCallback(() => setLastSubmission(false), []);
 
   useEffect(() => {
-    if (!roomCode || !playerName) return;
-
-    const sessionKey = `guess-the-ost-room-session:${roomCode}:${playerName.toLowerCase()}`;
-    const joinOrReconnect = () => {
-      setConnectionState("connecting");
-      const reconnectToken = window.sessionStorage.getItem(sessionKey);
-      if (reconnectToken) {
-        socket.emit("room:reconnect", { roomId: roomCode, reconnectToken });
-      } else {
-        socket.emit("room:join", roomCode, playerName);
-      }
+    if (!roomId || !playerName) return;
+    const addMessage = (incoming: Omit<ChatMessage, "id">) => setMessages((current) => [...current, { ...incoming, id: `${incoming.sentAt}-${Math.random()}` }].slice(-80));
+    const join = () => {
+      setConnection("connecting");
+      const token = storedTokenForRoom(roomId);
+      if (token) socket.emit("room:reconnect", { roomId, reconnectToken: token });
+      else socket.emit("room:join", { roomId, username: playerName });
     };
-    const handleDisconnect = () => setConnectionState("disconnected");
-    const handleRoomSession = ({
-      roomId,
-      reconnectToken,
-    }: {
-      roomId: string;
-      reconnectToken: string;
-    }) => {
-      if (roomId === roomCode) {
-        window.sessionStorage.setItem(sessionKey, reconnectToken);
-        setConnectionState("connected");
-      }
-    };
-    const handleReconnectFailed = () => {
-      window.sessionStorage.removeItem(sessionKey);
-      navigate("/", {
-        state: { notice: "The reconnect window expired. The match was forfeited." },
-      });
-    };
-
-    socket.on("connect", joinOrReconnect);
-    socket.on("disconnect", handleDisconnect);
-    socket.on("room:session", handleRoomSession);
-    socket.on("room:reconnect-failed", handleReconnectFailed);
+    const onConnect = () => join();
+    const onDisconnect = () => setConnection("disconnected");
+    const onSession = (payload: { roomId: string; seatId: string; reconnectToken: string }) => { if (payload.roomId === roomId) { setSession(payload.seatId, payload.reconnectToken, roomId); setConnection("connected"); } };
+    const onRoom = (state: RoomState) => { if (state.metadata.roomId === roomId) { setRoom(state); setConnection("connected"); } };
+    const onMatch = (state: MatchPublicState) => { if (state.roomId === roomId) setMatch(state); };
+    const onChat = (message: Omit<ChatMessage, "id">) => addMessage(message);
+    const onError = (payload: { message?: string } | string) => setErrorNotice(typeof payload === "string" ? payload : payload.message ?? "Something went wrong.");
+    const onReconnectFailed = (payload?: { message?: string }) => { clearStoredToken(roomId); setErrorNotice(payload?.message ?? "The guest seat expired. The match ended safely."); setTimeout(() => navigate("/", { replace: true }), 1800); };
+    const onAck = (payload: { submitted: true }) => setLastSubmission(payload.submitted);
+    socket.on("connect", onConnect); socket.on("disconnect", onDisconnect); socket.on("room:session", onSession); socket.on("room:state", onRoom); socket.on("match:state", onMatch); socket.on("chat:message", onChat); socket.on("server:error", onError); socket.on("room:reconnect-failed", onReconnectFailed); socket.on("match:submission-ack", onAck);
     connectSocket();
-    if (socket.connected) joinOrReconnect();
-
-    // Handler function to update notifications state when a 'room:notification' event is received
-    const handleRoomNotification = (notification: string) => {
-      const message: UnifiedMessage = {
-        id: `${Date.now()}-${Math.random()}`, // Generate a unique ID for the message
-        type: "SYSTEM",
-        text: notification,
-        timestamp: Date.now(),
-      };
-      setMessages((prevMessages) =>
-        [...prevMessages, message].slice(-MAX_MESSAGE_CAPACITY),
-      );
-    };
-
-    // Handler function to update players state when a 'room:state' event is received
-    const handleRoomState = (roomPlayers: string[]) => {
-      setErrorNotice("");
-      setPlayers(roomPlayers);
-      setConnectionState("connected");
-    };
-
-    // Handler function to handle room errors, such as when joining fails
-    const handleRoomError = (errorMessage: string) => {
-      setErrorNotice(errorMessage);
-      navigate("/", { state: { notice: errorMessage } }); // Redirect to home page on error
-    };
-
-    // Handler function to update chatMessages state when a 'chat:broadcast' event is received
-    const handleChatBroadcast = ({
-      username,
-      message,
-      type,
-    }: {
-      username: string;
-      message: string;
-      type?: "USER" | "SYSTEM";
-    }) => {
-      if (message.trim() === "") return; // Do not add empty user messages to chat
-
-      const chatMessage: UnifiedMessage = {
-        id: `${Date.now()}-${Math.random()}`, // Generate a unique ID for the message
-        type: type || "USER", // Default to "USER" type if not provided
-        sender: username,
-        text: message,
-        timestamp: Date.now(),
-      };
-
-      setMessages((prevMessages) =>
-        [...prevMessages, chatMessage].slice(-MAX_MESSAGE_CAPACITY),
-      );
-    };
-
-    const handleGameState = (gameState: GameState) => {
-      useGameStateStore.getState().setGameState(gameState);
-    };
-
-    const handleGameError = (errorMessage: string) => {
-      setErrorNotice(errorMessage);
-    };
-    const handleGuessCooldown = (endsAt: number) => {
-      setGuessCooldownEndsAt(endsAt);
-    };
-
-    // Listen for relevant events from the server
-    socket.on("room:notification", handleRoomNotification);
-    socket.on("room:state", handleRoomState);
-    socket.on("room:error", handleRoomError);
-    socket.on("chat:broadcast", handleChatBroadcast);
-    socket.on("game:state", handleGameState);
-    socket.on("game:error", handleGameError);
-    socket.on("guess:cooldown", handleGuessCooldown);
-
-    // Remove event listeners and disconnect after a short grace period.
-    // React StrictMode remounts effects in development; delaying prevents
-    // deleting a freshly matched room between the probe unmount/remount.
-    return () => {
-      socket.off("room:notification", handleRoomNotification);
-      socket.off("room:state", handleRoomState);
-      socket.off("room:error", handleRoomError);
-      socket.off("chat:broadcast", handleChatBroadcast);
-      socket.off("game:state", handleGameState);
-      socket.off("game:error", handleGameError);
-      socket.off("guess:cooldown", handleGuessCooldown);
-      socket.off("connect", joinOrReconnect);
-      socket.off("disconnect", handleDisconnect);
-      socket.off("room:session", handleRoomSession);
-      socket.off("room:reconnect-failed", handleReconnectFailed);
-      scheduleSocketDisconnect();
-    };
-  }, [navigate, roomCode, playerName]); // Re-run effect if roomCode or playerName changes
-
-  const sendChatMessage = (message: string) => {
-    const trimmedMessage = message.trim();
-    if (!trimmedMessage) return false;
-    socket.emit("chat:message", trimmedMessage);
-    return true;
-  };
-
-  const sendGuess = (message: string) => {
-    const trimmedMessage = message.trim();
-    if (!trimmedMessage || Date.now() < guessCooldownEndsAt) return false;
-    socket.emit("game:guess", trimmedMessage);
-    return true;
-  };
-
-  const setReady = () => {
-    socket.emit("game:ready");
-  };
-
-  const voteToSkip = () => {
-    socket.emit("game:skip-vote");
-  };
-
-  const leaveRoom = () => {
-    const sessionKey = `guess-the-ost-room-session:${roomCode}:${playerName.toLowerCase()}`;
-    window.sessionStorage.removeItem(sessionKey);
-    socket.emit("room:leave");
-  };
+    if (socket.connected) join();
+    return () => { socket.off("connect", onConnect); socket.off("disconnect", onDisconnect); socket.off("room:session", onSession); socket.off("room:state", onRoom); socket.off("match:state", onMatch); socket.off("chat:message", onChat); socket.off("server:error", onError); socket.off("room:reconnect-failed", onReconnectFailed); socket.off("match:submission-ack", onAck); scheduleSocketDisconnect(); };
+  }, [navigate, playerName, roomId, setMatch, setRoom, setSession]);
 
   return {
-    players,
-    messages,
-    errorNotice,
-    guessCooldownEndsAt,
-    connectionState,
-    sendChatMessage,
-    sendGuess,
-    setReady,
-    voteToSkip,
-    leaveRoom,
+    messages, errorNotice, connection, lastSubmission,
+    clearSubmission,
+    sendChat: (message: string) => { if (message.trim()) socket.emit("chat:send", { message }); },
+    configure: (config: unknown) => socket.emit("match:configure", config),
+    ready: () => socket.emit("match:ready"),
+    submit: (answer: unknown) => socket.emit("match:submit", answer),
+    rematch: () => socket.emit("match:rematch"),
+    leave: () => { clearStoredToken(roomId); socket.emit("room:leave"); },
   };
 };

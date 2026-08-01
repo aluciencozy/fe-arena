@@ -1,494 +1,65 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  Clock3,
-  Gamepad2,
-  Loader2,
-  LogIn,
-  Search,
-  Sparkles,
-  Users,
-  X,
-} from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowRight, BookOpen, Check, Clock3, Hash, LockKeyhole, Menu, Radio, ShieldCheck, Sparkles, Users, X } from "lucide-react";
 import { AppSettings } from "@/components/AppSettings";
-import { Toast } from "@/components/Toast";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { animeTitles, getTracksForPlaylist } from "@/data/catalog";
-import { playSound } from "@/lib/sound";
 import { connectSocket, socket } from "@/lib/socket";
 import { useGameStore } from "@/store/gameStore";
-import { getAnimePlaylistLabel } from "../../../shared/playlist";
-import type { AnimePlaylist, RoomMetadata } from "@/types";
+import { TOPICS, type MatchConfig, type TopicId } from "../../../shared/domain";
 
-type HomeView = "play" | "create" | "join" | "queue";
+const DEFAULT_TOPICS: TopicId[] = ["arrays-memory", "linked-lists", "stacks", "queues", "binary-trees", "sorting", "recursion", "analysis-mathematics"];
+const normalizeCode = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
 
-const normalizeRoomCode = (value: string) =>
-  value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
-
-const Home = () => {
+type Notice = { kind: "error" | "info"; text: string } | null;
+export default function Home() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const savedUsername = useGameStore((state) => state.playerName);
+  const playerName = useGameStore((state) => state.playerName);
   const setPlayerName = useGameStore((state) => state.setPlayerName);
-  const [username, setUsername] = useState(savedUsername);
-  const [view, setView] = useState<HomeView>("play");
-  const [roomId, setRoomId] = useState("");
-  const [titleSearch, setTitleSearch] = useState("");
-  const [selectedTitleIds, setSelectedTitleIds] = useState<string[]>([
-    animeTitles[0]?.id ?? "",
-  ].filter(Boolean));
-  const [playlist, setPlaylist] = useState<AnimePlaylist>("easy");
-  const [notice, setNotice] = useState(
-    (location.state as { notice?: string } | null)?.notice ?? "",
-  );
-  const [isCreating, setIsCreating] = useState(false);
-  const [toast, setToast] = useState("");
-  const [queueStartedAt, setQueueStartedAt] = useState<number | null>(null);
-  const [queueSeconds, setQueueSeconds] = useState(0);
-
-  const trimmedUsername = username.trim();
-  const availableTitles = useMemo(
-    () =>
-      animeTitles.filter(
-        (title) => getTracksForPlaylist(title, playlist).length > 0,
-      ),
-    [playlist],
-  );
-  const selectedTitleIdsForPlaylist = useMemo(() => {
-    const availableIds = new Set(availableTitles.map((title) => title.id));
-    return selectedTitleIds.filter((titleId) => availableIds.has(titleId));
-  }, [availableTitles, selectedTitleIds]);
-  const filteredTitles = useMemo(() => {
-    const query = titleSearch.trim().toLowerCase();
-    if (!query) return availableTitles;
-    return availableTitles.filter((title) =>
-      [
-        title.name,
-        title.canonicalTitle,
-        title.romajiName,
-        title.nativeName,
-        ...title.answerAliases.map((alias) => alias.value),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(query),
-    );
-  }, [availableTitles, titleSearch]);
-  const selectedTrackCount = useMemo(
-    () =>
-      availableTitles
-        .filter((title) => selectedTitleIds.includes(title.id))
-        .reduce(
-          (sum, title) => sum + getTracksForPlaylist(title, playlist).length,
-          0,
-        ),
-    [availableTitles, playlist, selectedTitleIds],
-  );
+  const [name, setName] = useState(playerName);
+  const [roomCode, setRoomCode] = useState("");
+  const [topics, setTopics] = useState<TopicId[]>(DEFAULT_TOPICS);
+  const [timer, setTimer] = useState(90);
+  const [view, setView] = useState<"home" | "private" | "join" | "queue">("home");
+  const [notice, setNotice] = useState<Notice>(null);
+  const [queueExpiresAt, setQueueExpiresAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [busy, setBusy] = useState(false);
+  const validName = name.trim().length > 0;
+  const config: MatchConfig = useMemo(() => ({ topicIds: topics, roundCount: 5, questionTimerSeconds: timer }), [timer, topics]);
 
   useEffect(() => {
-    if (!location.state) return;
-    navigate(".", { replace: true, state: null });
-  }, [location.state, navigate]);
-
-  useEffect(() => {
-    if (!queueStartedAt) return;
-    const update = () => setQueueSeconds(Math.floor((Date.now() - queueStartedAt) / 1000));
-    update();
-    const timer = window.setInterval(update, 1000);
-    return () => window.clearInterval(timer);
-  }, [queueStartedAt]);
-
-  useEffect(() => {
-    const roomCreated = (metadata: RoomMetadata) => {
-      setIsCreating(false);
-      setPlayerName(trimmedUsername);
-      playSound("confirm");
-      navigate(`/room/${metadata.roomId}`);
+    const created = (payload: { roomId: string; seatId: string; reconnectToken: string }) => {
+      useGameStore.getState().setSession(payload.seatId, payload.reconnectToken, payload.roomId);
+      setBusy(false); navigate(`/room/${payload.roomId}`);
     };
-    const queueWaiting = () => {
-      setView("queue");
-      setQueueStartedAt(Date.now());
+    const queueSeat = (payload: { roomId: string; seatId: string; reconnectToken: string }) => {
+      useGameStore.getState().setSession(payload.seatId, payload.reconnectToken, payload.roomId);
+      navigate(`/room/${payload.roomId}`);
     };
-    const queueMatched = (metadata: RoomMetadata) => {
-      setPlayerName(trimmedUsername);
-      playSound("confirm");
-      navigate(`/room/${metadata.roomId}`);
-    };
-    const queueCancelled = () => {
-      setQueueStartedAt(null);
-      setView("play");
-      setToast("Matchmaking cancelled.");
-    };
-    const error = (message: string) => {
-      setIsCreating(false);
-      setQueueStartedAt(null);
-      setView((current) => (current === "queue" ? "play" : current));
-      setNotice(message);
-      playSound("incorrect");
-    };
-    socket.on("room:created", roomCreated);
-    socket.on("room:error", error);
-    socket.on("queue:waiting", queueWaiting);
-    socket.on("queue:matched", queueMatched);
-    socket.on("queue:cancelled", queueCancelled);
-    socket.on("queue:error", error);
-    return () => {
-      socket.off("room:created", roomCreated);
-      socket.off("room:error", error);
-      socket.off("queue:waiting", queueWaiting);
-      socket.off("queue:matched", queueMatched);
-      socket.off("queue:cancelled", queueCancelled);
-      socket.off("queue:error", error);
-    };
-  }, [navigate, setPlayerName, trimmedUsername]);
+    const waiting = (payload: { status: string; expiresAt?: number }) => { if (payload.status === "waiting") { setView("queue"); setQueueExpiresAt(payload.expiresAt ?? Date.now() + 300_000); } else { setView("home"); setQueueExpiresAt(null); } };
+    const failed = (payload: { message?: string } | string) => { setBusy(false); setNotice({ kind: "error", text: typeof payload === "string" ? payload : payload.message ?? "Request failed." }); };
+    socket.on("room:created", created); socket.on("queue:seat", queueSeat); socket.on("queue:state", waiting); socket.on("server:error", failed);
+    return () => { socket.off("room:created", created); socket.off("queue:seat", queueSeat); socket.off("queue:state", waiting); socket.off("server:error", failed); };
+  }, [navigate]);
+  useEffect(() => { if (view !== "queue") return; const id = window.setInterval(() => setNow(Date.now()), 500); return () => window.clearInterval(id); }, [view]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(""), 2500);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
+  const begin = () => { if (!validName) { setNotice({ kind: "error", text: "Choose a guest name first." }); return false; } setPlayerName(name); setNotice(null); connectSocket(); return true; };
+  const createPrivate = () => { if (!begin()) return; setBusy(true); socket.emit("room:create-private", { username: name.trim(), config }); };
+  const joinPrivate = (event: React.FormEvent) => { event.preventDefault(); if (!begin() || roomCode.length !== 6) { if (roomCode.length !== 6) setNotice({ kind: "error", text: "Enter a six-character room code." }); return; } navigate(`/room/${roomCode}`); };
+  const joinQueue = () => { if (!begin()) return; socket.emit("queue:join", { username: name.trim() }); setView("queue"); };
+  const leaveQueue = () => { socket.emit("queue:leave"); setView("home"); setQueueExpiresAt(null); };
+  const toggleTopic = (id: TopicId) => setTopics((current) => current.includes(id) ? current.filter((topic) => topic !== id) : [...current, id]);
+  const queueSeconds = queueExpiresAt ? Math.max(0, Math.ceil((queueExpiresAt - now) / 1000)) : 300;
 
-  const persistUsername = () => {
-    if (!trimmedUsername) {
-      setNotice("Enter a username to continue.");
-      playSound("incorrect");
-      return false;
-    }
-    setPlayerName(trimmedUsername);
-    setNotice("");
-    return true;
-  };
+  if (view === "queue") return <Shell><section className="mx-auto flex max-w-xl flex-col items-center py-24 text-center"><div className="relative grid size-20 place-items-center rounded-full border border-gold/40 bg-gold/10 text-gold"><Radio className="animate-pulse" size={28} /></div><p className="eyebrow mt-8">public study queue</p><h1 className="display mt-3 text-4xl">finding a study partner</h1><p className="mt-4 max-w-md text-muted">The public room uses the full reviewed bank, five rounds, and a five-minute question timer.</p><div className="mt-8 flex items-center gap-2 font-mono text-sm text-gold"><Clock3 size={16} /> max wait {Math.floor(queueSeconds / 60)}:{String(queueSeconds % 60).padStart(2, "0")}</div><button className="button button-ghost mt-8" onClick={leaveQueue}><X size={15} /> leave queue</button></section></Shell>;
 
-  const chooseView = (nextView: HomeView) => {
-    if (!persistUsername()) return;
-    playSound("navigate");
-    setView(nextView);
-  };
+  return <Shell><main className="mx-auto max-w-6xl px-5 pb-20 pt-12 sm:px-8 sm:pt-20"><section className="grid items-end gap-10 lg:grid-cols-[1.2fr_.8fr]"><div><div className="eyebrow flex items-center gap-2"><Sparkles size={14} className="text-gold" /> foundation exam study arena</div><h1 className="display mt-5 max-w-3xl text-5xl leading-[.92] sm:text-8xl">think clearly.<br /><span className="text-gold">answer faster.</span></h1><p className="mt-7 max-w-xl text-lg leading-8 text-muted">A focused, unofficial practice room for core computer science foundations. Solo drills, private 1v1s, and a public study queue.</p><div className="mt-9 flex flex-wrap gap-3"><button className="button button-primary" onClick={joinQueue}><Radio size={16} /> public queue <ArrowRight size={16} /></button><Link to="/solo" className="button button-ghost"><BookOpen size={16} /> solo practice</Link></div></div><div className="gold-grid rounded-2xl border border-gold/20 bg-panel/80 p-6 sm:p-8"><p className="eyebrow text-gold">built for careful practice</p><div className="mt-7 space-y-5"><Feature icon={<ShieldCheck size={18} />} title="server-graded" text="One locked submission. Correctness is worth 1,000 points." /><Feature icon={<Clock3 size={18} />} title="speed is secondary" text="Earn up to 300 bonus points without letting the clock decide everything." /><Feature icon={<Users size={18} />} title="two seats, stable guests" text="Refresh recovery and a clear 30-second disconnect pause." /></div></div></section>
+    <section className="mt-20 grid gap-5 lg:grid-cols-2"><article className="panel p-6 sm:p-8"><div className="flex items-start justify-between"><div><p className="eyebrow">private 1v1</p><h2 className="display mt-2 text-3xl">set the room</h2></div><LockKeyhole className="text-gold" size={22} /></div><label className="field-label mt-7" htmlFor="name">guest name</label><input id="name" className="field mt-2" maxLength={24} value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. pointerPilot" />{notice && <p className={`mt-3 text-sm ${notice.kind === "error" ? "text-red-300" : "text-muted"}`} role="alert">{notice.text}</p>}<div className="mt-7 flex items-center justify-between"><div><p className="field-label">question timer</p><p className="mt-1 text-sm text-muted">{timer} seconds · five rounds</p></div><select className="field w-auto" value={timer} onChange={(event) => setTimer(Number(event.target.value))}><option value={60}>60 sec</option><option value={90}>90 sec</option><option value={120}>120 sec</option><option value={300}>5 min</option></select></div><button className="button button-primary mt-6 w-full" disabled={busy || topics.length === 0} onClick={createPrivate}><LockKeyhole size={16} /> create private room</button><button className="mt-4 flex w-full items-center justify-center gap-2 text-sm text-muted underline-offset-4 hover:text-gold hover:underline" onClick={() => setView("private")}><Menu size={15} /> configure topic pool ({topics.length}/12)</button></article>
+      <article className="panel p-6 sm:p-8"><div className="flex items-start justify-between"><div><p className="eyebrow">join a friend</p><h2 className="display mt-2 text-3xl">enter a code</h2></div><Hash className="text-gold" size={22} /></div><form onSubmit={joinPrivate}><label className="field-label mt-7" htmlFor="code">six-character room code</label><input id="code" className="field mt-2 text-center font-mono uppercase tracking-[.25em]" maxLength={6} value={roomCode} onChange={(event) => setRoomCode(normalizeCode(event.target.value))} placeholder="ABC123" /> <button className="button button-ghost mt-6 w-full"><ArrowRight size={16} /> join private room</button></form><div className="mt-10 border-t border-line pt-5 text-sm text-muted"><button className="flex items-center gap-2 hover:text-gold" onClick={() => setView("private")}><Menu size={15} /> review topics and room settings</button></div></article></section>
+    <section className="mt-16 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6 text-sm text-muted"><span>12 topic families · original prompts · five answer types</span><span>Not affiliated with or endorsed by UCF.</span></section>
+    {view === "private" && <TopicDialog topics={topics} toggleTopic={toggleTopic} close={() => setView("home")} />}
+  </main></Shell>;
+}
 
-  const startQueue = () => {
-    if (!persistUsername()) return;
-    playSound("confirm");
-    setView("queue");
-    setQueueStartedAt(Date.now());
-    connectSocket();
-    socket.emit("queue:join", {
-      username: trimmedUsername,
-      mode: "anime",
-      playlist,
-    });
-  };
-
-  const createRoom = () => {
-    if (!persistUsername()) return;
-    if (selectedTitleIdsForPlaylist.length === 0) {
-      setNotice("Select at least one anime.");
-      playSound("incorrect");
-      return;
-    }
-    setIsCreating(true);
-    setNotice("");
-    playSound("confirm");
-    connectSocket();
-    socket.emit("room:create-private", {
-      username: trimmedUsername,
-      mode: "anime",
-      playlist,
-      selectedTitleIds: selectedTitleIdsForPlaylist,
-    });
-  };
-
-  const joinRoom = (event: React.FormEvent) => {
-    event.preventDefault();
-    const normalized = normalizeRoomCode(roomId);
-    if (!persistUsername() || normalized.length !== 6) {
-      if (normalized.length !== 6) setNotice("Enter a valid 6-character room code.");
-      return;
-    }
-    playSound("confirm");
-    navigate(`/room/${normalized}`);
-  };
-
-  const toggleTitle = (titleId: string) => {
-    playSound("select");
-    setSelectedTitleIds((current) =>
-      current.includes(titleId)
-        ? current.filter((id) => id !== titleId)
-        : [...current, titleId],
-    );
-  };
-
-  return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
-        <button
-          type="button"
-          onClick={() => {
-            playSound("navigate");
-            setView("play");
-          }}
-          className="ui-title text-lg"
-        >
-          guess the ost
-        </button>
-        <div className="flex items-center gap-3">
-          <span className="hidden font-mono text-xs lowercase text-muted-foreground sm:inline">
-            anime mode
-          </span>
-          <AppSettings />
-        </div>
-      </header>
-
-      <main className="page-enter mx-auto w-full max-w-6xl px-5 pb-16 pt-10 sm:px-8 sm:pt-16">
-        {view === "play" && (
-          <section className="mx-auto max-w-4xl">
-            <div className="max-w-2xl">
-              <p className="ui-label">two players · soundtrack showdown</p>
-              <h1 className="ui-title mt-5 text-5xl leading-[0.96] sm:text-7xl">
-                hear it.<br />name it first.
-              </h1>
-              <p className="mt-6 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
-               Can you guess the ost? Pick a name, find a match, and become the soundtrack sovereign.
-              </p>
-            </div>
-
-            <PlaylistPicker playlist={playlist} onChange={setPlaylist} />
-
-            <div className="mt-12 grid gap-5 lg:grid-cols-[1fr_1.25fr]">
-              <section className="surface p-5 sm:p-6">
-                <label htmlFor="username" className="ui-label">your name</label>
-                <Input
-                  id="username"
-                  value={username}
-                  maxLength={18}
-                  onChange={(event) => {
-                    setUsername(event.target.value);
-                    setNotice("");
-                  }}
-                  placeholder="enter a username"
-                  className="mt-3 h-12 rounded-md bg-input px-4 text-base"
-                />
-                {notice && (
-                  <p role="alert" className="mt-3 text-sm text-destructive">{notice}</p>
-                )}
-                <Button
-                  type="button"
-                  onClick={startQueue}
-                  className="mt-6 h-12 w-full rounded-md bg-primary font-mono text-sm lowercase text-primary-foreground"
-                >
-                  <Sparkles size={16} /> quick match <ArrowRight size={16} />
-                </Button>
-              </section>
-
-              <section className="grid gap-3 sm:grid-cols-2">
-                <PathCard
-                  icon={<Users size={20} />}
-                  label="create private"
-                  description="Choose an anime pool and invite a friend."
-                  onClick={() => chooseView("create")}
-                />
-                <PathCard
-                  icon={<LogIn size={20} />}
-                  label="join by code"
-                  description="Enter a six-character room code."
-                  onClick={() => chooseView("join")}
-                />
-                <div className="rounded-lg border border-dashed border-border p-5 sm:col-span-2">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="ui-label">coming soon</p>
-                      <p className="ui-title mt-1 text-base text-muted-foreground">video game ost</p>
-                    </div>
-                    <Gamepad2 className="text-muted-foreground" size={20} />
-                  </div>
-                </div>
-              </section>
-            </div>
-          </section>
-        )}
-
-        {view === "queue" && (
-          <section className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center text-center">
-            <div className="relative flex size-20 items-center justify-center rounded-full border border-border bg-card">
-              <Loader2 className="animate-spin text-primary" size={28} />
-            </div>
-            <p className="ui-label mt-8">public matchmaking</p>
-            <h1 className="ui-title mt-2 text-4xl">finding your opponent</h1>
-            <p className="mt-4 text-muted-foreground">
-              Searching the {getAnimePlaylistLabel(playlist)} anime playlist for {trimmedUsername}.
-            </p>
-            <div className="mt-8 flex items-center gap-2 font-mono text-sm text-muted-foreground">
-              <Clock3 size={15} /> {queueSeconds}s elapsed
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                playSound("navigate");
-                socket.emit("queue:cancel");
-              }}
-              className="mt-8 rounded-md font-mono text-xs lowercase"
-            >
-              <X size={15} /> cancel search
-            </Button>
-          </section>
-        )}
-
-        {view === "join" && (
-          <FocusedShell title="join a room" onBack={() => setView("play")}>
-            <form onSubmit={joinRoom} className="surface mx-auto max-w-lg p-6 sm:p-8">
-              <label htmlFor="room-code" className="ui-label">room code</label>
-              <Input
-                id="room-code"
-                autoFocus
-                value={roomId}
-                onChange={(event) => {
-                  setRoomId(normalizeRoomCode(event.target.value));
-                  setNotice("");
-                }}
-                placeholder="ABC123"
-                maxLength={6}
-                className="mt-3 h-14 rounded-md bg-input text-center font-mono text-xl uppercase tracking-[0.28em]"
-              />
-              {notice && <p role="alert" className="mt-3 text-sm text-destructive">{notice}</p>}
-              <Button className="mt-6 h-12 w-full rounded-md font-mono text-sm lowercase">
-                join room <ArrowRight size={16} />
-              </Button>
-            </form>
-          </FocusedShell>
-        )}
-
-        {view === "create" && (
-          <FocusedShell title="choose the soundtrack pool" onBack={() => setView("play")}>
-            <PlaylistPicker playlist={playlist} onChange={setPlaylist} />
-            <div className="mb-5 flex flex-col gap-4 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                <Input
-                  value={titleSearch}
-                  onChange={(event) => setTitleSearch(event.target.value)}
-                  placeholder="search anime titles"
-                  className="h-10 rounded-md bg-input pl-10"
-                />
-              </div>
-              <div className="flex items-center justify-between gap-5 font-mono text-xs lowercase text-muted-foreground">
-                <span>{selectedTitleIdsForPlaylist.length} selected</span>
-                <span>{selectedTrackCount} tracks</span>
-              </div>
-            </div>
-
-            <div className="quiet-scrollbar grid max-h-[52vh] gap-3 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredTitles.map((title) => {
-                const selected = selectedTitleIds.includes(title.id);
-                return (
-                  <button
-                    key={title.id}
-                    type="button"
-                    onClick={() => toggleTitle(title.id)}
-                    aria-pressed={selected}
-                    className={`interactive group relative min-h-36 overflow-hidden rounded-lg border text-left ${
-                      selected ? "border-primary bg-primary/10" : "border-border bg-card"
-                    }`}
-                  >
-                    <img src={title.coverImageUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" />
-                    <div className="absolute inset-0 bg-background/60" />
-                    <div className="relative flex min-h-36 flex-col justify-between p-4">
-                      <span className={`flex size-7 items-center justify-center rounded-md border ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card/80"}`}>
-                        {selected && <Check size={14} />}
-                      </span>
-                      <div>
-                        <p className="line-clamp-2 font-semibold leading-snug">{title.canonicalTitle}</p>
-                        <p className="ui-label mt-1">{getTracksForPlaylist(title, playlist).length} tracks</p>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="sticky bottom-4 mt-6 flex justify-end">
-              <Button
-                type="button"
-                disabled={isCreating || selectedTitleIdsForPlaylist.length === 0}
-                onClick={createRoom}
-                className="h-12 rounded-md px-6 font-mono text-sm lowercase"
-              >
-                {isCreating ? <Loader2 className="animate-spin" size={16} /> : <Users size={16} />}
-                create room
-              </Button>
-            </div>
-            {notice && <p role="alert" className="mt-3 text-right text-sm text-destructive">{notice}</p>}
-          </FocusedShell>
-        )}
-      </main>
-      <Toast message={toast} onDismiss={() => setToast("")} />
-    </div>
-  );
-};
-
-const playlistDescription = (playlist: AnimePlaylist) => {
-  if (playlist === "easy") return "Up to 10 ranked soundtrack tracks per anime.";
-  if (playlist === "op-ed") return "Full opening and ending themes.";
-  return "All soundtrack tracks for each anime.";
-};
-
-const PlaylistPicker = ({ playlist, onChange }: { playlist: AnimePlaylist; onChange: (playlist: AnimePlaylist) => void }) => (
-  <section className="surface mt-8 mb-5 p-4 sm:p-5">
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <p className="ui-label">playlist</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {playlistDescription(playlist)}
-        </p>
-      </div>
-      <div className="grid grid-cols-3 gap-2" role="group" aria-label="Anime playlist">
-        {(["standard", "easy", "op-ed"] as const).map((option) => (
-          <button
-            key={option}
-            type="button"
-            aria-pressed={playlist === option}
-            onClick={() => {
-              playSound("select");
-              onChange(option);
-            }}
-            className={`rounded-md border px-4 py-2 font-mono text-xs lowercase transition-colors ${
-              playlist === option
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border text-muted-foreground hover:bg-secondary hover:text-foreground"
-            }`}
-          >
-            {getAnimePlaylistLabel(option)}
-          </button>
-        ))}
-      </div>
-    </div>
-  </section>
-);
-
-const PathCard = ({ icon, label, description, onClick }: { icon: React.ReactNode; label: string; description: string; onClick: () => void }) => (
-  <button type="button" onClick={onClick} className="interactive surface group p-5 text-left hover:bg-secondary">
-    <span className="flex size-10 items-center justify-center rounded-md border border-border bg-input text-primary">{icon}</span>
-    <p className="ui-title mt-5 text-lg">{label}</p>
-    <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
-    <ArrowRight className="mt-5 text-muted-foreground transition-transform group-hover:translate-x-1" size={16} />
-  </button>
-);
-
-const FocusedShell = ({ title, onBack, children }: { title: string; onBack: () => void; children: React.ReactNode }) => (
-  <section className="mx-auto max-w-5xl">
-    <button type="button" onClick={() => { playSound("navigate"); onBack(); }} className="interactive flex items-center gap-2 font-mono text-xs lowercase text-muted-foreground hover:text-foreground">
-      <ArrowLeft size={15} /> back
-    </button>
-    <div className="mb-8 mt-6">
-      <p className="ui-label">private match</p>
-      <h1 className="ui-title mt-2 text-3xl sm:text-4xl">{title}</h1>
-    </div>
-    {children}
-  </section>
-);
-
-export default Home;
+const Feature = ({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) => <div className="flex gap-3"><span className="mt-0.5 text-gold">{icon}</span><div><p className="font-semibold">{title}</p><p className="mt-1 text-sm leading-6 text-muted">{text}</p></div></div>;
+const TopicDialog = ({ topics, toggleTopic, close }: { topics: TopicId[]; toggleTopic: (id: TopicId) => void; close: () => void }) => <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-5" role="dialog" aria-modal="true"><section className="panel max-h-[90vh] w-full max-w-2xl overflow-y-auto p-6 sm:p-8"><div className="flex items-start justify-between"><div><p className="eyebrow text-gold">host controls</p><h2 className="display mt-2 text-3xl">choose your syllabus</h2><p className="mt-3 text-sm text-muted">Guests see the selected pool. Public queue always uses all reviewed topics.</p></div><button className="icon-button" onClick={close} aria-label="Close"><X size={17} /></button></div><div className="mt-7 grid gap-2 sm:grid-cols-2">{TOPICS.map((topic) => <button key={topic.id} className={`topic-chip ${topics.includes(topic.id) ? "topic-chip-active" : ""}`} onClick={() => toggleTopic(topic.id)}><span>{topic.label}</span>{topics.includes(topic.id) && <Check size={15} />}</button>)}</div><button className="button button-primary mt-7 w-full" onClick={close}><Check size={16} /> save topic pool</button></section></div>;
+const Shell = ({ children }: { children: React.ReactNode }) => <div className="min-h-screen bg-ink text-cream"><header className="mx-auto flex max-w-7xl items-center justify-between border-b border-line px-5 py-5 sm:px-8"><Link to="/" className="flex items-center gap-3"><span className="grid size-8 place-items-center rounded bg-gold font-black text-ink">FE</span><span className="font-mono text-sm font-bold tracking-[.18em]">ARENA</span></Link><div className="flex items-center gap-5"><AppSettings /><span className="hidden text-xs text-muted sm:inline">v1 study room</span></div></header>{children}</div>;

@@ -7,202 +7,79 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-heading: "Geist Mono Variable", monospace;
-  --font-mono: "Geist Mono Variable", monospace;
   --font-sans: "Geist Variable", sans-serif;
-
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
+  --font-mono: "Geist Mono Variable", monospace;
+  --color-ink: var(--ink);
+  --color-panel: var(--panel);
+  --color-cream: var(--cream);
   --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-info: var(--info);
-  --color-player-1: var(--player-1);
-  --color-player-2: var(--player-2);
-
+  --color-line: var(--line);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-background: var(--ink);
+  --color-foreground: var(--cream);
+  --color-card: var(--panel);
+  --color-card-foreground: var(--cream);
+  --color-popover: var(--panel-raised);
+  --color-popover-foreground: var(--cream);
+  --color-primary: var(--gold);
+  --color-primary-foreground: var(--ink);
+  --color-secondary: var(--panel-raised);
+  --color-secondary-foreground: var(--cream);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--gold-soft);
+  --color-accent-foreground: var(--ink);
+  --color-destructive: var(--red-300);
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--gold);
   --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 10px;
-  --radius-xl: 10px;
+  --radius-md: 7px;
+  --radius-lg: 12px;
+  --radius-xl: 12px;
+  --color-red-300: #fca5a5;
+  --color-green-300: #86efac;
 }
-
-:root,
-[data-theme="rose-pine"] {
-  color-scheme: dark;
-  --color-base: #191724;
-  --color-surface: #1f1d2e;
-  --color-overlay: #26233a;
-  --color-muted-rp: #6e6a86;
-  --color-subtle: #908caa;
-  --color-text: #e0def4;
-  --color-love: #eb6f92;
-  --color-gold: #f6c177;
-  --color-rose: #ebbcba;
-  --color-pine: #31748f;
-  --color-foam: #9ccfd8;
-  --color-iris: #c4a7e7;
-  --color-highlight-low: #21202e;
-  --color-highlight-med: #403d52;
-  --color-highlight-high: #524f67;
-
-  --background: var(--color-base);
-  --foreground: var(--color-text);
-  --card: var(--color-surface);
-  --card-foreground: var(--color-text);
-  --popover: var(--color-overlay);
-  --popover-foreground: var(--color-text);
-  --primary: var(--color-iris);
-  --primary-foreground: var(--color-base);
-  --secondary: var(--color-overlay);
-  --secondary-foreground: var(--color-text);
-  --muted: var(--color-highlight-low);
-  --muted-foreground: var(--color-subtle);
-  --accent: var(--color-highlight-med);
-  --accent-foreground: var(--color-text);
-  --destructive: var(--color-love);
-  --success: var(--color-foam);
-  --warning: var(--color-gold);
-  --info: var(--color-pine);
-  --border: var(--color-highlight-med);
-  --input: var(--color-highlight-low);
-  --ring: var(--color-iris);
-  --player-1: var(--color-iris);
-  --player-2: var(--color-rose);
-}
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-
-  html {
-    @apply bg-background font-sans text-foreground;
-  }
-
-  body {
-    min-width: 320px;
-    min-height: 100vh;
-    margin: 0;
-    background: var(--background);
-  }
-
-  button,
-  input,
-  textarea {
-    font: inherit;
-  }
-
-  button,
-  [role="button"] {
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  ::selection {
-    color: var(--color-base);
-    background: var(--color-iris);
-  }
-}
-
-@layer components {
-  .ui-label {
-    @apply font-mono text-[11px] lowercase tracking-[0.08em] text-muted-foreground;
-  }
-
-  .ui-title {
-    @apply font-mono lowercase tracking-[-0.04em];
-  }
-
-  .surface {
-    @apply rounded-lg border border-border bg-card text-card-foreground;
-    box-shadow: 0 12px 30px rgb(0 0 0 / 0.14);
-  }
-
-  .surface-raised {
-    @apply rounded-lg border border-border bg-popover text-popover-foreground;
-    box-shadow: 0 18px 45px rgb(0 0 0 / 0.22);
-  }
-
-  .interactive {
-    @apply transition-[background-color,border-color,color,opacity,transform] duration-150 ease-out;
-  }
-
-  .interactive:hover:not(:disabled) {
-    border-color: var(--color-highlight-high);
-  }
-
-  .interactive:active:not(:disabled) {
-    transform: translateY(1px) scale(0.99);
-  }
-
-  .page-enter {
-    animation: page-enter 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-
-  .event-enter {
-    animation: event-enter 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-
-  .damage-shake {
-    animation: damage-shake 420ms ease-out both;
-  }
-
-  .artwork-dim {
-    position: relative;
-    overflow: hidden;
-  }
-
-  .artwork-dim::after {
-    position: absolute;
-    inset: 0;
-    content: "";
-    background: rgb(25 23 36 / 0.48);
-  }
-
-  .quiet-scrollbar {
-    scrollbar-color: var(--color-highlight-high) transparent;
-    scrollbar-width: thin;
-  }
-}
-
-@keyframes page-enter {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes event-enter {
-  0% { opacity: 0; transform: translateY(12px) scale(0.98); }
-  70% { opacity: 1; transform: translateY(0) scale(1.01); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes damage-shake {
-  0%, 100% { transform: translateX(0); }
-  30% { transform: translateX(-5px); }
-  60% { transform: translateX(4px); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
+:root { color-scheme: dark; --ink: #0a0b0d; --panel: #121519; --panel-raised: #191d22; --cream: #f4f1e8; --muted: #99a0a9; --line: #2a3037; --gold: #e8b84a; --gold-soft: #f4d58b; }
+* { box-sizing: border-box; border-color: var(--line); }
+html, body, #root { min-width: 320px; min-height: 100%; margin: 0; background: var(--ink); color: var(--cream); }
+body { font-family: "Geist Variable", sans-serif; }
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .5; }
+::selection { background: var(--gold); color: var(--ink); }
+.display { font-family: "Geist Mono Variable", monospace; font-weight: 700; letter-spacing: -.075em; text-transform: lowercase; }
+.eyebrow { color: var(--muted); font: 600 10px/1.2 "Geist Mono Variable", monospace; letter-spacing: .12em; text-transform: uppercase; }
+.text-muted { color: var(--muted); }
+.gold-grid { background-image: linear-gradient(rgb(232 184 74 / .06) 1px, transparent 1px), linear-gradient(90deg, rgb(232 184 74 / .06) 1px, transparent 1px); background-size: 26px 26px; }
+.panel { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); box-shadow: 0 18px 60px rgb(0 0 0 / .22); }
+.field { min-height: 44px; width: 100%; border: 1px solid var(--line); border-radius: 7px; background: var(--ink); color: var(--cream); padding: 10px 13px; outline: none; }
+.field:focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgb(232 184 74 / .15); }
+.field-label { color: var(--muted); font: 600 10px/1.2 "Geist Mono Variable", monospace; letter-spacing: .1em; text-transform: uppercase; }
+.button { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 9px; border: 1px solid transparent; border-radius: 7px; padding: 10px 16px; font: 600 12px "Geist Mono Variable", monospace; letter-spacing: .02em; text-transform: lowercase; transition: transform .15s, background .15s, border-color .15s; }
+.button:hover:not(:disabled) { transform: translateY(-1px); }
+.button-primary { background: var(--gold); color: var(--ink); }
+.button-primary:hover:not(:disabled) { background: var(--gold-soft); }
+.button-ghost { border-color: var(--line); background: var(--panel); color: var(--cream); }
+.button-ghost:hover:not(:disabled) { border-color: var(--gold); color: var(--gold-soft); }
+.button-danger { border-color: rgb(248 113 113 / .25); background: rgb(127 29 29 / .25); color: #fca5a5; }
+.icon-button { position: relative; display: grid; size: 36px; place-items: center; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--muted); }
+.icon-button:hover { border-color: var(--gold); color: var(--gold); }
+.code-pill { display: inline-flex; align-items: center; gap: 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); padding: 9px 12px; font: 600 11px "Geist Mono Variable", monospace; letter-spacing: .14em; }
+.code-pill:hover { border-color: var(--gold); color: var(--gold); }
+.topic-chip { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--ink); padding: 10px 12px; text-align: left; font-size: 13px; color: var(--muted); }
+.topic-chip:hover, .topic-chip-active { border-color: rgb(232 184 74 / .6); background: rgb(232 184 74 / .1); color: var(--gold-soft); }
+.answer-option { display: flex; min-height: 52px; align-items: center; gap: 13px; border: 1px solid var(--line); border-radius: 7px; background: var(--ink); padding: 12px 14px; text-align: left; color: var(--cream); }
+.answer-option:hover:not(:disabled), .answer-option-active { border-color: var(--gold); background: rgb(232 184 74 / .1); }
+.option-key { display: grid; size: 25px; place-items: center; border: 1px solid var(--line); border-radius: 4px; color: var(--gold); font: 600 11px "Geist Mono Variable", monospace; }
+.status-pill, .type-pill { border: 1px solid var(--line); border-radius: 99px; padding: 5px 8px; color: var(--muted); font: 600 9px "Geist Mono Variable", monospace; letter-spacing: .08em; text-transform: uppercase; }
+.status-good { border-color: rgb(134 239 172 / .35); background: rgb(34 197 94 / .1); color: #86efac; }
+.type-pill { border-color: rgb(232 184 74 / .35); color: var(--gold); }
+.timer { display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgb(232 184 74 / .35); border-radius: 7px; padding: 10px 12px; color: var(--gold); font: 600 14px "Geist Mono Variable", monospace; }
+.timer-hot { border-color: rgb(248 113 113 / .5); color: #fca5a5; }
+.badge { position: absolute; right: -5px; top: -5px; min-width: 16px; border-radius: 99px; background: var(--gold); padding: 2px 4px; color: var(--ink); font: 700 9px "Geist Mono Variable", monospace; }
+.notice-error, .notice-info { display: flex; align-items: flex-start; gap: 10px; border: 1px solid rgb(248 113 113 / .25); border-radius: 7px; background: rgb(127 29 29 / .2); padding: 12px 14px; font-size: 13px; color: #fca5a5; }
+.notice-info { border-color: rgb(232 184 74 / .25); background: rgb(232 184 74 / .08); color: var(--gold-soft); }
+.spinner { size: 32px; border: 2px solid var(--line); border-top-color: var(--gold); border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
