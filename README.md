@@ -13,7 +13,7 @@ FE Arena is an unofficial UCF Computer Science Foundation Exam study tool. It is
 
 ## Local development
 
-Requirements: Node.js 20+ and npm.
+Requirements: Node.js `^20.19.0 || >=22.12.0` and npm.
 
 ```bash
 (cd shared && npm install)
@@ -67,7 +67,7 @@ Every item carries an answer, explanation, assumptions, and provenance. Content 
 
 ```bash
 cd backend && npm run typecheck && npm test
-cd ../frontend && npm run lint && npm run build
+cd ../frontend && npm run lint && npm test && npm run build
 ```
 
 The backend tests cover normalization, all five question types, seeded selection, score boundaries, hidden answers, ready/countdown transitions, duplicate-safe service behavior, queue expiry/cancellation, room isolation, and reconnect seat restoration. Production hosting needs a Node process for the backend and a static host/reverse proxy for the Vite build; runtime match state is intentionally in memory for this MVP.
