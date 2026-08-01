@@ -16,9 +16,10 @@ FE Arena is an unofficial UCF Computer Science Foundation Exam study tool. It is
 Requirements: Node.js 20+ and npm.
 
 ```bash
-cd backend && npm install && npm run dev
+(cd shared && npm install)
+(cd backend && npm install && npm run dev)
 # in another terminal
-cd frontend && npm install && npm run dev
+(cd frontend && npm install && npm run dev)
 ```
 
 The frontend runs at `http://localhost:5173`; the backend runs at `http://localhost:3001`. Copy `.env.example` files when changing those defaults:
@@ -41,7 +42,7 @@ Match states carry absolute `questionStartedAt`, `questionEndsAt`, and countdown
 
 The server emits a public question view without answer, explanation, assumptions, provenance, or opponent submission. Reveal and results are the first phases that include those fields. Late, duplicate, wrong-question, malformed, and client-invented submissions are rejected. C prompts are text-traced against reviewed expected output; FE Arena never executes arbitrary submitted code.
 
-Scores are `1,000` correctness points plus a maximum `300` speed bonus. A wrong answer is zero. Server-computed total score wins; ties compare correct count, then aggregate response time, then remain a draw.
+Scores are `1,000` correctness points plus a maximum `300` speed bonus. A wrong answer is zero. Correct count wins; ties compare server-computed total score, then aggregate response time, then remain a draw.
 
 ## Content and provenance
 
