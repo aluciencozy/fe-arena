@@ -39,6 +39,14 @@ const snapshot = (overrides: Partial<TerminalMatchSnapshot> = {}): TerminalMatch
   ...overrides,
 });
 
+const waitFor = async (predicate: () => Promise<boolean>): Promise<void> => {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (await predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 1));
+  }
+  throw new Error("Timed out waiting for the outbox state.");
+};
+
 test("selects memory persistence without complete server-only Supabase configuration", async () => {
   const directory = await mkdtemp(join(process.cwd(), ".terminal-outbox-test-"));
   assert.ok(createMatchRepository({}) instanceof InMemoryMatchRepository);
@@ -81,6 +89,73 @@ test("durable persistence replays a failed terminal write after process restart"
     assert.deepEqual(delivered, [first]);
     assert.equal((await readdir(directory)).filter((name) => name.endsWith(".json")).length, 0);
     afterRestart.close();
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("stages a current terminal snapshot while startup replay is blocked", async () => {
+  const directory = await mkdtemp(join(process.cwd(), ".terminal-outbox-test-"));
+  const backlog = snapshot();
+  const current = snapshot({
+    matchId: "55555555-5555-4555-8555-555555555555",
+    idempotencyKey: "55555555-5555-4555-8555-555555555555",
+  });
+  const unavailable: MatchRepository = {
+    persistTerminalMatch: async () => { throw new Error("database unavailable"); },
+  };
+  let releaseBacklog: (() => void) | undefined;
+  let signalBacklogStarted: (() => void) | undefined;
+  const backlogStarted = new Promise<void>((resolve) => { signalBacklogStarted = resolve; });
+  const blocked: MatchRepository = {
+    persistTerminalMatch: async (value) => {
+      if (value.matchId === backlog.matchId) {
+        signalBacklogStarted?.();
+        await new Promise<void>((resolve) => { releaseBacklog = resolve; });
+      }
+      return { status: "inserted", matchId: value.matchId };
+    },
+  };
+  let afterRestart: DurableMatchRepository | undefined;
+
+  try {
+    const beforeRestart = new DurableMatchRepository(unavailable, directory, 60_000);
+    await assert.rejects(beforeRestart.persistTerminalMatch(backlog));
+    beforeRestart.close();
+
+    afterRestart = new DurableMatchRepository(blocked, directory, 60_000);
+    await backlogStarted;
+    const currentWrite = afterRestart.persistTerminalMatch(current);
+    await waitFor(async () => (await readdir(directory)).filter((name) => name.endsWith(".json")).length === 2);
+    releaseBacklog?.();
+    await currentWrite;
+  } finally {
+    releaseBacklog?.();
+    afterRestart?.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("delivers the staged snapshot when a retry payload changes", async () => {
+  const directory = await mkdtemp(join(process.cwd(), ".terminal-outbox-test-"));
+  const first = snapshot();
+  const delivered: TerminalMatchSnapshot[] = [];
+  let unavailable = true;
+  const delegate: MatchRepository = {
+    persistTerminalMatch: async (value) => {
+      if (unavailable) throw new Error("database unavailable");
+      delivered.push(structuredClone(value));
+      return { status: "inserted", matchId: value.matchId };
+    },
+  };
+
+  try {
+    const repository = new DurableMatchRepository(delegate, directory, 60_000);
+    await assert.rejects(repository.persistTerminalMatch(first));
+    unavailable = false;
+    await repository.persistTerminalMatch({ ...first, terminalOutcome: "draw", finishedAt: "2026-03-08T00:01:00.000Z" });
+    assert.deepEqual(delivered, [first]);
+    repository.close();
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

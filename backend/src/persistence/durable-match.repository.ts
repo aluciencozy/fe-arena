@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, open, readFile, readdir, rename, rm, unlink } from "node:fs/promises";
+import { link, mkdir, open, readFile, readdir, rm, unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type {
   MatchRepository,
@@ -52,25 +52,21 @@ export class DurableMatchRepository implements MatchRepository {
   }
 
   private async persist(snapshot: TerminalMatchSnapshot): Promise<PersistTerminalResult> {
+    const stagedSnapshot = await this.stage(snapshot);
     await this.startupReplay;
-    await this.stage(snapshot);
     try {
-      return await this.deliver(snapshot);
+      return await this.deliver(stagedSnapshot);
     } catch (error) {
       this.scheduleRetry();
       throw error;
     }
   }
 
-  private async stage(snapshot: TerminalMatchSnapshot): Promise<void> {
+  private async stage(snapshot: TerminalMatchSnapshot): Promise<TerminalMatchSnapshot> {
     await mkdir(this.outboxDirectory, { recursive: true });
     const target = this.snapshotPath(snapshot.matchId);
     try {
-      const existing = this.parseSnapshot(await readFile(target, "utf8"), target);
-      if (existing.matchId !== snapshot.matchId || existing.idempotencyKey !== snapshot.idempotencyKey) {
-        throw new Error("A durable match outbox entry cannot be reused with different immutable keys.");
-      }
-      return;
+      return await this.authoritativeSnapshot(target, snapshot);
     } catch (error) {
       if (!this.isMissingFile(error)) throw error;
     }
@@ -84,19 +80,37 @@ export class DurableMatchRepository implements MatchRepository {
       } finally {
         await file.close();
       }
-      await rename(temporary, target);
+      let created = false;
+      try {
+        await link(temporary, target);
+        created = true;
+      } catch (error) {
+        if (!this.isExistingFile(error)) throw error;
+      }
       await this.syncDirectory();
-    } catch (error) {
+      return created ? snapshot : await this.authoritativeSnapshot(target, snapshot);
+    } finally {
       await rm(temporary, { force: true });
-      throw error;
     }
   }
 
   private async deliver(snapshot: TerminalMatchSnapshot): Promise<PersistTerminalResult> {
     const result = await this.delegate.persistTerminalMatch(snapshot);
-    await unlink(this.snapshotPath(snapshot.matchId));
+    try {
+      await unlink(this.snapshotPath(snapshot.matchId));
+    } catch (error) {
+      if (!this.isMissingFile(error)) throw error;
+    }
     await this.syncDirectory();
     return result;
+  }
+
+  private async authoritativeSnapshot(path: string, requested: TerminalMatchSnapshot): Promise<TerminalMatchSnapshot> {
+    const existing = this.parseSnapshot(await readFile(path, "utf8"), path);
+    if (existing.matchId !== requested.matchId || existing.idempotencyKey !== requested.idempotencyKey) {
+      throw new Error("A durable match outbox entry cannot be reused with different immutable keys.");
+    }
+    return existing;
   }
 
   private async replayOutbox(): Promise<void> {
@@ -152,5 +166,9 @@ export class DurableMatchRepository implements MatchRepository {
 
   private isMissingFile(error: unknown): boolean {
     return error instanceof Error && "code" in error && error.code === "ENOENT";
+  }
+
+  private isExistingFile(error: unknown): boolean {
+    return error instanceof Error && "code" in error && error.code === "EEXIST";
   }
 }
