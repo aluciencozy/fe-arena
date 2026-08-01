@@ -7,7 +7,7 @@ import {
 import { createRoom, attachSeat, disconnectSocket, getMetadata, getRoomForSocket, getSeatForSocket, getSeats, joinRoom, reconnectRoom, removeSeat } from "../services/room.service.js";
 import { enqueue, dequeue, publicConfig } from "../services/queue.service.js";
 import { clearMatch, configureMatch, ensureMatch, getMatchState, leaveMatch, pauseForDisconnect, resumeAfterReconnect, submitAnswer, toggleReady, requestRematch } from "../services/match.service.js";
-import { clearSolo, soloNext, soloSubmit, startSolo } from "../services/solo.service.js";
+import { soloNext, soloSubmit, startSolo } from "../services/solo.service.js";
 
 const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const chatTimes = new Map<string, number>();
@@ -44,10 +44,7 @@ const expireDisconnectedSeat = (io: Server, roomId: string, seatId: string, toke
   const seat = getSeats(roomId).find((candidate) => candidate.seatId === seatId);
   if (!seat || seat.connected) return;
   const state = getMatchState(roomId);
-  if (state && ACTIVE_PHASES.has(state.phase)) {
-    const reason = getSeats(roomId).every((candidate) => !candidate.connected) ? "abandoned" : "expired";
-    leaveMatch(roomId, seatId, reason, makeEvents(io, roomId));
-  }
+  if (state && ACTIVE_PHASES.has(state.phase)) leaveMatch(roomId, seatId, "expired", makeEvents(io, roomId));
   const removal = removeSeat(roomId, seatId);
   if (!removal) return;
   emitRoom(io, roomId);
@@ -72,10 +69,8 @@ const validateEmpty = (socket: Socket, schema: { safeParse: (value: unknown) => 
 
 export const registerHandlers = (io: Server, socket: Socket) => {
   socket.on("room:create-private", (payload: unknown) => {
-    if (session(socket)) return error(socket, "This browser is already seated in a match.", "ALREADY_SEATED");
     const input = validate(socket, ClientEventSchemas["room:create-private"], payload);
     if (!input) return;
-    dequeue(socket.id);
     const created = createRoom("private", input.config, input.username);
     attachSeat(created.metadata.roomId, created.seat, socket.id);
     enterRoom(io, socket, created.metadata.roomId, created.seat);
@@ -87,13 +82,11 @@ export const registerHandlers = (io: Server, socket: Socket) => {
     if (!input) return;
     const result = joinRoom(input.roomId, input.username, socket.id);
     if (!result.ok) { error(socket, result.error, "ROOM_NOT_FOUND"); return; }
-    dequeue(socket.id);
     enterRoom(io, socket, result.metadata.roomId, result.seat);
     io.to(result.metadata.roomId).emit("chat:message", output(ServerEventSchemas["chat:message"], { type: "system", sender: "FE Arena", text: `${result.seat.name} joined the study room.`, sentAt: Date.now() }));
   });
 
   socket.on("queue:join", (payload: unknown) => {
-    if (session(socket)) return error(socket, "This browser is already seated in a match.", "ALREADY_SEATED");
     const input = validate(socket, ClientEventSchemas["queue:join"], payload);
     if (!input) return;
     const result = enqueue({ socketId: socket.id, username: input.username, queuedAt: Date.now() }, () => socket.emit("queue:state", output(ServerEventSchemas["queue:state"], { status: "expired" })));
@@ -121,7 +114,6 @@ export const registerHandlers = (io: Server, socket: Socket) => {
     if (!input) return;
     const result = reconnectRoom(input.roomId, input.reconnectToken, socket.id);
     if (!result.ok) { socket.emit("room:reconnect-failed", output(ServerEventSchemas["room:reconnect-failed"], { message: result.error })); return; }
-    dequeue(socket.id);
     const timer = reconnectTimers.get(result.seat.reconnectToken);
     if (timer) clearTimeout(timer);
     reconnectTimers.delete(result.seat.reconnectToken);
@@ -162,7 +154,7 @@ export const registerHandlers = (io: Server, socket: Socket) => {
     if (!input) return;
     const result = submitAnswer(current.roomId, current.seat.seatId, input, makeEvents(io, current.roomId));
     if (!result.ok) error(socket, result.error, "SUBMISSION_ERROR");
-    else socket.emit("match:submission-ack", output(ServerEventSchemas["match:submission-ack"], { submitted: true }));
+    else socket.emit("match:submission-ack", output(ServerEventSchemas["match:submission-ack"], { correct: result.correct, score: result.score }));
   });
   socket.on("match:rematch", (payload?: unknown) => {
     if (!validateEmpty(socket, ClientEventSchemas["match:rematch"], payload)) return;
@@ -208,7 +200,6 @@ export const registerHandlers = (io: Server, socket: Socket) => {
   });
 
   socket.on("disconnect", () => {
-    clearSolo(socket.id);
     dequeue(socket.id);
     chatTimes.delete(socket.id);
     const current = session(socket);
