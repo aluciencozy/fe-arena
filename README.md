@@ -40,7 +40,7 @@ The frontend runs at `http://localhost:5173`; the backend runs at `http://localh
 
 Match states carry absolute `questionStartedAt`, `questionEndsAt`, and countdown deadlines. A temporary disconnect changes the match to `PAUSED`, clears timers, and extends the saved deadline by the actual pause duration on reconnect. Expiry becomes an explicit `EXPIRED` outcome; an intentional leave becomes `FORFEIT`. A reconnect token restores the same seat rather than creating a new guest.
 
-The server emits a public question view without answer, explanation, assumptions, provenance, or opponent submission. Reveal and results are the first phases that include those fields. Late, duplicate, wrong-question, malformed, and client-invented submissions are rejected. C prompts are text-traced against reviewed expected output; FE Arena never executes arbitrary submitted code.
+The server emits a public question view without answer, explanation, assumptions, provenance, or opponent answers. Reveal and results are the first phases that include solution fields. Late, duplicate, wrong-question, malformed, and client-invented submissions are rejected. C prompts are text-traced against reviewed expected output; FE Arena never executes arbitrary submitted code.
 
 Scores are `1,000` correctness points plus a maximum `300` speed bonus. A wrong answer is zero. Correct count wins; ties compare server-computed total score, then aggregate response time, then remain a draw.
 
