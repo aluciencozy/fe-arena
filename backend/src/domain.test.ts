@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { calculateScore, ClientEventSchemas, compareScores, gradeQuestion, normalizeAnswer, selectSeededQuestions, ServerEventSchemas, toPublicQuestion, TOPICS, type Question } from "../../shared/domain.js";
 import { QUESTION_BANK, validateQuestionBank } from "./data/questions.js";
+import { loadQuestionRepository, questionToRow } from "./services/question-bank.service.js";
 
 test("normalization is stable and explicit aliases grade short answers", () => {
   assert.equal(normalizeAnswer("  Little–Endian! "), "little endian");
@@ -10,14 +11,27 @@ test("normalization is stable and explicit aliases grade short answers", () => {
   assert.equal(gradeQuestion(question, { questionId: question.id, answer: "cat" }), false);
 });
 
-test("all five discriminated question types validate and public views hide solutions", () => {
+test("reviewed bank has complete topic/type coverage, valid unique IDs, and hidden public solutions", () => {
   const questions = validateQuestionBank();
-  assert.equal(new Set(questions.map((question) => question.type)).size, 5);
+  assert.ok(questions.length >= 100);
+  assert.equal(new Set(questions.map((question) => question.id)).size, questions.length);
   assert.equal(new Set(questions.map((question) => question.topicId)).size, TOPICS.length);
+  for (const topic of TOPICS) {
+    const topicQuestions = questions.filter((question) => question.topicId === topic.id);
+    assert.ok(topicQuestions.length >= 8, topic.id);
+    assert.equal(new Set(topicQuestions.map((question) => question.type)).size, 5, topic.id);
+  }
+  assert.equal(new Set(questions.map((question) => question.type)).size, 5);
   for (const question of questions) {
     const publicView = toPublicQuestion(question);
-    assert.equal("explanation" in publicView, false);
     assert.equal("answer" in publicView, false);
+    assert.equal("answers" in publicView, false);
+    assert.equal("output" in publicView, false);
+    assert.equal("tolerance" in publicView, false);
+    assert.equal("answerOrder" in publicView, false);
+    assert.equal("explanation" in publicView, false);
+    assert.equal("assumptions" in publicView, false);
+    assert.equal("provenance" in publicView, false);
   }
 });
 
@@ -38,11 +52,26 @@ test("socket contracts validate payloadless requests and public outputs", () => 
   assert.equal(ServerEventSchemas["queue:state"].safeParse({ status: "waiting" }).success, false);
 });
 
-test("seeded selection is deterministic and topic-filtered", () => {
-  const first = selectSeededQuestions(QUESTION_BANK, "replay-seed", 5, ["stacks", "queues"]);
-  const second = selectSeededQuestions(QUESTION_BANK, "replay-seed", 5, ["stacks", "queues"]);
+test("seeded selection is deterministic, topic-filtered, and has no repeated questions", () => {
+  const first = selectSeededQuestions(QUESTION_BANK, "replay-seed", 10, ["stacks", "queues"]);
+  const second = selectSeededQuestions(QUESTION_BANK, "replay-seed", 10, ["stacks", "queues"]);
   assert.deepEqual(first.map((question) => question.id), second.map((question) => question.id));
+  assert.equal(new Set(first.map((question) => question.id)).size, first.length);
   assert.ok(first.every((question) => question.topicId === "stacks" || question.topicId === "queues"));
+});
+
+test("Supabase rows load private content through the repository without changing public views", async () => {
+  const source = QUESTION_BANK.find((question) => question.type === "multiple-choice")!;
+  const row = { ...questionToRow(source), schema_version: 2, published: true };
+  const query = {
+    select: () => query,
+    eq: () => query,
+    order: async () => ({ data: [row], error: null }),
+  };
+  const repository = await loadQuestionRepository({ SUPABASE_URL: "https://example.supabase.co", SUPABASE_SECRET_KEY: "service-key" }, { from: () => query } as never);
+  const loaded = repository.get(source.id)!;
+  assert.equal(loaded.explanation, source.explanation);
+  assert.equal("answer" in toPublicQuestion(loaded), false);
 });
 
 test("code output and ordered sequence grading do not execute arbitrary code", () => {

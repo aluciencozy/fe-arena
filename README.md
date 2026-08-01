@@ -30,7 +30,7 @@ The frontend runs at `http://localhost:5173`; the backend runs at `http://localh
 ## Architecture
 
 - `shared/domain.ts` is the framework-free domain boundary. It defines discriminated question types, stable topic IDs, Zod schemas, normalization, grading, seeded selection, score calculation, and tie-breakers.
-- `backend/src/data/questions.ts` is the reviewed file-backed source. `question-bank.service.ts` is the repository boundary intended to be replaced by an account-backed database later without changing match orchestration.
+- `backend/src/data/questions.ts` is the reviewed in-memory fallback. `question-bank.service.ts` loads the same validated content from the server-only Supabase `question_bank` repository when configured, without changing match orchestration.
 - `backend/src/services/match.service.ts` owns the explicit state machine and absolute deadlines. The server selects questions, accepts exactly one submission per seat, grades privately, and calculates timing and scores.
 - `backend/src/services/room.service.ts` owns stable guest seats, reconnect tokens, and room isolation. `queue.service.ts` owns FIFO public matching and expiry. `solo.service.ts` reuses the repository and grading engine without durable history.
 - `backend/src/sockets/handlers.ts` is the validated Socket.IO contract for room, queue, match, chat, reconnect, state-request, solo, and error events. Incoming payloads are parsed with Zod before services run.
@@ -61,7 +61,7 @@ The bank covers:
 11. Recursion
 12. Algorithm analysis and representation
 
-Every item carries an answer, explanation, assumptions, and provenance. Content is validated at module load and in tests for schema shape, unique IDs, option/sequence references, and complete type coverage. New content requires normal PR review plus validation. The public UCF index and supplied reference PDFs are provenance anchors for topic planning only: https://www.cs.ucf.edu/registration/exm/. They are not a license to copy, and FE Arena does not claim to match any future exam format.
+Every item carries an answer, explanation, assumptions, and provenance. Content is validated at module load and in tests for schema shape, unique IDs, option/sequence references, and complete type coverage. New content requires normal PR review plus validation. Migration `supabase/migrations/202603080003_question_bank.sql` creates the server-only table; after applying migrations, `cd backend && npm run seed:questions` idempotently upserts the reviewed bank using `SUPABASE_URL` and `SUPABASE_SECRET_KEY`. If either variable is absent, local development and tests use the in-memory fallback. The public UCF index and supplied reference PDFs are provenance anchors for topic planning only: https://www.cs.ucf.edu/registration/exm/. They are not a license to copy, and FE Arena does not claim to match any future exam format.
 
 ## Verification
 
@@ -70,7 +70,7 @@ cd backend && npm run typecheck && npm test
 cd ../frontend && npm run lint && npm run build
 ```
 
-The backend tests cover normalization, all five question types, seeded selection, score boundaries, hidden answers, ready/countdown transitions, duplicate-safe service behavior, queue expiry/cancellation, room isolation, and reconnect seat restoration. Production hosting needs a Node process for the backend and a static host/reverse proxy for the Vite build; runtime match state is intentionally in memory for this MVP.
+The backend tests cover normalization, all five question types, seeded selection, score boundaries, hidden answers, ready/countdown transitions, duplicate-safe service behavior, queue expiry/cancellation, room isolation, and reconnect seat restoration. Production hosting needs a Node process for the backend and a static host/reverse proxy for the Vite build. Runtime match state is intentionally in memory for this MVP; Supabase question loading and terminal persistence use the server-only secret key.
 
 ## Explicit exclusions
 

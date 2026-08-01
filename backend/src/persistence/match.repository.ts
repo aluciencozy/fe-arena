@@ -1,7 +1,7 @@
 import type { MatchConfig, MatchSource } from "../../../shared/domain.js";
 
 export const PERSISTENCE_SCHEMA_VERSION = 1;
-export const QUESTION_BANK_VERSION = "fe-arena-question-bank-v1";
+export const QUESTION_BANK_VERSION = "fe-arena-question-bank-v2";
 
 export type TerminalOutcome = "completed" | "draw" | "forfeit" | "abandoned" | "expired";
 

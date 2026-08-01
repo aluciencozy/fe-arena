@@ -203,7 +203,8 @@ export const selectSeededQuestions = (questions: readonly Question[], seed: stri
   const allowed = topicIds?.length ? questions.filter((question) => topicIds.includes(question.topicId)) : [...questions];
   if (!allowed.length) return [];
   const shuffled = seededShuffle(allowed, seed);
-  return Array.from({ length: Math.max(0, count) }, (_, index) => shuffled[index % shuffled.length]!);
+  // A run must not repeat a question; callers can request fewer rounds than the bank size.
+  return shuffled.slice(0, Math.min(Math.max(0, count), shuffled.length));
 };
 
 export type MatchScore = { playerId: string; playerName: string; total: number; correct: number; responseMs: number };
