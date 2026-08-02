@@ -15,10 +15,12 @@ import {
   ensureMatch,
   getMatchState,
   leaveMatch,
+  markCodingReady,
   pauseForDisconnect,
   resumeAfterReconnect,
   skipReveal,
   submitAnswer,
+  submitCodingResult,
   toggleReady,
 } from "./match.service.js";
 import { QUESTION_BANK } from "../data/questions.js";
@@ -161,6 +163,62 @@ test("graph and C submissions stay server-authoritative through the match lifecy
       false,
     );
     clearMatch(room.metadata.roomId);
+  } finally {
+    setQuestionRepository(inMemoryQuestionRepository);
+    clearMatchesForTests();
+    clearRoomsForTests();
+  }
+});
+
+test("mixed matches gate coding rounds on browser readiness and accept typed completion ordering", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
+  clearMatchesForTests();
+  clearRoomsForTests();
+  const coding = QUESTION_BANK.find((question) => question.type === "coding");
+  const graph = QUESTION_BANK.find((question) => question.id === "q-graph-bfs");
+  assert.ok(coding && coding.type === "coding");
+  assert.ok(graph && graph.type === "graph");
+  if (!coding || coding.type !== "coding" || !graph || graph.type !== "graph") return;
+  setQuestionRepository(fixedQuestionRepository([coding, graph]));
+  const mixedConfig = {
+    topicIds: ["arrays-memory"],
+    roundCount: 2,
+    questionTimerSeconds: 30,
+    includeCoding: true,
+  } as MatchConfig;
+  try {
+    const room = createRoom("private", mixedConfig, "Host");
+    attachSeat(room.metadata.roomId, room.seat, "mixed-host");
+    const guest = joinRoom(room.metadata.roomId, "Guest", "mixed-guest");
+    assert.equal(guest.ok, true);
+    if (!guest.ok) return;
+    ensureMatch(room.metadata.roomId);
+    toggleReady(room.metadata.roomId, room.seat.seatId, events());
+    toggleReady(room.metadata.roomId, guest.seat.seatId, events());
+    assert.equal(getMatchState(room.metadata.roomId)?.phase, "READY");
+    assert.equal(markCodingReady(room.metadata.roomId, room.seat.seatId, events()).ok, true);
+    assert.equal(markCodingReady(room.metadata.roomId, guest.seat.seatId, events()).ok, true);
+    assert.equal(getMatchState(room.metadata.roomId)?.phase, "COUNTDOWN");
+    t.mock.timers.tick(3_000);
+    const state = getMatchState(room.metadata.roomId)!;
+    assert.equal(state.question?.type, "coding");
+    assert.equal(state.questionEndsAt, (state.questionStartedAt ?? 0) + 60_000);
+    assert.equal(
+      submitCodingResult(
+        room.metadata.roomId,
+        room.seat.seatId,
+        {
+          questionId: state.question!.id,
+          passed: true,
+          tests: [{ index: 1, name: "sum", passed: true }],
+          outcome: "success",
+        },
+        events(),
+      ).ok,
+      true,
+    );
+    assert.equal(getMatchState(room.metadata.roomId)?.phase, "REVEAL");
+    assert.equal(getMatchState(room.metadata.roomId)?.codingProgress[room.seat.seatId]?.passed, true);
   } finally {
     setQuestionRepository(inMemoryQuestionRepository);
     clearMatchesForTests();

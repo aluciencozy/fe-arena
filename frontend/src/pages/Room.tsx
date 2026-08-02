@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Editor from "@monaco-editor/react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -21,6 +22,7 @@ import {
 import { useArenaSocket } from "@/hooks/useSocket";
 import { useGameStore } from "@/store/gameStore";
 import { graphEdgePoints } from "@/lib/graph";
+import { runCInWorker, type CExecutionOutcome, type CTestResult } from "@/lib/c-runner";
 import { canConfigureMatch, TOPICS, type PublicQuestion, type TopicId } from "../../../shared/domain";
 import type { MatchPublicState } from "@/types";
 
@@ -39,6 +41,7 @@ export default function Room() {
   const seatId = useGameStore((state) => state.seatId);
   const clearSession = useGameStore((state) => state.clearSession);
   const api = useArenaSocket(roomId, name);
+  const markCodingReady = api.codingReady;
   const questionId = match?.question?.id ?? null;
   const [chatOpen, setChatOpen] = useState(false);
   const [chatText, setChatText] = useState("");
@@ -62,6 +65,7 @@ export default function Room() {
     "analysis-mathematics",
   ]);
   const [timer, setTimer] = useState(90);
+  const [includeCoding, setIncludeCoding] = useState(false);
   const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const answer = answerState.questionId === questionId ? answerState.value : "";
@@ -76,6 +80,16 @@ export default function Room() {
     const id = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(id);
   }, []);
+  useEffect(() => {
+    if (
+      match?.config.includeCoding &&
+      seatId &&
+      !match.codingReady[seatId] &&
+      window.crossOriginIsolated &&
+      ["LOBBY", "SETUP", "READY"].includes(match.phase)
+    )
+      markCodingReady();
+  }, [markCodingReady, match?.codingReady, match?.config.includeCoding, match?.phase, seatId]);
   const seats = room?.seats ?? [];
   const self = seats.find((seat) => seat.seatId === seatId);
   const opponent = seats.find((seat) => seat.seatId !== seatId);
@@ -90,7 +104,7 @@ export default function Room() {
   const configure = () => {
     if (selectedTopics.length) {
       api.clearSubmission();
-      api.configure({ topicIds: selectedTopics, roundCount: 5, questionTimerSeconds: timer });
+      api.configure({ topicIds: selectedTopics, roundCount: 5, questionTimerSeconds: timer, includeCoding });
     }
     setSettingsOpen(false);
   };
@@ -198,25 +212,38 @@ export default function Room() {
             setTimer={setTimer}
             settingsOpen={settingsOpen}
             setSettingsOpen={setSettingsOpen}
+            includeCoding={includeCoding}
+            setIncludeCoding={setIncludeCoding}
             onConfigure={configure}
             onReady={api.ready}
           />
         ) : match.phase === "COUNTDOWN" ? (
           <Countdown seconds={seconds ?? 3} round={match.roundIndex + 1} />
         ) : match.phase === "QUESTION" ? (
-          <QuestionStage
-            match={match}
-            seatId={seatId}
-            opponent={opponent?.name}
-            seconds={seconds}
-            answer={answer}
-            setAnswer={setAnswer}
-            ordered={ordered}
-            setOrdered={setOrdered}
-            submitted={isSubmitted}
-            submit={submit}
-            lastSubmission={isSubmitted ? api.lastSubmission : null}
-          />
+          match.question?.type === "coding" ? (
+            <CodingQuestionStage
+              key={match.question.id}
+              match={match}
+              seatId={seatId}
+              now={now}
+              onProgress={api.codingProgress}
+              onComplete={api.codingComplete}
+            />
+          ) : (
+            <QuestionStage
+              match={match}
+              seatId={seatId}
+              opponent={opponent?.name}
+              seconds={seconds}
+              answer={answer}
+              setAnswer={setAnswer}
+              ordered={ordered}
+              setOrdered={setOrdered}
+              submitted={isSubmitted}
+              submit={submit}
+              lastSubmission={isSubmitted ? api.lastSubmission : null}
+            />
+          )
         ) : match.phase === "REVEAL" ? (
           <Reveal match={match} seatId={seatId} now={now} onSkip={api.skipReveal} />
         ) : match.phase === "PAUSED" ? (
@@ -250,6 +277,8 @@ const Lobby = ({
   setTimer,
   settingsOpen,
   setSettingsOpen,
+  includeCoding,
+  setIncludeCoding,
   onConfigure,
   onReady,
 }: {
@@ -264,6 +293,8 @@ const Lobby = ({
   setTimer: (timer: number) => void;
   settingsOpen: boolean;
   setSettingsOpen: (open: boolean) => void;
+  includeCoding: boolean;
+  setIncludeCoding: (include: boolean) => void;
   onConfigure: () => void;
   onReady: () => void;
 }) => (
@@ -321,6 +352,14 @@ const Lobby = ({
                 </button>
               ))}
             </div>
+            <label className="mt-4 flex items-center gap-3 text-sm text-muted">
+              <input
+                type="checkbox"
+                checked={includeCoding}
+                onChange={(event) => setIncludeCoding(event.target.checked)}
+              />
+              include reviewed browser C rounds (results are client-reported; no anti-cheat guarantee)
+            </label>
             <div className="mt-4 flex items-center gap-3">
               <span className="text-sm text-muted">Timer</span>
               <select className="field w-auto" value={timer} onChange={(event) => setTimer(Number(event.target.value))}>
@@ -365,6 +404,85 @@ const Countdown = ({ seconds, round }: { seconds: number; round: number }) => (
     <p className="mt-5 text-muted">Get your scratch paper ready. The next prompt is coming.</p>
   </section>
 );
+
+const CodingQuestionStage = ({
+  match,
+  seatId,
+  now,
+  onProgress,
+  onComplete,
+}: {
+  match: MatchPublicState;
+  seatId: string | null;
+  now: number;
+  onProgress: (status: "compiling" | "running") => void;
+  onComplete: (result: {
+    questionId: string;
+    passed: boolean;
+    tests: CTestResult[];
+    outcome: "success" | "compile-error" | "runtime-error" | "timeout";
+  }) => void;
+}) => {
+  const question = match.question;
+  const problem = question?.type === "coding" ? question.problem : undefined;
+  const [code, setCode] = useState(problem?.starterCode ?? "");
+  const [outcome, setOutcome] = useState<CExecutionOutcome | null>(null);
+  if (!question || question.type !== "coding" || !problem) return null;
+  const submitted = Boolean(seatId && match.submissions[seatId]?.submitted);
+  const run = async () => {
+    onProgress("compiling");
+    const result = await runCInWorker(problem, code);
+    setOutcome(result);
+    onComplete({
+      questionId: question.id,
+      passed: result.kind === "success" && result.passed,
+      tests: result.tests,
+      outcome: result.kind === "success" ? "success" : result.kind,
+    });
+  };
+  return (
+    <section className="mx-auto max-w-5xl py-6 sm:py-12">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="eyebrow text-gold">coding round · browser worker</p>
+          <h1 className="display mt-3 text-5xl">run the solution.</h1>
+        </div>
+        <div className="timer">
+          <Clock3 size={16} />
+          {match.questionEndsAt ? Math.max(0, Math.ceil((match.questionEndsAt - now) / 1000)) : 0}s
+        </div>
+      </div>
+      <p className="mt-4 max-w-2xl text-muted">
+        {problem.description} The server receives only typed progress and test results, never source code.
+      </p>
+      <div className="mt-7 panel overflow-hidden">
+        <div className="border-b border-line bg-ink px-4 py-3 font-mono text-xs text-gold">
+          locked · {problem.functionSignature} {"{"}
+        </div>
+        <Editor
+          height="min(52vh, 500px)"
+          language="c"
+          theme="vs-dark"
+          value={code}
+          onChange={(value) => setCode(value ?? "")}
+          options={{ minimap: { enabled: false }, readOnly: submitted, wordWrap: "on", scrollBeyondLastLine: false }}
+        />
+        <div className="flex items-center justify-between border-t border-line p-4">
+          <span className="text-xs text-muted">Local-only execution · no anti-cheat guarantee</span>
+          <button className="button button-primary" onClick={run} disabled={submitted || !code.trim()}>
+            <Zap size={15} /> run tests
+          </button>
+        </div>
+      </div>
+      {outcome && (
+        <div className="panel mt-5 p-5 text-sm">
+          <p className="eyebrow">runner result</p>
+          <p className="mt-2">{outcome.kind === "success" && outcome.passed ? "all tests passed" : outcome.kind}</p>
+        </div>
+      )}
+    </section>
+  );
+};
 
 const QuestionStage = ({
   match,

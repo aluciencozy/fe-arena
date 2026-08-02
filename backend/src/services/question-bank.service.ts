@@ -73,12 +73,13 @@ printf("%d", x);`,
 const makeInMemoryRepository = (questions: readonly Question[]): QuestionRepository => ({
   list: (topicIds) =>
     topicIds?.length ? questions.filter((question) => topicIds.includes(question.topicId)) : [...questions],
-  select: (seed, count, topicIds) => selectSeededQuestions(questions, seed, count, topicIds),
+  select: (seed, count, topicIds, includeCoding = false) =>
+    selectSeededQuestions(questions, seed, count, topicIds, includeCoding),
   get: (id) => questions.find((question) => question.id === id),
 });
 export type QuestionRepository = {
   list(topicIds?: readonly TopicId[]): Question[];
-  select(seed: string, count: number, topicIds?: readonly TopicId[]): Question[];
+  select(seed: string, count: number, topicIds?: readonly TopicId[], includeCoding?: boolean): Question[];
   get(id: string): Question | undefined;
 };
 
@@ -150,8 +151,8 @@ export class SupabaseQuestionRepository implements QuestionRepository {
       : [...this.questions];
   }
 
-  select(seed: string, count: number, topicIds?: readonly TopicId[]): Question[] {
-    return selectSeededQuestions(this.questions, seed, count, topicIds);
+  select(seed: string, count: number, topicIds?: readonly TopicId[], includeCoding = false): Question[] {
+    return selectSeededQuestions(this.questions, seed, count, topicIds, includeCoding);
   }
 
   get(id: string): Question | undefined {

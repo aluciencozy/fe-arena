@@ -5,10 +5,16 @@ export type CExecutionOutcome =
   | { kind: "success"; stdout: string; stderr: string; tests: CTestResult[]; passed: boolean }
   | { kind: "compile-error"; stdout: string; stderr: string; tests: CTestResult[] }
   | { kind: "runtime-error"; stdout: string; stderr: string; tests: CTestResult[]; exitCode?: number }
-  | { kind: "timeout"; phase: "initialization" | "execution"; stdout: string; stderr: string; tests: CTestResult[] };
+  | {
+      kind: "timeout";
+      phase: "initialization" | "compilation" | "execution";
+      stdout: string;
+      stderr: string;
+      tests: CTestResult[];
+    };
 
 type WorkerMessage = {
-  kind: "ready" | "success" | "compile-error" | "runtime-error";
+  kind: "ready" | "compiled" | "success" | "compile-error" | "runtime-error";
   stdout?: string;
   stderr?: string;
   exitCode?: number;
@@ -67,9 +73,11 @@ export const runCInWorker = (
       return;
     }
     let settled = false;
+    let compilationTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
     let executionTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
     const clearTimers = () => {
       if (initializationTimer !== undefined) globalThis.clearTimeout(initializationTimer);
+      if (compilationTimer !== undefined) globalThis.clearTimeout(compilationTimer);
       if (executionTimer !== undefined) globalThis.clearTimeout(executionTimer);
     };
     const finish = (outcome: CExecutionOutcome) => {
@@ -95,6 +103,20 @@ export const runCInWorker = (
       initializationTimeoutMs,
     );
     const complete = (outcome: CExecutionOutcome) => finish(outcome);
+    const startCompilationTimer = () => {
+      if (settled || compilationTimer !== undefined) return;
+      compilationTimer = globalThis.setTimeout(
+        () =>
+          finish({
+            kind: "timeout",
+            phase: "compilation",
+            stdout: "",
+            stderr: "Compilation exceeded the startup safety limit.",
+            tests: [],
+          }),
+        initializationTimeoutMs,
+      );
+    };
     const startExecutionTimer = () => {
       if (settled || executionTimer !== undefined) return;
       executionTimer = globalThis.setTimeout(
@@ -112,6 +134,11 @@ export const runCInWorker = (
     worker.onmessage = ({ data }) => {
       if (data.kind === "ready") {
         if (initializationTimer !== undefined) globalThis.clearTimeout(initializationTimer);
+        startCompilationTimer();
+        return;
+      }
+      if (data.kind === "compiled") {
+        if (compilationTimer !== undefined) globalThis.clearTimeout(compilationTimer);
         startExecutionTimer();
         return;
       }

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import Editor from "@monaco-editor/react";
-import { ArrowLeft, Check, CircleAlert, Clock3, Code2, Play, RotateCcw } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, CircleAlert, Clock3, Code2, Play, RotateCcw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { CODING_PROBLEMS } from "../../../shared/coding-problems";
 import { runCInWorker, type CExecutionOutcome } from "@/lib/c-runner";
@@ -56,29 +56,14 @@ export default function CPractice() {
         <section className="mt-10 grid gap-6 lg:grid-cols-[minmax(0,.75fr)_minmax(0,1.25fr)]">
           <aside className="space-y-5">
             <div>
-              <p className="eyebrow text-gold">practice lab</p>
-              <h1 className="display mt-3 text-5xl">write C. run local.</h1>
+              <p className="eyebrow text-gold">practice lab · temporary browser surface</p>
+              <h1 className="display mt-3 text-5xl">FE Arena C practice</h1>
               <p className="mt-4 leading-7 text-muted">
-                Your function is compiled and executed in a fresh WebAssembly worker. No code is uploaded and no server
-                compiler is involved.
+                Try reviewed C function bodies locally in Chromium. Code stays in this browser; the server never
+                compiles or receives it.
               </p>
             </div>
-            <label className="field-label" htmlFor="coding-problem">
-              reviewed problem
-            </label>
-            <select
-              id="coding-problem"
-              className="field"
-              value={problem.id}
-              onChange={(event) => chooseProblem(event.target.value)}
-              disabled={running}
-            >
-              {CODING_PROBLEMS.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.title}
-                </option>
-              ))}
-            </select>
+            <ProblemPicker problemId={problem.id} onChange={chooseProblem} disabled={running} />
             <article className="panel p-5 sm:p-6">
               <p className="eyebrow">prompt</p>
               <h2 className="mt-3 text-xl font-semibold">{problem.title}</h2>
@@ -103,6 +88,10 @@ export default function CPractice() {
                 <button className="button button-ghost px-3 py-2 text-xs" onClick={reset} disabled={running}>
                   <RotateCcw size={14} /> reset starter
                 </button>
+              </div>
+              <div className="border-b border-line bg-ink px-4 py-3 font-mono text-xs text-gold">
+                <span className="text-muted">locked · </span>
+                {problem.functionSignature} {"{"}
               </div>
               <Editor
                 height="min(58vh, 560px)"
@@ -135,6 +124,69 @@ export default function CPractice() {
   );
 }
 
+const ProblemPicker = ({
+  problemId,
+  onChange,
+  disabled,
+}: {
+  problemId: string;
+  onChange: (problemId: string) => void;
+  disabled: boolean;
+}) => {
+  const [open, setOpen] = useState(false);
+  const problem = CODING_PROBLEMS.find((item) => item.id === problemId) ?? CODING_PROBLEMS[0]!;
+  return (
+    <div className="relative">
+      <span className="field-label">reviewed problem</span>
+      <button
+        type="button"
+        className="field mt-2 flex items-center justify-between text-left"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => setOpen((value) => !value)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") setOpen(false);
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            const index = CODING_PROBLEMS.findIndex((item) => item.id === problemId);
+            const nextIndex =
+              (index + (event.key === "ArrowDown" ? 1 : -1) + CODING_PROBLEMS.length) % CODING_PROBLEMS.length;
+            onChange(CODING_PROBLEMS[nextIndex]!.id);
+            setOpen(true);
+          }
+        }}
+      >
+        <span>{problem.title}</span>
+        <ChevronDown size={16} className={open ? "rotate-180 transition-transform" : "transition-transform"} />
+      </button>
+      {open && (
+        <div
+          className="absolute z-20 mt-2 w-full rounded-lg border border-line bg-panel-raised p-1 shadow-2xl"
+          role="listbox"
+          aria-label="Reviewed C problems"
+        >
+          {CODING_PROBLEMS.map((item) => (
+            <button
+              type="button"
+              role="option"
+              aria-selected={item.id === problemId}
+              key={item.id}
+              className={`w-full rounded px-3 py-2 text-left text-sm hover:bg-gold/10 ${item.id === problemId ? "text-gold" : "text-cream"}`}
+              onClick={() => {
+                onChange(item.id);
+                setOpen(false);
+              }}
+            >
+              {item.title}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const RunnerOutput = ({ outcome }: { outcome: CExecutionOutcome }) => {
   const successful = outcome.kind === "success" && outcome.passed;
   return (
@@ -151,7 +203,9 @@ const RunnerOutput = ({ outcome }: { outcome: CExecutionOutcome }) => {
             {outcome.kind === "timeout"
               ? outcome.phase === "initialization"
                 ? "compiler startup timed out"
-                : "execution timed out"
+                : outcome.phase === "compilation"
+                  ? "compilation timed out"
+                  : "execution timed out"
               : outcome.kind === "compile-error"
                 ? "compile error"
                 : outcome.kind === "runtime-error"

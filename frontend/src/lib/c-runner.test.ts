@@ -35,6 +35,38 @@ test("parses machine-readable test results while preserving student stdout", () 
   });
 });
 
+test("runs the curated sum fixture after compilation completes", async () => {
+  let receivedSource = "";
+  const outcome = await runCInWorker(CODING_PROBLEMS[0]!, CODING_PROBLEMS[0]!.starterCode, {
+    createWorker: () => {
+      const worker = {
+        onmessage: null as ((event: MessageEvent) => void) | null,
+        onerror: null as ((event: ErrorEvent) => void) | null,
+        postMessage: (message: { source: string }) => {
+          receivedSource = message.source;
+          setTimeout(() => {
+            worker.onmessage?.({ data: { kind: "ready" } } as MessageEvent);
+            worker.onmessage?.({ data: { kind: "compiled" } } as MessageEvent);
+            worker.onmessage?.({
+              data: {
+                kind: "success",
+                stdout: "FEA_TEST|1|mixed values|PASS\nFEA_TEST|2|zero included|PASS\n",
+                stderr: "",
+                exitCode: 0,
+              },
+            } as MessageEvent);
+          }, 0);
+        },
+        terminate: () => undefined,
+      };
+      return worker;
+    },
+  });
+  assert.equal(outcome.kind, "success");
+  if (outcome.kind === "success") assert.equal(outcome.passed, true);
+  assert.match(receivedSource, /int sum_array\(const int values\[\], size_t length\)/);
+});
+
 test("classifies non-zero WASM exits as runtime errors", () => {
   const result = parseExecutionOutput("FEA_TEST|1|crash|FAIL", "trap", wasmExitCode());
   assert.equal(result.kind, "runtime-error");
@@ -49,7 +81,11 @@ test("terminates an unresponsive worker and returns a typed timeout", async () =
       const worker = {
         onmessage: null as ((event: MessageEvent) => void) | null,
         onerror: null as ((event: ErrorEvent) => void) | null,
-        postMessage: () => setTimeout(() => worker.onmessage?.({ data: { kind: "ready" } } as MessageEvent), 0),
+        postMessage: () =>
+          setTimeout(() => {
+            worker.onmessage?.({ data: { kind: "ready" } } as MessageEvent);
+            worker.onmessage?.({ data: { kind: "compiled" } } as MessageEvent);
+          }, 0),
         terminate: () => {
           terminated = true;
         },
@@ -70,7 +106,11 @@ test("starts the execution limit after compiler initialization", async () => {
       const worker = {
         onmessage: null as ((event: MessageEvent) => void) | null,
         onerror: null as ((event: ErrorEvent) => void) | null,
-        postMessage: () => setTimeout(() => worker.onmessage?.({ data: { kind: "ready" } } as MessageEvent), 10),
+        postMessage: () =>
+          setTimeout(() => {
+            worker.onmessage?.({ data: { kind: "ready" } } as MessageEvent);
+            worker.onmessage?.({ data: { kind: "compiled" } } as MessageEvent);
+          }, 10),
         terminate: () => undefined,
       };
       return worker;
