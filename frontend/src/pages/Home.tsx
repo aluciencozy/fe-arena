@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, BookOpen, Check, Clock3, Hash, LockKeyhole, Menu, Radio, ShieldCheck, Sparkles, Users, X } from "lucide-react";
 import AuthPanel from "@/components/AuthPanel";
@@ -24,6 +24,7 @@ export default function Home() {
   const [queueExpiresAt, setQueueExpiresAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
+  const queuedName = useRef<string | null>(null);
   const validName = name.trim().length > 0;
   const config: MatchConfig = useMemo(() => ({ topicIds: topics, roundCount: 5, questionTimerSeconds: timer }), [timer, topics]);
 
@@ -33,21 +34,23 @@ export default function Home() {
       setBusy(false); navigate(`/room/${payload.roomId}`);
     };
     const queueSeat = (payload: { roomId: string; seatId: string; reconnectToken: string }) => {
+      queuedName.current = null;
       useGameStore.getState().setSession(payload.seatId, payload.reconnectToken, payload.roomId);
       navigate(`/room/${payload.roomId}`);
     };
-    const waiting = (payload: { status: string; expiresAt?: number }) => { if (payload.status === "waiting") { setView("queue"); setQueueExpiresAt(payload.expiresAt ?? Date.now() + 300_000); } else { setView("home"); setQueueExpiresAt(null); } };
+    const waiting = (payload: { status: string; expiresAt?: number }) => { if (payload.status === "waiting") { setView("queue"); setQueueExpiresAt(payload.expiresAt ?? Date.now() + 300_000); } else { queuedName.current = null; setView("home"); setQueueExpiresAt(null); } };
+    const onConnect = () => { if (queuedName.current) socket.emit("queue:join", { username: queuedName.current }); };
     const failed = (payload: { message?: string } | string) => { setBusy(false); setNotice({ kind: "error", text: typeof payload === "string" ? payload : payload.message ?? "Request failed." }); };
-    socket.on("room:created", created); socket.on("queue:seat", queueSeat); socket.on("queue:state", waiting); socket.on("server:error", failed);
-    return () => { socket.off("room:created", created); socket.off("queue:seat", queueSeat); socket.off("queue:state", waiting); socket.off("server:error", failed); };
+    socket.on("room:created", created); socket.on("queue:seat", queueSeat); socket.on("queue:state", waiting); socket.on("connect", onConnect); socket.on("server:error", failed);
+    return () => { socket.off("room:created", created); socket.off("queue:seat", queueSeat); socket.off("queue:state", waiting); socket.off("connect", onConnect); socket.off("server:error", failed); };
   }, [navigate]);
   useEffect(() => { if (view !== "queue") return; const id = window.setInterval(() => setNow(Date.now()), 500); return () => window.clearInterval(id); }, [view]);
 
   const begin = () => { if (!validName) { setNotice({ kind: "error", text: "Choose a guest name first." }); return false; } setPlayerName(name); setNotice(null); connectSocket(); return true; };
   const createPrivate = () => { if (!begin()) return; setBusy(true); socket.emit("room:create-private", { username: name.trim(), config }); };
   const joinPrivate = (event: React.FormEvent) => { event.preventDefault(); if (!begin() || roomCode.length !== 6) { if (roomCode.length !== 6) setNotice({ kind: "error", text: "Enter a six-character room code." }); return; } navigate(`/room/${roomCode}`); };
-  const joinQueue = () => { if (!begin()) return; socket.emit("queue:join", { username: name.trim() }); setView("queue"); };
-  const leaveQueue = () => { socket.emit("queue:leave"); setView("home"); setQueueExpiresAt(null); };
+  const joinQueue = () => { if (!begin()) return; queuedName.current = name.trim(); if (socket.connected) socket.emit("queue:join", { username: queuedName.current }); setView("queue"); };
+  const leaveQueue = () => { queuedName.current = null; socket.emit("queue:leave"); setView("home"); setQueueExpiresAt(null); };
   const toggleTopic = (id: TopicId) => setTopics((current) => current.includes(id) ? current.filter((topic) => topic !== id) : [...current, id]);
   const queueSeconds = queueExpiresAt ? Math.max(0, Math.ceil((queueExpiresAt - now) / 1000)) : 300;
 

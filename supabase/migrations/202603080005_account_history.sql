@@ -78,6 +78,28 @@ begin
     return 'already_exists';
   end if;
 
+  insert into public.matches (
+    id, idempotency_key, mode, source, terminal_outcome, winner_seat_id,
+    topic_ids, round_count, question_timer_seconds, question_bank_version,
+    schema_version, question_ids, started_at, finished_at
+  ) values (
+    v_match_id, (p_match->>'idempotency_key')::uuid, p_match->>'mode', p_match->>'source',
+    p_match->>'terminal_outcome', nullif(p_match->>'winner_seat_id', '')::uuid,
+    array(select jsonb_array_elements_text(coalesce(p_match->'topic_ids', '[]'::jsonb))),
+    (p_match->>'round_count')::integer, (p_match->>'question_timer_seconds')::integer,
+    p_match->>'question_bank_version', (p_match->>'schema_version')::integer,
+    array(select jsonb_array_elements_text(coalesce(p_match->'question_ids', '[]'::jsonb))),
+    (p_match->>'started_at')::timestamptz, (p_match->>'finished_at')::timestamptz
+  ) on conflict (id) do nothing;
+  get diagnostics v_rows = row_count;
+  if v_rows = 0 then
+    select idempotency_key into v_existing_key from public.matches where id = v_match_id;
+    if v_existing_key <> (p_match->>'idempotency_key')::uuid then
+      raise exception 'A match ID cannot be reused with a different idempotency key';
+    end if;
+    return 'already_exists';
+  end if;
+
   for v_player in select value from jsonb_array_elements(coalesce(p_players, '[]'::jsonb)) loop
     select id, auth_user_id into v_identity_id, v_auth_user_id
       from public.player_identities where guest_session_owner = v_player->>'guest_session_owner';
@@ -97,22 +119,6 @@ begin
       select auth_user_id into v_auth_user_id from public.player_identities where id = v_identity_id;
     end if;
   end loop;
-
-  insert into public.matches (
-    id, idempotency_key, mode, source, terminal_outcome, winner_seat_id,
-    topic_ids, round_count, question_timer_seconds, question_bank_version,
-    schema_version, question_ids, started_at, finished_at
-  ) values (
-    v_match_id, (p_match->>'idempotency_key')::uuid, p_match->>'mode', p_match->>'source',
-    p_match->>'terminal_outcome', nullif(p_match->>'winner_seat_id', '')::uuid,
-    array(select jsonb_array_elements_text(coalesce(p_match->'topic_ids', '[]'::jsonb))),
-    (p_match->>'round_count')::integer, (p_match->>'question_timer_seconds')::integer,
-    p_match->>'question_bank_version', (p_match->>'schema_version')::integer,
-    array(select jsonb_array_elements_text(coalesce(p_match->'question_ids', '[]'::jsonb))),
-    (p_match->>'started_at')::timestamptz, (p_match->>'finished_at')::timestamptz
-  );
-  get diagnostics v_rows = row_count;
-  if v_rows = 0 then return 'already_exists'; end if;
 
   for v_player in select value from jsonb_array_elements(coalesce(p_players, '[]'::jsonb)) loop
     insert into public.match_players (
