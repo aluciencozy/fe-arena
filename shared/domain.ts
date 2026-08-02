@@ -225,12 +225,7 @@ export type Question = z.infer<typeof QuestionSchema>;
 
 export const QuestionAttemptSchema = z.object({
   questionId: z.string().min(1).max(128),
-  answer: z.union([
-    z.string().max(4096),
-    z.number(),
-    z.boolean(),
-    z.array(z.string().max(256)).max(100),
-  ]),
+  answer: z.union([z.string().max(4096), z.number(), z.boolean(), z.array(z.string().max(256)).max(100)]),
 });
 export type QuestionAttempt = z.infer<typeof QuestionAttemptSchema>;
 

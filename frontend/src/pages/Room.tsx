@@ -148,7 +148,9 @@ export default function Room() {
   const self = seats.find((seat) => seat.seatId === seatId);
   const opponent = seats.find((seat) => seat.seatId !== seatId);
   const host =
-    room && match?.phase !== "REMATCH" ? canConfigureMatch(room.metadata.source, room.metadata.hostSeatId, seatId) : false;
+    room && match?.phase !== "REMATCH"
+      ? canConfigureMatch(room.metadata.source, room.metadata.hostSeatId, seatId)
+      : false;
   const isSubmitted = seatId ? Boolean(match?.submissions[seatId]?.submitted) : false;
   const seconds =
     match?.phase === "COUNTDOWN"

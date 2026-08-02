@@ -501,12 +501,7 @@ test("rematch is two-sided, preserves results while pending, and selects a fresh
     assert.equal(rematch.history.length, 0);
     assert.equal(rematch.rematchRequests[room.seat.seatId], false);
     assert.equal(
-      configureMatch(
-        room.metadata.roomId,
-        room.seat.seatId,
-        { ...oneRound, topicIds: ["queues"] },
-        events(),
-      ).ok,
+      configureMatch(room.metadata.roomId, room.seat.seatId, { ...oneRound, topicIds: ["queues"] }, events()).ok,
       false,
     );
     assert.equal(getMatchState(room.metadata.roomId)?.question, null);
@@ -728,7 +723,12 @@ test("terminal matches reject replacement guests", (t) => {
   const questionId = getMatchState(room.metadata.roomId)?.question?.id;
   assert.ok(questionId);
   assert.equal(
-    submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId: questionId!, answer: "private answer" }, events()).ok,
+    submitAnswer(
+      room.metadata.roomId,
+      room.seat.seatId,
+      { questionId: questionId!, answer: "private answer" },
+      events(),
+    ).ok,
     true,
   );
   leaveMatch(room.metadata.roomId, guest.seat.seatId, "forfeit", events());
