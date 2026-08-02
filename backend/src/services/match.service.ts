@@ -288,7 +288,7 @@ const advanceOrFinish = (roomId: string, events: MatchEvents) => {
   startCountdown(roomId, events);
 };
 
-const finalizeRound = (record: MatchRecord, question: NonNullable<ReturnType<typeof questionFor>>) => {
+const finalizeRound = (record: MatchRecord, question: NonNullable<ReturnType<typeof questionFor>>, countUnanswered: boolean) => {
   const round = record.state.roundIndex + 1;
   const existing = record.state.history.find((entry) => entry.round === round);
   if (existing) return existing.question;
@@ -296,7 +296,7 @@ const finalizeRound = (record: MatchRecord, question: NonNullable<ReturnType<typ
   record.state.history.push({ round, question: revealed, submissions: structuredClone(record.state.submissions) });
   const summary = record.state.topicSummary[question.topicId] ?? emptyTopicPerformance();
   const attempts = Object.values(record.state.submissions);
-  const attempted = attempts.filter((submission) => submission.submitted).length;
+  const attempted = countUnanswered ? attempts.length : attempts.filter((submission) => submission.submitted).length;
   const correct = attempts.filter((submission) => submission.correct === true).length;
   const score = attempts.reduce((total, submission) => total + (submission.score?.total ?? 0), 0);
   const responseMs = Object.values(record.roundResponseMs[record.state.roundIndex] ?? {}).reduce((total, value) => total + value, 0);
@@ -310,7 +310,8 @@ const revealRound = (roomId: string, events: MatchEvents) => {
   const question = record && questionFor(record);
   if (!record || !question || (record.state.phase !== "QUESTION" && record.state.phase !== "PAUSED")) return;
   clearTimer(record);
-  const revealed = finalizeRound(record, question);
+  const timedOut = record.state.questionEndsAt !== null && record.state.questionEndsAt <= Date.now();
+  const revealed = finalizeRound(record, question, timedOut);
   record.state.phase = "REVEAL";
   record.state.question = null;
   record.state.revealedQuestion = revealed;
@@ -441,7 +442,7 @@ export const leaveMatch = (roomId: string, leavingSeatId: string, reason: "forfe
   clearTimer(record);
   const phase = record.state.phase === "PAUSED" ? record.pausedFrom : record.state.phase;
   const question = phase === "QUESTION" ? questionFor(record) : undefined;
-  if (question) finalizeRound(record, question);
+  if (question) finalizeRound(record, question, false);
   const winner = reason === "abandoned" ? null : seatIds(roomId).find((id) => id !== leavingSeatId) ?? null;
   record.state.phase = reason === "forfeit" ? "FORFEIT" : reason === "expired" ? "EXPIRED" : "ABANDONED";
   record.state.winnerSeatId = winner;

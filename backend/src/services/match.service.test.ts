@@ -209,6 +209,25 @@ test("a submission at the server deadline is rejected before grading", (t) => {
   clearMatchesForTests(); clearRoomsForTests();
 });
 
+test("question timeouts count unanswered seats as incorrect topic attempts", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
+  clearMatchesForTests(); clearRoomsForTests();
+  const oneRound = { topicIds: [TOPICS[2].id], roundCount: 1, questionTimerSeconds: 30 } as MatchConfig;
+  const room = createRoom("private", oneRound, "Host");
+  attachSeat(room.metadata.roomId, room.seat, "a");
+  const guest = joinRoom(room.metadata.roomId, "Guest", "b");
+  assert.equal(guest.ok, true);
+  if (!guest.ok) return;
+  ensureMatch(room.metadata.roomId);
+  toggleReady(room.metadata.roomId, room.seat.seatId, events());
+  toggleReady(room.metadata.roomId, guest.seat.seatId, events());
+  t.mock.timers.tick(3_000);
+  t.mock.timers.tick(30_000);
+  const summary = getMatchState(room.metadata.roomId)?.topicSummary[TOPICS[2].id];
+  assert.deepEqual(summary && { attempted: summary.attempted, correct: summary.correct, incorrect: summary.incorrect }, { attempted: 2, correct: 0, incorrect: 2 });
+  clearMatchesForTests(); clearRoomsForTests();
+});
+
 test("reconnect waits for both guests and abandoned matches have no winner", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
   clearMatchesForTests(); clearRoomsForTests();
