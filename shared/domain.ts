@@ -444,7 +444,14 @@ export const selectSeededQuestions = (
     : [...unique.values()].filter((question) => includeCoding || question.type !== "coding");
   if (!allowed.length || count <= 0 || allowed.length < count) return [];
   const shuffled = seededShuffle(allowed, seed);
-  return shuffled.slice(0, count);
+  const selected = shuffled.slice(0, count);
+  if (includeCoding && !selected.some((question) => question.type === "coding")) {
+    const codingQuestion = shuffled.find((question) => question.type === "coding");
+    if (!codingQuestion) return [];
+    const codingSlot = Math.floor(createSeededRandom(`${seed}:coding-slot`)() * count);
+    selected[codingSlot] = codingQuestion;
+  }
+  return selected;
 };
 
 export type MatchScore = { playerId: string; playerName: string; total: number; correct: number; responseMs: number };

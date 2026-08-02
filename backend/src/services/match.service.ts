@@ -324,7 +324,7 @@ const startQuestion = (roomId: string, events: MatchEvents) => {
   record.state.submissions = makeSubmissions(roomId);
   record.state.codingProgress = makeCodingProgress(roomId);
   emit(record, events);
-  record.timer = setTimeout(() => revealRound(roomId, events), record.state.config.questionTimerSeconds * 1000);
+  record.timer = setTimeout(() => revealRound(roomId, events), questionTimerSeconds(record, question) * 1000);
 };
 
 const advanceOrFinish = (roomId: string, events: MatchEvents) => {
@@ -617,6 +617,8 @@ export const requestRematch = (roomId: string, seatId: string, events: MatchEven
   record.roundResponseMs = {};
   record.terminalPersistence = "idle";
   record.state.ready = makeReady(roomId);
+  record.state.codingReady = makeReady(roomId);
+  record.state.codingProgress = makeCodingProgress(roomId);
   record.state.question = null;
   record.state.revealedQuestion = null;
   record.state.revealStartedAt = null;

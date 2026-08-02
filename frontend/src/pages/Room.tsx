@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -22,7 +22,7 @@ import {
 import { useArenaSocket } from "@/hooks/useSocket";
 import { useGameStore } from "@/store/gameStore";
 import { graphEdgePoints } from "@/lib/graph";
-import { runCInWorker, type CExecutionOutcome, type CTestResult } from "@/lib/c-runner";
+import { prewarmCWorker, runCInWorker, type CExecutionOutcome, type CTestResult } from "@/lib/c-runner";
 import { canConfigureMatch, TOPICS, type PublicQuestion, type TopicId } from "../../../shared/domain";
 import type { MatchPublicState } from "@/types";
 
@@ -66,6 +66,8 @@ export default function Room() {
   ]);
   const [timer, setTimer] = useState(90);
   const [includeCoding, setIncludeCoding] = useState(false);
+  const [codingReadyError, setCodingReadyError] = useState("");
+  const codingReadyAttempted = useRef(false);
   const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const answer = answerState.questionId === questionId ? answerState.value : "";
@@ -81,14 +83,40 @@ export default function Room() {
     return () => window.clearInterval(id);
   }, []);
   useEffect(() => {
+    if (!match?.config.includeCoding) {
+      codingReadyAttempted.current = false;
+      setCodingReadyError("");
+      return;
+    }
+    if (match.phase === "REMATCH") {
+      codingReadyAttempted.current = false;
+      setCodingReadyError("");
+      return;
+    }
     if (
-      match?.config.includeCoding &&
-      seatId &&
-      !match.codingReady[seatId] &&
-      window.crossOriginIsolated &&
-      ["LOBBY", "SETUP", "READY"].includes(match.phase)
+      !seatId ||
+      match.codingReady[seatId] ||
+      codingReadyAttempted.current ||
+      !["LOBBY", "SETUP", "READY"].includes(match.phase)
     )
-      markCodingReady();
+      return;
+    codingReadyAttempted.current = true;
+    if (!window.crossOriginIsolated) {
+      setCodingReadyError("Coding rounds require a cross-origin isolated Chromium tab.");
+      return;
+    }
+    let active = true;
+    void prewarmCWorker()
+      .then(() => {
+        if (active) markCodingReady();
+      })
+      .catch((error) => {
+        if (active)
+          setCodingReadyError(error instanceof Error ? error.message : "The browser C compiler could not initialize.");
+      });
+    return () => {
+      active = false;
+    };
   }, [markCodingReady, match?.codingReady, match?.config.includeCoding, match?.phase, seatId]);
   const seats = room?.seats ?? [];
   const self = seats.find((seat) => seat.seatId === seatId);
@@ -194,6 +222,7 @@ export default function Room() {
             {api.errorNotice}
           </div>
         )}
+        {codingReadyError && <div className="notice-error mb-5">{codingReadyError}</div>}
         {!match ? (
           <Loading />
         ) : match.phase === "LOBBY" ||
@@ -477,7 +506,27 @@ const CodingQuestionStage = ({
       {outcome && (
         <div className="panel mt-5 p-5 text-sm">
           <p className="eyebrow">runner result</p>
-          <p className="mt-2">{outcome.kind === "success" && outcome.passed ? "all tests passed" : outcome.kind}</p>
+          <p className="mt-2">
+            {outcome.kind === "success" && outcome.passed
+              ? "all tests passed"
+              : outcome.kind === "success"
+                ? "tests need attention"
+                : outcome.kind === "timeout"
+                  ? `${outcome.phase} timed out`
+                  : outcome.kind}
+          </p>
+          {outcome.tests.length > 0 && (
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {outcome.tests.map((test) => (
+                <div key={test.index} className="flex items-center justify-between rounded border border-line px-3 py-2">
+                  <span>{test.name}</span>
+                  <span className={test.passed ? "text-green-300" : "text-red-300"}>
+                    {test.passed ? "PASS" : "FAIL"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </section>

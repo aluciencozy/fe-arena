@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateScore, canConfigureMatch, normalizeAnswer, toPublicQuestion } from "../../shared/domain";
+import {
+  calculateScore,
+  canConfigureMatch,
+  normalizeAnswer,
+  selectSeededQuestions,
+  toPublicQuestion,
+  type Question,
+} from "../../shared/domain";
 import { GRAPH_NODE_RADIUS, graphEdgePoints } from "./lib/graph";
 
 test("frontend consumes the shared public-view and grading contract", () => {
@@ -25,6 +32,24 @@ test("public queue never grants host controls to either seated player", () => {
   assert.equal(canConfigureMatch("private", "host-seat", "guest-seat"), false);
   assert.equal(canConfigureMatch("public", "host-seat", "host-seat"), false);
   assert.equal(canConfigureMatch("public", "host-seat", "guest-seat"), false);
+});
+
+test("mixed selection always includes a browser coding round", () => {
+  const regular = {
+    id: "q-regular",
+    topicId: "arrays-memory",
+    type: "short-answer",
+    difficulty: "intro",
+    prompt: "regular",
+    answers: ["regular"],
+    explanation: "regular",
+    assumptions: [],
+    provenance: { source: "test", note: "test" },
+  } as Question;
+  const coding = { ...regular, id: "q-coding", type: "coding" } as Question;
+  const selected = selectSeededQuestions([regular, coding], "mixed-test", 2, ["arrays-memory"], true);
+  assert.equal(selected.length, 2);
+  assert.equal(selected.some((question) => question.type === "coding"), true);
 });
 
 test("directed graph edges stop outside the destination node", () => {

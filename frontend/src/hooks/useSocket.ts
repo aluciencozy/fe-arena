@@ -14,6 +14,7 @@ export const useArenaSocket = (roomId: string, playerName: string) => {
   const [connection, setConnection] = useState<"connecting" | "connected" | "disconnected">("connecting");
   const [lastSubmission, setLastSubmission] = useState<{ correct: boolean; total: number } | null>(null);
   const clearSubmission = useCallback(() => setLastSubmission(null), []);
+  const markCodingReady = useCallback(() => socket.emit("match:coding-ready"), []);
 
   useEffect(() => {
     if (!roomId || !playerName) return;
@@ -88,7 +89,7 @@ export const useArenaSocket = (roomId: string, playerName: string) => {
     },
     configure: (config: unknown) => socket.emit("match:configure", config),
     ready: () => socket.emit("match:ready"),
-    codingReady: () => socket.emit("match:coding-ready"),
+    codingReady: markCodingReady,
     codingProgress: (status: "compiling" | "running") => socket.emit("match:coding-progress", { status }),
     codingComplete: (result: unknown) => socket.emit("match:coding-complete", result),
     submit: (answer: unknown) => socket.emit("match:submit", answer),

@@ -1,6 +1,6 @@
-import type { Wasmer } from "@wasmer/sdk";
+import type { Runtime, Wasmer } from "@wasmer/sdk";
 
-type RunRequest = { source: string };
+type RunRequest = { kind?: "initialize"; source: string };
 type RunResponse = {
   kind: "ready" | "compiled" | "success" | "compile-error" | "runtime-error";
   stdout?: string;
@@ -11,6 +11,7 @@ type WasmerSdk = typeof import("@wasmer/sdk");
 
 let initialized: Promise<void> | undefined;
 let compiler: Wasmer | undefined;
+let runtime: Runtime | undefined;
 let sdk: WasmerSdk | undefined;
 const MAX_OUTPUT_LENGTH = 32_768;
 const boundedOutput = (value: string | undefined) => {
@@ -22,9 +23,10 @@ const initialize = async () => {
   const loadedSdk = sdk ?? (sdk = await import("@wasmer/sdk"));
   initialized ??= loadedSdk.init().then(() => undefined);
   await initialized;
+  runtime ??= new loadedSdk.Runtime();
   if (!compiler) {
     // The compiler package is fetched as public WASM by the SDK; no application or database credentials are used.
-    const packageDefinition = await loadedSdk.Wasmer.fromRegistry("clang/clang@0.160000.1");
+    const packageDefinition = await loadedSdk.Wasmer.fromRegistry("clang/clang@0.160000.1", runtime);
     compiler = packageDefinition;
   }
   return loadedSdk;
@@ -34,6 +36,7 @@ self.onmessage = async ({ data }: MessageEvent<RunRequest>) => {
   try {
     const loadedSdk = await initialize();
     self.postMessage({ kind: "ready" } satisfies RunResponse);
+    if (data.kind === "initialize") return;
     const files = new loadedSdk.Directory({ "main.c": data.source });
     if (!compiler) throw new Error("The browser C compiler package did not initialize.");
     const command = compiler.commands.clang ?? compiler.entrypoint;
@@ -68,11 +71,12 @@ self.onmessage = async ({ data }: MessageEvent<RunRequest>) => {
     // local module through a second runtime triggers Chromium's module
     // serialization boundary.
     const executable = new Uint8Array(await files.readFile("program.wasm"));
-    self.postMessage({ kind: "compiled" } satisfies RunResponse);
-    const executablePackage = loadedSdk.Wasmer.fromWasm(executable);
+    if (!runtime) throw new Error("The browser C runtime did not initialize.");
+    const executablePackage = loadedSdk.Wasmer.fromWasm(executable, runtime);
     const executableCommand = executablePackage.entrypoint;
     if (!executableCommand) throw new Error("The compiled C program has no executable entrypoint.");
     const instance = await executableCommand.run({ args: ["program"] });
+    self.postMessage({ kind: "compiled" } satisfies RunResponse);
     const output = await instance.wait();
     self.postMessage({
       kind: output.code === 0 ? "success" : "runtime-error",

@@ -203,6 +203,8 @@ test("mixed matches gate coding rounds on browser readiness and accept typed com
     const state = getMatchState(room.metadata.roomId)!;
     assert.equal(state.question?.type, "coding");
     assert.equal(state.questionEndsAt, (state.questionStartedAt ?? 0) + 60_000);
+    t.mock.timers.tick(59_999);
+    assert.equal(getMatchState(room.metadata.roomId)?.phase, "QUESTION");
     assert.equal(
       submitCodingResult(
         room.metadata.roomId,
