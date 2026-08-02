@@ -243,22 +243,17 @@ export const runCInWorker = (
     }
     return options.createWorker();
   };
-  const start = options.createWorker
-    ? Promise.resolve()
-    : prewarmCWorker({ initializationTimeoutMs });
-  return start.then(
-    () => {
-      try {
-        return execute(takeWorker());
-      } catch (error) {
-        return {
-          kind: "runtime-error" as const,
-          stdout: "",
-          stderr: error instanceof Error ? error.message : "The browser compiler worker could not start.",
-          tests: [],
-        };
-      }
-    },
-    initializationFailure,
-  );
+  const start = options.createWorker ? Promise.resolve() : prewarmCWorker({ initializationTimeoutMs });
+  return start.then(() => {
+    try {
+      return execute(takeWorker());
+    } catch (error) {
+      return {
+        kind: "runtime-error" as const,
+        stdout: "",
+        stderr: error instanceof Error ? error.message : "The browser compiler worker could not start.",
+        tests: [],
+      };
+    }
+  }, initializationFailure);
 };

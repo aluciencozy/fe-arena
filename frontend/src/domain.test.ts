@@ -49,7 +49,10 @@ test("mixed selection always includes a browser coding round", () => {
   const coding = { ...regular, id: "q-coding", type: "coding" } as Question;
   const selected = selectSeededQuestions([regular, coding], "mixed-test", 2, ["arrays-memory"], true);
   assert.equal(selected.length, 2);
-  assert.equal(selected.some((question) => question.type === "coding"), true);
+  assert.equal(
+    selected.some((question) => question.type === "coding"),
+    true,
+  );
 });
 
 test("mixed selection includes coding when its topic is not selected", () => {
@@ -67,7 +70,10 @@ test("mixed selection includes coding when its topic is not selected", () => {
   const coding = { ...regular, id: "q-coding-topic", topicId: "arrays-memory", type: "coding" } as Question;
   const selected = selectSeededQuestions([regular, coding], "mixed-topic-test", 2, ["stacks"], true);
   assert.equal(selected.length, 2);
-  assert.equal(selected.some((question) => question.type === "coding"), true);
+  assert.equal(
+    selected.some((question) => question.type === "coding"),
+    true,
+  );
 });
 
 test("directed graph edges stop outside the destination node", () => {

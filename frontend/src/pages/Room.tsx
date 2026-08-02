@@ -71,6 +71,10 @@ export default function Room() {
   const codingReadyAttempted = useRef(false);
   const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const codingEnvironmentError = window.crossOriginIsolated
+    ? ""
+    : "Coding rounds require a cross-origin isolated Chromium tab.";
+  const codingReadyNotice = codingEnvironmentError || codingReadyError;
   const answer = answerState.questionId === questionId ? answerState.value : "";
   const ordered = orderedState.questionId === questionId ? orderedState.value : [];
   const setAnswer = (value: string | number | boolean | string[]) => setAnswerState({ questionId, value });
@@ -91,12 +95,10 @@ export default function Room() {
   useEffect(() => {
     if (!match?.config.includeCoding) {
       codingReadyAttempted.current = false;
-      setCodingReadyError("");
       return;
     }
     if (match.phase === "REMATCH") {
       codingReadyAttempted.current = false;
-      setCodingReadyError("");
       return;
     }
     if (
@@ -107,14 +109,14 @@ export default function Room() {
     )
       return;
     codingReadyAttempted.current = true;
-    if (!window.crossOriginIsolated) {
-      setCodingReadyError("Coding rounds require a cross-origin isolated Chromium tab.");
-      return;
-    }
+    if (!window.crossOriginIsolated) return;
     let active = true;
     void prewarmCWorker()
       .then(() => {
-        if (active) markCodingReady();
+        if (active) {
+          setCodingReadyError("");
+          markCodingReady();
+        }
       })
       .catch((error) => {
         if (active) {
@@ -230,9 +232,9 @@ export default function Room() {
             {api.errorNotice}
           </div>
         )}
-        {codingReadyError && (
+        {codingReadyNotice && match?.config.includeCoding && match.phase !== "REMATCH" && (
           <div className="notice-error mb-5 flex items-center justify-between gap-3">
-            <span>{codingReadyError}</span>
+            <span>{codingReadyNotice}</span>
             <button className="button button-primary shrink-0" onClick={retryCodingReady}>
               retry readiness
             </button>
@@ -557,7 +559,10 @@ const CodingQuestionStage = ({
           {outcome.tests.length > 0 && (
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {outcome.tests.map((test) => (
-                <div key={test.index} className="flex items-center justify-between rounded border border-line px-3 py-2">
+                <div
+                  key={test.index}
+                  className="flex items-center justify-between rounded border border-line px-3 py-2"
+                >
                   <span>{test.name}</span>
                   <span className={test.passed ? "text-green-300" : "text-red-300"}>
                     {test.passed ? "PASS" : "FAIL"}
