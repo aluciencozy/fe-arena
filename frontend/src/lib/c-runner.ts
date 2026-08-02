@@ -5,10 +5,10 @@ export type CExecutionOutcome =
   | { kind: "success"; stdout: string; stderr: string; tests: CTestResult[]; passed: boolean }
   | { kind: "compile-error"; stdout: string; stderr: string; tests: CTestResult[] }
   | { kind: "runtime-error"; stdout: string; stderr: string; tests: CTestResult[]; exitCode?: number }
-  | { kind: "timeout"; stdout: string; stderr: string; tests: CTestResult[] };
+  | { kind: "timeout"; phase: "initialization" | "execution"; stdout: string; stderr: string; tests: CTestResult[] };
 
 type WorkerMessage = {
-  kind: "success" | "compile-error" | "runtime-error";
+  kind: "ready" | "success" | "compile-error" | "runtime-error";
   stdout?: string;
   stderr?: string;
   exitCode?: number;
@@ -22,7 +22,7 @@ type WorkerLike = {
 type WorkerFactory = () => WorkerLike;
 
 export const generateCSource = (problem: CodingProblem, studentCode: string): string =>
-  `${problem.prefix}\n${problem.functionSignature} {\n${studentCode}\n}\n${problem.testHarness}\n`;
+  `${problem.prefix}\n${problem.functionSignature};\n${problem.testHarness}\n${problem.functionSignature} {\n${studentCode}\n}\n`;
 
 export const parseExecutionOutput = (stdout: string, stderr: string, exitCode: number): CExecutionOutcome => {
   const tests: CTestResult[] = [];
@@ -48,30 +48,85 @@ const defaultWorkerFactory: WorkerFactory = () =>
 export const runCInWorker = (
   problem: CodingProblem,
   studentCode: string,
-  options: { timeoutMs?: number; createWorker?: WorkerFactory } = {},
+  options: { timeoutMs?: number; initializationTimeoutMs?: number; createWorker?: WorkerFactory } = {},
 ): Promise<CExecutionOutcome> => {
-  const worker = (options.createWorker ?? defaultWorkerFactory)();
-  const timeoutMs = options.timeoutMs ?? 2_500;
+  const executionTimeoutMs = options.timeoutMs ?? 2_500;
+  const initializationTimeoutMs = options.initializationTimeoutMs ?? 30_000;
+  const source = generateCSource(problem, studentCode);
   return new Promise((resolve) => {
+    let worker: WorkerLike;
+    try {
+      worker = (options.createWorker ?? defaultWorkerFactory)();
+    } catch (error) {
+      resolve({
+        kind: "runtime-error",
+        stdout: "",
+        stderr: error instanceof Error ? error.message : "The browser compiler worker could not start.",
+        tests: [],
+      });
+      return;
+    }
     let settled = false;
+    let executionTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
+    const clearTimers = () => {
+      if (initializationTimer !== undefined) globalThis.clearTimeout(initializationTimer);
+      if (executionTimer !== undefined) globalThis.clearTimeout(executionTimer);
+    };
     const finish = (outcome: CExecutionOutcome) => {
       if (settled) return;
       settled = true;
-      worker.terminate();
+      clearTimers();
+      try {
+        worker.terminate();
+      } catch (error) {
+        void error;
+      }
       resolve(outcome);
     };
-    const timer = globalThis.setTimeout(
+    const initializationTimer = globalThis.setTimeout(
       () =>
-        finish({ kind: "timeout", stdout: "", stderr: "Execution exceeded the 2.5 second safety limit.", tests: [] }),
-      timeoutMs,
+        finish({
+          kind: "timeout",
+          phase: "initialization",
+          stdout: "",
+          stderr: "The browser compiler worker did not initialize within the startup limit.",
+          tests: [],
+        }),
+      initializationTimeoutMs,
     );
-    const complete = (outcome: CExecutionOutcome) => {
-      globalThis.clearTimeout(timer);
-      finish(outcome);
+    const complete = (outcome: CExecutionOutcome) => finish(outcome);
+    const startExecutionTimer = () => {
+      if (settled || executionTimer !== undefined) return;
+      executionTimer = globalThis.setTimeout(
+        () =>
+          finish({
+            kind: "timeout",
+            phase: "execution",
+            stdout: "",
+            stderr: "Execution exceeded the 2.5 second safety limit.",
+            tests: [],
+          }),
+        executionTimeoutMs,
+      );
     };
     worker.onmessage = ({ data }) => {
+      if (data.kind === "ready") {
+        if (initializationTimer !== undefined) globalThis.clearTimeout(initializationTimer);
+        startExecutionTimer();
+        return;
+      }
       if (data.kind === "compile-error") {
         complete({ kind: "compile-error", stdout: data.stdout ?? "", stderr: data.stderr ?? "", tests: [] });
+        return;
+      }
+      if (data.kind === "runtime-error") {
+        complete({
+          kind: "runtime-error",
+          stdout: data.stdout ?? "",
+          stderr: data.stderr ?? "",
+          tests: [],
+          ...(data.exitCode === undefined ? {} : { exitCode: data.exitCode }),
+        });
         return;
       }
       complete(parseExecutionOutput(data.stdout ?? "", data.stderr ?? "", data.exitCode ?? 0));
@@ -83,6 +138,15 @@ export const runCInWorker = (
         stderr: event.message || "The browser compiler worker failed.",
         tests: [],
       });
-    worker.postMessage({ source: generateCSource(problem, studentCode) });
+    try {
+      worker.postMessage({ source });
+    } catch (error) {
+      complete({
+        kind: "runtime-error",
+        stdout: "",
+        stderr: error instanceof Error ? error.message : "The browser compiler worker could not receive the request.",
+        tests: [],
+      });
+    }
   });
 };

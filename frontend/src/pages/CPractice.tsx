@@ -23,9 +23,19 @@ export default function CPractice() {
   const run = async () => {
     setRunning(true);
     setOutcome(null);
-    const result = await runCInWorker(problem, studentCode);
-    setOutcome(result);
-    setRunning(false);
+    try {
+      const result = await runCInWorker(problem, studentCode);
+      setOutcome(result);
+    } catch (error) {
+      setOutcome({
+        kind: "runtime-error",
+        stdout: "",
+        stderr: error instanceof Error ? error.message : "The browser compiler worker failed.",
+        tests: [],
+      });
+    } finally {
+      setRunning(false);
+    }
   };
   const reset = () => {
     setStudentCode(problem.starterCode);
@@ -61,6 +71,7 @@ export default function CPractice() {
               className="field"
               value={problem.id}
               onChange={(event) => chooseProblem(event.target.value)}
+              disabled={running}
             >
               {CODING_PROBLEMS.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -107,6 +118,7 @@ export default function CPractice() {
                   scrollBeyondLastLine: false,
                   tabSize: 2,
                   wordWrap: "on",
+                  readOnly: running,
                 }}
               />
               <div className="flex justify-end border-t border-line p-4">
@@ -137,7 +149,9 @@ const RunnerOutput = ({ outcome }: { outcome: CExecutionOutcome }) => {
           <p className="eyebrow">runner result</p>
           <h2 className="mt-1 font-semibold">
             {outcome.kind === "timeout"
-              ? "execution timed out"
+              ? outcome.phase === "initialization"
+                ? "compiler startup timed out"
+                : "execution timed out"
               : outcome.kind === "compile-error"
                 ? "compile error"
                 : outcome.kind === "runtime-error"

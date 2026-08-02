@@ -95,4 +95,4 @@ Account history is private and server-authorized. See [`backend/PERSISTENCE.md`]
 
 ## Explicit exclusions
 
-No profiles, rankings, social sharing, payments, broad account settings, AI grading, invasive anti-cheat, or arbitrary code execution are included in this pass.
+No profiles, rankings, social sharing, payments, broad account settings, AI grading, invasive anti-cheat, or arbitrary server-side code execution are included in this pass.
