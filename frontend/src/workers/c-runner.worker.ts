@@ -1,30 +1,35 @@
-import { Directory, Wasmer, init, runWasix } from "@wasmer/sdk";
+import type { Wasmer } from "@wasmer/sdk";
 
 type RunRequest = { source: string };
 type RunResponse = {
-  kind: "success" | "compile-error" | "runtime-error";
+  kind: "ready" | "success" | "compile-error" | "runtime-error";
   stdout?: string;
   stderr?: string;
   exitCode?: number;
 };
+type WasmerSdk = typeof import("@wasmer/sdk");
 
 let initialized: Promise<void> | undefined;
 let compiler: Wasmer | undefined;
+let sdk: WasmerSdk | undefined;
 
 const initialize = async () => {
-  initialized ??= init().then(() => undefined);
+  const loadedSdk = sdk ?? (sdk = await import("@wasmer/sdk"));
+  initialized ??= loadedSdk.init().then(() => undefined);
   await initialized;
   if (!compiler) {
     // The compiler package is fetched as public WASM by the SDK; no application or database credentials are used.
-    const packageDefinition = await Wasmer.fromRegistry("clang/clang@0.160000.1");
+    const packageDefinition = await loadedSdk.Wasmer.fromRegistry("clang/clang@0.160000.1");
     compiler = packageDefinition;
   }
+  return loadedSdk;
 };
 
 self.onmessage = async ({ data }: MessageEvent<RunRequest>) => {
   try {
-    await initialize();
-    const files = new Directory({ "main.c": data.source });
+    const loadedSdk = await initialize();
+    self.postMessage({ kind: "ready" } satisfies RunResponse);
+    const files = new loadedSdk.Directory({ "main.c": data.source });
     if (!compiler) throw new Error("The browser C compiler package did not initialize.");
     const command = compiler.commands.clang ?? compiler.entrypoint;
     if (!command) throw new Error("The browser C compiler package has no clang command.");
@@ -52,7 +57,7 @@ self.onmessage = async ({ data }: MessageEvent<RunRequest>) => {
       return;
     }
     const executable = await files.readFile("program.wasm");
-    const execution = await runWasix(executable, { mount: { "/workspace": files }, cwd: "/workspace" });
+    const execution = await loadedSdk.runWasix(executable, { mount: { "/workspace": files }, cwd: "/workspace" });
     const output = await execution.wait();
     self.postMessage({
       kind: output.ok ? "success" : "runtime-error",

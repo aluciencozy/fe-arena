@@ -35,17 +35,95 @@ test("terminates an unresponsive worker and returns a typed timeout", async () =
   let terminated = false;
   const outcome = await runCInWorker(CODING_PROBLEMS[0]!, "while (1) {}", {
     timeoutMs: 5,
+    createWorker: () => {
+      const worker = {
+        onmessage: null as ((event: MessageEvent) => void) | null,
+        onerror: null as ((event: ErrorEvent) => void) | null,
+        postMessage: () => setTimeout(() => worker.onmessage?.({ data: { kind: "ready" } } as MessageEvent), 0),
+        terminate: () => {
+          terminated = true;
+        },
+      };
+      return worker;
+    },
+  });
+  assert.equal(outcome.kind, "timeout");
+  if (outcome.kind === "timeout") assert.equal(outcome.phase, "execution");
+  assert.equal(terminated, true);
+});
+
+test("starts the execution limit after compiler initialization", async () => {
+  const outcome = await runCInWorker(CODING_PROBLEMS[0]!, "return 0;", {
+    timeoutMs: 5,
+    initializationTimeoutMs: 100,
+    createWorker: () => {
+      const worker = {
+        onmessage: null as ((event: MessageEvent) => void) | null,
+        onerror: null as ((event: ErrorEvent) => void) | null,
+        postMessage: () => setTimeout(() => worker.onmessage?.({ data: { kind: "ready" } } as MessageEvent), 10),
+        terminate: () => undefined,
+      };
+      return worker;
+    },
+  });
+  assert.equal(outcome.kind, "timeout");
+  if (outcome.kind === "timeout") assert.equal(outcome.phase, "execution");
+});
+
+test("preserves worker runtime failures without an exit code", async () => {
+  const outcome = await runCInWorker(CODING_PROBLEMS[0]!, "return 0;", {
+    createWorker: () => {
+      const worker = {
+        onmessage: null as ((event: MessageEvent) => void) | null,
+        onerror: null as ((event: ErrorEvent) => void) | null,
+        postMessage: () =>
+          setTimeout(() => {
+            worker.onmessage?.({ data: { kind: "runtime-error", stderr: "SDK unavailable" } } as MessageEvent);
+          }, 0),
+        terminate: () => undefined,
+      };
+      return worker;
+    },
+  });
+  assert.deepEqual(outcome, {
+    kind: "runtime-error",
+    stdout: "",
+    stderr: "SDK unavailable",
+    tests: [],
+  });
+});
+
+test("returns a typed runtime error when the worker cannot start", async () => {
+  const outcome = await runCInWorker(CODING_PROBLEMS[0]!, "return 0;", {
+    createWorker: () => {
+      throw new Error("worker construction failed");
+    },
+  });
+  assert.deepEqual(outcome, {
+    kind: "runtime-error",
+    stdout: "",
+    stderr: "worker construction failed",
+    tests: [],
+  });
+});
+
+test("returns a typed runtime error when the worker rejects the request", async () => {
+  const outcome = await runCInWorker(CODING_PROBLEMS[0]!, "return 0;", {
     createWorker: () => ({
       onmessage: null,
       onerror: null,
-      postMessage: () => undefined,
-      terminate: () => {
-        terminated = true;
+      postMessage: () => {
+        throw new Error("request rejected");
       },
+      terminate: () => undefined,
     }),
   });
-  assert.equal(outcome.kind, "timeout");
-  assert.equal(terminated, true);
+  assert.deepEqual(outcome, {
+    kind: "runtime-error",
+    stdout: "",
+    stderr: "request rejected",
+    tests: [],
+  });
 });
 
 test("returns worker failures as runtime errors", async () => {
