@@ -1,4 +1,3 @@
-import { Buffer } from "buffer";
 import type { Wasmer } from "@wasmer/sdk";
 
 type RunRequest = { source: string };
@@ -14,7 +13,6 @@ let initialized: Promise<void> | undefined;
 let compiler: Wasmer | undefined;
 let sdk: WasmerSdk | undefined;
 const MAX_OUTPUT_LENGTH = 32_768;
-(globalThis as typeof globalThis & { Buffer: typeof Buffer }).Buffer = Buffer;
 const boundedOutput = (value: string | undefined) => {
   const output = value ?? "";
   return output.length > MAX_OUTPUT_LENGTH ? `${output.slice(0, MAX_OUTPUT_LENGTH)}\n[output truncated]` : output;
@@ -64,31 +62,23 @@ self.onmessage = async ({ data }: MessageEvent<RunRequest>) => {
       } satisfies RunResponse);
       return;
     }
-    // Directory.readFile may expose a view backed by the SDK's shared WASM memory.
-    // Copy it before handing it to the standalone WASI adapter; the SDK's
-    // browser runtime cannot serialize local modules in Chromium.
+    // Run the locally compiled module through the same Wasmer WASIX runtime
+    // that loaded the compiler. The standalone @wasmer/wasi adapter cannot
+    // satisfy the compiler package's wasix_32v1 imports, and compiling a
+    // local module through a second runtime triggers Chromium's module
+    // serialization boundary.
     const executable = new Uint8Array(await files.readFile("program.wasm"));
-    const wasiSdk = await import("@wasmer/wasi");
-    await wasiSdk.init();
-    const executableModule = await WebAssembly.compile(executable);
     self.postMessage({ kind: "compiled" } satisfies RunResponse);
-    const wasi = new wasiSdk.WASI({ args: ["program"] });
-    const wasiImports = wasi.getImports(executableModule) as WebAssembly.Imports &
-      Record<string, Record<string, unknown>>;
-    wasiImports.env = { memory: new WebAssembly.Memory({ initial: 16, maximum: 16 }) };
-    wasiImports.wasix_32v1 = {
-      callback_signal: () => 0,
-      futex_wait: () => 0,
-      futex_wake: () => 0,
-      futex_wake_all: () => 0,
-    };
-    const instance = await wasi.instantiate(executableModule, wasiImports);
-    const exitCode = wasi.start(instance);
+    const executablePackage = loadedSdk.Wasmer.fromWasm(executable);
+    const executableCommand = executablePackage.entrypoint;
+    if (!executableCommand) throw new Error("The compiled C program has no executable entrypoint.");
+    const instance = await executableCommand.run({ args: ["program"] });
+    const output = await instance.wait();
     self.postMessage({
-      kind: exitCode === 0 ? "success" : "runtime-error",
-      stdout: boundedOutput(wasi.getStdoutString()),
-      stderr: boundedOutput(wasi.getStderrString()),
-      exitCode,
+      kind: output.code === 0 ? "success" : "runtime-error",
+      stdout: boundedOutput(output.stdout),
+      stderr: boundedOutput(output.stderr),
+      exitCode: output.code,
     } satisfies RunResponse);
   } catch (error) {
     self.postMessage({
