@@ -1,7 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
 import { link, mkdir, open, readFile, readdir, rm, unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { emptyAccountHistory } from "./account-history.js";
+import type { AccountHistory } from "./account-history.js";
 import type {
+  AccountHistoryRepository,
   MatchRepository,
   PersistTerminalResult,
   TerminalMatchSnapshot,
@@ -14,7 +17,7 @@ type ActiveWrite = {
   promise: Promise<PersistTerminalResult>;
 };
 
-export class DurableMatchRepository implements MatchRepository {
+export class DurableMatchRepository implements MatchRepository, AccountHistoryRepository {
   private readonly activeWrites = new Map<string, ActiveWrite>();
   private readonly startupReplay: Promise<void>;
   private retryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -25,6 +28,11 @@ export class DurableMatchRepository implements MatchRepository {
     private readonly retryDelayMs = 5_000,
   ) {
     this.startupReplay = this.replayOutbox().catch(() => this.scheduleRetry());
+  }
+
+  async getAccountHistory(authUserId: string): Promise<AccountHistory> {
+    const reader = this.delegate as Partial<AccountHistoryRepository>;
+    return typeof reader.getAccountHistory === "function" ? reader.getAccountHistory(authUserId) : emptyAccountHistory();
   }
 
   persistTerminalMatch(snapshot: TerminalMatchSnapshot): Promise<PersistTerminalResult> {

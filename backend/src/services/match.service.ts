@@ -137,6 +137,7 @@ const terminalSnapshot = (record: MatchRecord): TerminalMatchSnapshot | undefine
     return {
       seatId: seat.seatId,
       guestSessionOwner: guestSessionOwner(seat.reconnectToken),
+      ...(seat.authUserId ? { authUserId: seat.authUserId } : {}),
       username: seat.name,
       scoreTotal: score.total,
       correctCount: score.correct,
@@ -149,9 +150,11 @@ const terminalSnapshot = (record: MatchRecord): TerminalMatchSnapshot | undefine
     return {
       roundNumber: round.round,
       questionId: round.question.id,
+      topicId: round.question.topicId,
       questionBankVersion: QUESTION_BANK_VERSION,
       correctness: Object.fromEntries(Object.entries(round.submissions).map(([seatId, submission]) => [seatId, submission.correct])),
       responseMs: Object.fromEntries(players.map((player) => [player.seatId, responseMs[player.seatId] ?? null])),
+      score: Object.fromEntries(players.map((player) => [player.seatId, round.submissions[player.seatId]?.score?.total ?? null])),
     };
   });
   return {

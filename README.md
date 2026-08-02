@@ -7,7 +7,7 @@ FE Arena is an unofficial UCF Computer Science Foundation Exam study tool. It is
 - Private host-configured two-seat rooms with a stable guest seat and refresh recovery.
 - Public random-player queue with a five-minute maximum wait and five-minute question timer.
 - Five-round server-authoritative matches, explicit confirmed leave/forfeit, 30-second disconnect pause, up-to-30-second answer reveals with per-seat skip, rematch, and current-run topic feedback.
-- Solo practice using the same question repository, normalization, grading, and scoring functions, with account-free current-run feedback and no durable answer history.
+- Solo practice using the same question repository, normalization, grading, and scoring functions, with guest-first current-run feedback and optional private account history/progress.
 - Original reviewed prompts across twelve topic families and six domain question types: multiple choice, numeric, normalized short answer, curated C output tracing, ordered sequence, and graph reasoning.
 - Collapsible room chat limited to one message per second.
 
@@ -24,8 +24,8 @@ Requirements: Node.js 20+ and npm.
 
 The frontend runs at `http://localhost:5173`; the backend runs at `http://localhost:3001`. Copy `.env.example` files when changing those defaults:
 
-- `frontend/.env.example`: `VITE_SOCKET_URL`
-- `backend/.env.example`: `PORT`, `FRONTEND_ORIGIN`, and optional `SUPABASE_URL` plus `SUPABASE_SECRET_KEY` for server-side question-bank loading
+- `frontend/.env.example`: `VITE_SOCKET_URL`, and optional `VITE_SUPABASE_URL` plus `VITE_SUPABASE_PUBLISHABLE_KEY` for Auth only
+- `backend/.env.example`: `PORT`, `FRONTEND_ORIGIN`, optional `SUPABASE_URL` plus `SUPABASE_SECRET_KEY` for server-side question-bank/loading and persistence, and optional `SUPABASE_PUBLISHABLE_KEY` for server-side Auth token verification
 
 ## Architecture
 
@@ -34,7 +34,7 @@ The frontend runs at `http://localhost:5173`; the backend runs at `http://localh
 - `backend/src/services/match.service.ts` owns the explicit state machine and absolute deadlines. The server selects questions, accepts exactly one submission per seat, grades privately, and calculates timing and scores.
 - `backend/src/services/room.service.ts` owns stable guest seats, reconnect tokens, and room isolation. `queue.service.ts` owns FIFO public matching and expiry. `solo.service.ts` reuses the repository and grading engine without durable history.
 - `backend/src/sockets/handlers.ts` is the validated Socket.IO contract for room, queue, match, chat, reconnect, state-request, solo, and error events. Incoming payloads are parsed with Zod before services run.
-- `frontend/` contains the responsive React/Vite UI and a small Zustand cache. It never selects a question, grades an answer, or supplies a score.
+- `frontend/` contains the responsive React/Vite UI and a small Zustand cache. It never selects a question, grades an answer, or supplies a score. Optional Supabase Auth uses only `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`; the frontend never receives or bundles `SUPABASE_SECRET_KEY`.
 
 ### Synchronization and safety
 
@@ -70,8 +70,21 @@ cd backend && npm run typecheck && npm test
 cd ../frontend && npm run lint && npm run build
 ```
 
-The backend tests cover normalization, all six question types, Supabase row compatibility, seeded selection, score boundaries, hidden answers, reveal deadlines and skips, topic summaries, solo deadline handling, ready/countdown transitions, graph/C lifecycle submissions, duplicate-safe service behavior, queue expiry/cancellation, room isolation, and reconnect seat restoration. Production hosting needs a Node process for the backend and a static host/reverse proxy for the Vite build; runtime match state is intentionally in memory for this MVP. Supabase question loading and terminal persistence use the server-only secret key.
+The backend tests cover normalization, all six question types, Supabase row compatibility, seeded selection, score boundaries, hidden answers, reveal deadlines and skips, topic summaries, solo deadline handling, ready/countdown transitions, graph/C lifecycle submissions, duplicate-safe service behavior, queue expiry/cancellation, room isolation, and reconnect seat restoration. Production hosting needs a Node process for the backend and a static host/reverse proxy for the Vite build; runtime match state is intentionally in memory for this MVP. Supabase question loading and terminal persistence use the server-only secret key. Authenticated terminal summaries use server-verified Auth IDs, while local development without Supabase uses an in-memory history fallback.
+
+## Optional Supabase Auth and account history
+
+Guest play is the default and does not require any Supabase variable. When configured, the frontend signs users in with email/password through Supabase Auth and sends the resulting access token through the existing Socket.IO handshake and the authenticated history HTTP request. The backend verifies that token with Supabase before associating the verified `auth_user_id` with the opaque reconnect-derived guest identity; client-supplied user IDs are ignored.
+
+Manual captain setup (not performed by this task):
+
+1. Create or select the Supabase project and apply the ordered migrations, including `supabase/migrations/202603080005_account_history.sql`, using the project migration workflow after merge. Do not deploy migrations from a worker branch.
+2. In Supabase Dashboard → Authentication → Providers, enable Email (password) and choose the project’s email-confirmation policy. No provider is required for guest play or tests.
+3. In Authentication → URL Configuration, add the deployed frontend origin and local `http://localhost:5173` as allowed Site URLs (and redirect URLs if the project’s email-confirmation flow requires them).
+4. Set frontend `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` to the project URL and publishable key. Set backend `SUPABASE_URL` and server-only `SUPABASE_SECRET_KEY`; optionally set backend `SUPABASE_PUBLISHABLE_KEY` for Auth verification. Never place the secret key in frontend `.env`, Vite code, browser storage, or deployment variables exposed to the browser.
+
+Privacy boundary: persisted records contain only terminal match IDs, source/outcome, dates, topic IDs, player/opponent name snapshots, scores/correct counts, response timing, and aggregate per-topic attempts/correct/incorrect/accuracy/score/response time. They do not contain raw answers, answer keys, copied question text, arbitrary code, or chat. History is read only after a server-verified token and is scoped to that Auth user; anonymous requests receive 401 and cannot receive another user’s history. RLS remains closed to browser roles; the server-only persistence/history RPC is the database boundary.
 
 ## Explicit exclusions
 
-No accounts, user-facing match history, rankings, payments, public profiles, AI grading, invasive anti-cheat, or arbitrary code execution are included in this pass.
+No profiles, rankings, social sharing, payments, broad account settings, AI grading, invasive anti-cheat, or arbitrary code execution are included in this pass.

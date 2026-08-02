@@ -1,11 +1,13 @@
+import { accountHistoryForSnapshots } from "./account-history.js";
 import type {
+  AccountHistoryRepository,
   MatchRepository,
   PersistTerminalResult,
   TerminalMatchSnapshot,
 } from "./match.repository.js";
 
 /** Test/local adapter. It has the same immutable-key behavior as the SQL adapter. */
-export class InMemoryMatchRepository implements MatchRepository {
+export class InMemoryMatchRepository implements MatchRepository, AccountHistoryRepository {
   private readonly records = new Map<string, TerminalMatchSnapshot>();
   private readonly idempotencyKeys = new Map<string, string>();
 
@@ -26,6 +28,10 @@ export class InMemoryMatchRepository implements MatchRepository {
     this.records.set(snapshot.matchId, structuredClone(snapshot));
     this.idempotencyKeys.set(snapshot.idempotencyKey, snapshot.matchId);
     return { status: "inserted", matchId: snapshot.matchId };
+  }
+
+  async getAccountHistory(authUserId: string) {
+    return accountHistoryForSnapshots([...this.records.values()], authUserId);
   }
 
   getForOwner(matchId: string, guestSessionOwner: string): TerminalMatchSnapshot | undefined {

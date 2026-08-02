@@ -1,5 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { parseAccountHistory } from "./account-history.js";
 import type {
+  AccountHistoryRepository,
   MatchRepository,
   PersistTerminalResult,
   TerminalMatchSnapshot,
@@ -26,6 +28,7 @@ const toRpcPlayers = (snapshot: TerminalMatchSnapshot) => snapshot.players.map((
   seat_id: player.seatId,
   guest_session_owner: player.guestSessionOwner,
   chosen_username: player.username,
+  auth_user_id: player.authUserId ?? null,
   score_total: player.scoreTotal,
   correct_count: player.correctCount,
   response_ms_total: player.responseMsTotal,
@@ -35,12 +38,14 @@ const toRpcPlayers = (snapshot: TerminalMatchSnapshot) => snapshot.players.map((
 const toRpcRounds = (snapshot: TerminalMatchSnapshot) => snapshot.rounds.map((round) => ({
   round_number: round.roundNumber,
   question_id: round.questionId,
+  topic_id: round.topicId ?? null,
   question_bank_version: round.questionBankVersion,
   correctness_summary: round.correctness,
   timing_summary: round.responseMs,
+  score_summary: round.score ?? {},
 }));
 
-export class SupabaseMatchRepository implements MatchRepository {
+export class SupabaseMatchRepository implements MatchRepository, AccountHistoryRepository {
   private readonly client: SupabaseClient;
 
   constructor(url: string, secretKey: string, client = createClient(url, secretKey, {
@@ -58,5 +63,11 @@ export class SupabaseMatchRepository implements MatchRepository {
     if (error) throw new Error(`Supabase terminal match write failed: ${error.message}`);
     if (data !== "inserted" && data !== "already_exists") throw new Error("Supabase terminal match RPC returned an invalid status.");
     return { status: data, matchId: snapshot.matchId };
+  }
+
+  async getAccountHistory(authUserId: string) {
+    const { data, error } = await this.client.rpc("get_account_history", { p_auth_user_id: authUserId });
+    if (error) throw new Error(`Supabase account history read failed: ${error.message}`);
+    return parseAccountHistory(data);
   }
 }

@@ -7,6 +7,8 @@ export type RoomSeat = {
   reconnectToken: string;
   socketId: string | null;
   connected: boolean;
+  /** Set only by a server-verified Auth token; never accepted from room payloads. */
+  authUserId?: string;
 };
 
 export type RoomMetadata = {
@@ -43,6 +45,13 @@ export const getRoom = (roomId: string) => rooms.get(normalizeRoomId(roomId));
 export const getMetadata = (roomId: string) => getRoom(roomId)?.metadata;
 export const getSeats = (roomId: string) => getRoom(roomId)?.seats ?? [];
 export const getSeat = (roomId: string, seatId: string) => getRoom(roomId)?.seats.find((seat) => seat.seatId === seatId);
+export const bindSeatAuthIdentity = (roomId: string, seatId: string, authUserId: string | undefined) => {
+  if (!authUserId) return false;
+  const seat = getSeat(roomId, seatId);
+  if (!seat) return false;
+  seat.authUserId = authUserId;
+  return true;
+};
 export const getSeatForSocket = (socketId: string) => {
   const location = socketSeats.get(socketId);
   return location ? getSeat(location.roomId, location.seatId) : undefined;
