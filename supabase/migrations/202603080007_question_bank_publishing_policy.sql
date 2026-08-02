@@ -1,5 +1,5 @@
 -- FE Arena question-bank publishing policy v2.
--- Retired prompts remain queryable to server-side history, but are excluded by
+-- Retired prompts remain stored for historical references, but are excluded by
 -- the published loader. This migration is additive and never deletes rows.
 alter table if exists public.question_bank
   add column if not exists version integer not null default 1;
