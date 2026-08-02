@@ -22,6 +22,7 @@ export const createApp = (options: AppOptions = {}): Express => {
   app.get("/api/topics", (_request, response) => response.json({ topics: TOPICS }));
   app.get("/api/question-bank", (_request, response) => response.json({ ...questionBankStats(), provenance: "Original content informed by public reference materials; answers are never exposed by this endpoint." }));
   app.get("/api/account/history", async (request, response) => {
+    response.set("Cache-Control", "no-store");
     const identity = await verifyBearerHeader(authVerifier, request.header("authorization"));
     if (!identity) return response.status(401).json({ code: "AUTH_REQUIRED", message: "Sign in to view account history." });
     try {

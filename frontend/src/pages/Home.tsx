@@ -25,6 +25,7 @@ export default function Home() {
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
   const queuedName = useRef<string | null>(null);
+  const queueToken = useRef<string | null>(null);
   const validName = name.trim().length > 0;
   const config: MatchConfig = useMemo(() => ({ topicIds: topics, roundCount: 5, questionTimerSeconds: timer }), [timer, topics]);
 
@@ -35,11 +36,12 @@ export default function Home() {
     };
     const queueSeat = (payload: { roomId: string; seatId: string; reconnectToken: string }) => {
       queuedName.current = null;
+      queueToken.current = null;
       useGameStore.getState().setSession(payload.seatId, payload.reconnectToken, payload.roomId);
       navigate(`/room/${payload.roomId}`);
     };
-    const waiting = (payload: { status: string; expiresAt?: number }) => { if (payload.status === "waiting") { setView("queue"); setQueueExpiresAt(payload.expiresAt ?? Date.now() + 300_000); } else { queuedName.current = null; setView("home"); setQueueExpiresAt(null); } };
-    const onConnect = () => { if (queuedName.current) socket.emit("queue:join", { username: queuedName.current }); };
+    const waiting = (payload: { status: string; expiresAt?: number; queueToken?: string }) => { if (payload.status === "waiting") { if (payload.queueToken) queueToken.current = payload.queueToken; setView("queue"); setQueueExpiresAt(payload.expiresAt ?? Date.now() + 300_000); } else { queuedName.current = null; queueToken.current = null; setView("home"); setQueueExpiresAt(null); } };
+    const onConnect = () => { if (queuedName.current) socket.emit("queue:join", queueToken.current ? { username: queuedName.current, queueToken: queueToken.current } : { username: queuedName.current }); };
     const failed = (payload: { message?: string } | string) => { setBusy(false); setNotice({ kind: "error", text: typeof payload === "string" ? payload : payload.message ?? "Request failed." }); };
     socket.on("room:created", created); socket.on("queue:seat", queueSeat); socket.on("queue:state", waiting); socket.on("connect", onConnect); socket.on("server:error", failed);
     return () => { socket.off("room:created", created); socket.off("queue:seat", queueSeat); socket.off("queue:state", waiting); socket.off("connect", onConnect); socket.off("server:error", failed); };
@@ -49,8 +51,8 @@ export default function Home() {
   const begin = () => { if (!validName) { setNotice({ kind: "error", text: "Choose a guest name first." }); return false; } setPlayerName(name); setNotice(null); connectSocket(); return true; };
   const createPrivate = () => { if (!begin()) return; setBusy(true); socket.emit("room:create-private", { username: name.trim(), config }); };
   const joinPrivate = (event: React.FormEvent) => { event.preventDefault(); if (!begin() || roomCode.length !== 6) { if (roomCode.length !== 6) setNotice({ kind: "error", text: "Enter a six-character room code." }); return; } navigate(`/room/${roomCode}`); };
-  const joinQueue = () => { if (!begin()) return; queuedName.current = name.trim(); if (socket.connected) socket.emit("queue:join", { username: queuedName.current }); setView("queue"); };
-  const leaveQueue = () => { queuedName.current = null; socket.emit("queue:leave"); setView("home"); setQueueExpiresAt(null); };
+  const joinQueue = () => { if (!begin()) return; queuedName.current = name.trim(); queueToken.current = null; if (socket.connected) socket.emit("queue:join", { username: queuedName.current }); setView("queue"); };
+  const leaveQueue = () => { queuedName.current = null; queueToken.current = null; socket.emit("queue:leave"); setView("home"); setQueueExpiresAt(null); };
   const toggleTopic = (id: TopicId) => setTopics((current) => current.includes(id) ? current.filter((topic) => topic !== id) : [...current, id]);
   const queueSeconds = queueExpiresAt ? Math.max(0, Math.ceil((queueExpiresAt - now) / 1000)) : 300;
 

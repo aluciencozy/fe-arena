@@ -35,6 +35,7 @@ test("history rejects missing and invalid tokens, then returns only the verified
     assert.equal((await request(server, "/api/account/history", "invalid")).status, 401);
     const response = await request(server, "/api/account/history", "valid-one");
     assert.equal(response.status, 200);
+    assert.equal(response.headers.get("cache-control"), "no-store");
     const body = await response.json() as { matches: Array<{ matchId: string }> };
     assert.deepEqual(body.matches.map((match) => match.matchId), ["11111111-1111-4111-8111-111111111111"]);
   } finally {

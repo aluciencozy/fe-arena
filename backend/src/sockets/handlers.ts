@@ -5,7 +5,7 @@ import {
   type QuestionAttempt,
 } from "../../../shared/domain.js";
 import { createRoom, attachSeat, bindSeatAuthIdentity, disconnectSocket, getMetadata, getRoomForSocket, getSeatForSocket, getSeats, joinRoom, reconnectRoom, removeSeat } from "../services/room.service.js";
-import { enqueue, dequeue, publicConfig } from "../services/queue.service.js";
+import { enqueue, dequeue, publicConfig, suspend } from "../services/queue.service.js";
 import { clearMatch, configureMatch, ensureMatch, getMatchState, leaveMatch, pauseForDisconnect, resumeAfterReconnect, skipReveal, submitAnswer, toggleReady, requestRematch } from "../services/match.service.js";
 import { soloNext, soloSubmit, startSolo } from "../services/solo.service.js";
 
@@ -97,12 +97,12 @@ export const registerHandlers = (io: Server, socket: Socket) => {
   socket.on("queue:join", (payload: unknown) => {
     const input = validate(socket, ClientEventSchemas["queue:join"], payload);
     if (!input) return;
-    const result = enqueue({ socketId: socket.id, username: input.username, queuedAt: Date.now() }, () => socket.emit("queue:state", output(ServerEventSchemas["queue:state"], { status: "expired" })));
-    if (result.status === "waiting") { socket.emit("queue:state", output(ServerEventSchemas["queue:state"], { status: "waiting", expiresAt: result.expiresAt })); return; }
+    const result = enqueue({ socketId: socket.id, username: input.username, queueToken: input.queueToken, queuedAt: Date.now() }, () => socket.emit("queue:state", output(ServerEventSchemas["queue:state"], { status: "expired" })));
+    if (result.status === "waiting") { socket.emit("queue:state", output(ServerEventSchemas["queue:state"], { status: "waiting", expiresAt: result.expiresAt, queueToken: result.queueToken })); return; }
     const opponentSocket = io.sockets.sockets.get(result.opponent.socketId);
     if (!opponentSocket) {
-      const retry = enqueue({ socketId: socket.id, username: input.username, queuedAt: Date.now() }, () => socket.emit("queue:state", output(ServerEventSchemas["queue:state"], { status: "expired" })));
-      if (retry.status === "waiting") socket.emit("queue:state", output(ServerEventSchemas["queue:state"], { status: "waiting", expiresAt: retry.expiresAt }));
+      const retry = enqueue(result.entry, () => socket.emit("queue:state", output(ServerEventSchemas["queue:state"], { status: "expired" })));
+      if (retry.status === "waiting") socket.emit("queue:state", output(ServerEventSchemas["queue:state"], { status: "waiting", expiresAt: retry.expiresAt, queueToken: retry.queueToken }));
       return;
     }
     const created = createRoom("public", publicConfig, result.opponent.username);
@@ -219,7 +219,7 @@ export const registerHandlers = (io: Server, socket: Socket) => {
   });
 
   socket.on("disconnect", () => {
-    dequeue(socket.id);
+    suspend(socket.id);
     chatTimes.delete(socket.id);
     const current = session(socket);
     if (!current) return;
