@@ -12,7 +12,7 @@ The SQL migrations are committed but are not applied automatically. Apply the or
 
 ## Durable data boundary
 
-The server sends opaque guest-session owner identifiers (a hash of the server-issued reconnect token), username snapshots, score/correctness/timing summaries, question IDs, and version fields. It sends an `auth_user_id` only after Supabase verifies the access token. It does not persist raw answers, answer keys, copied exam text, arbitrary code, or chat. For terminal match persistence, the RPC is the single SQL transaction boundary and the immutable match ID/idempotency key makes repeats safe.
+The server sends opaque guest-session owner identifiers (a hash of the server-issued reconnect token), match source, username snapshots, score/correctness/timing summaries, question IDs, and version fields. It sends an `auth_user_id` only after Supabase verifies the access token. It does not persist raw answers, answer keys, copied exam text, arbitrary code, or chat. For terminal match persistence, the RPC is the single SQL transaction boundary and the immutable match ID/idempotency key makes repeats safe.
 
 All tables have RLS enabled with no anonymous or authenticated policies. The server-only API-key path is the only intended write path today. Authenticated terminal summaries are linked only when the server has verified the Supabase access token. `account_match_history` and `account_topic_progress` are read through a server-only RPC scoped by the verified Auth user ID; browser roles remain denied by RLS. Missing Supabase configuration uses the in-memory repository, including private account-history fallback for local development.
 

@@ -67,7 +67,6 @@ export const runCInWorker = (
       return;
     }
     let settled = false;
-    let initializationTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
     let executionTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
     const clearTimers = () => {
       if (initializationTimer !== undefined) globalThis.clearTimeout(initializationTimer);
@@ -84,6 +83,17 @@ export const runCInWorker = (
       }
       resolve(outcome);
     };
+    const initializationTimer = globalThis.setTimeout(
+      () =>
+        finish({
+          kind: "timeout",
+          phase: "initialization",
+          stdout: "",
+          stderr: "The browser compiler worker did not initialize within the startup limit.",
+          tests: [],
+        }),
+      initializationTimeoutMs,
+    );
     const complete = (outcome: CExecutionOutcome) => finish(outcome);
     const startExecutionTimer = () => {
       if (settled || executionTimer !== undefined) return;
@@ -128,17 +138,6 @@ export const runCInWorker = (
         stderr: event.message || "The browser compiler worker failed.",
         tests: [],
       });
-    initializationTimer = globalThis.setTimeout(
-      () =>
-        finish({
-          kind: "timeout",
-          phase: "initialization",
-          stdout: "",
-          stderr: "The browser compiler worker did not initialize within the startup limit.",
-          tests: [],
-        }),
-      initializationTimeoutMs,
-    );
     try {
       worker.postMessage({ source });
     } catch (error) {
