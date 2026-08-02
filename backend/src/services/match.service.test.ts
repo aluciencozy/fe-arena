@@ -26,6 +26,7 @@ import {
 } from "./match.service.js";
 import { QUESTION_BANK } from "../data/questions.js";
 import { inMemoryQuestionRepository, setQuestionRepository, type QuestionRepository } from "./question-bank.service.js";
+import { publicConfig } from "./queue.service.js";
 import { TOPICS, type MatchConfig, type Question } from "../../../shared/domain.js";
 
 const events = () => ({ emit: (_state: unknown) => undefined, message: (_text: string) => undefined });
@@ -551,16 +552,69 @@ test("leaving an active match records a forfeit", () => {
   clearRoomsForTests();
 });
 
-test("simultaneous rooms have isolated state", () => {
+test("public and private rooms isolate match state and submitted answers", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
   clearMatchesForTests();
   clearRoomsForTests();
-  const first = createRoom("private", { topicIds: [TOPICS[2].id], roundCount: 1, questionTimerSeconds: 30 }, "A");
-  const second = createRoom("private", { topicIds: [TOPICS[3].id], roundCount: 1, questionTimerSeconds: 30 }, "B");
-  const firstState = ensureMatch(first.metadata.roomId)!;
-  const secondState = ensureMatch(second.metadata.roomId)!;
-  assert.notEqual(firstState.roomId, secondState.roomId);
-  assert.equal(firstState.config.topicIds[0], TOPICS[2].id);
-  assert.equal(secondState.config.topicIds[0], TOPICS[3].id);
+  const privateRoom = createRoom(
+    "private",
+    { topicIds: [TOPICS[2].id], roundCount: 1, questionTimerSeconds: 30 },
+    "Private host",
+  );
+  const publicRoom = createRoom("public", publicConfig, "Public host");
+  attachSeat(privateRoom.metadata.roomId, privateRoom.seat, "private-host");
+  attachSeat(publicRoom.metadata.roomId, publicRoom.seat, "public-host");
+  const privateGuest = joinRoom(privateRoom.metadata.roomId, "Private guest", "private-guest");
+  const publicGuest = joinRoom(publicRoom.metadata.roomId, "Public guest", "public-guest");
+  assert.equal(privateGuest.ok, true);
+  assert.equal(publicGuest.ok, true);
+  if (!privateGuest.ok || !publicGuest.ok) return;
+  const privateState = ensureMatch(privateRoom.metadata.roomId)!;
+  const publicState = ensureMatch(publicRoom.metadata.roomId)!;
+  assert.notEqual(privateState.roomId, publicState.roomId);
+  assert.equal(privateState.source, "private");
+  assert.equal(publicState.source, "public");
+  toggleReady(privateRoom.metadata.roomId, privateRoom.seat.seatId, events());
+  toggleReady(privateRoom.metadata.roomId, privateGuest.seat.seatId, events());
+  toggleReady(publicRoom.metadata.roomId, publicRoom.seat.seatId, events());
+  toggleReady(publicRoom.metadata.roomId, publicGuest.seat.seatId, events());
+  t.mock.timers.tick(3_000);
+  const privateQuestionId = getMatchState(privateRoom.metadata.roomId)?.question?.id;
+  const publicQuestionId = getMatchState(publicRoom.metadata.roomId)?.question?.id;
+  assert.ok(privateQuestionId);
+  assert.ok(publicQuestionId);
+  assert.equal(
+    submitAnswer(
+      publicRoom.metadata.roomId,
+      publicRoom.seat.seatId,
+      { questionId: publicQuestionId!, answer: "public answer" },
+      events(),
+    ).ok,
+    true,
+  );
+  assert.equal(getMatchState(privateRoom.metadata.roomId)?.submissions[privateRoom.seat.seatId]?.submitted, false);
+  assert.equal(getMatchState(publicRoom.metadata.roomId)?.submissions[publicRoom.seat.seatId]?.answer, null);
+  assert.equal(
+    submitAnswer(
+      privateRoom.metadata.roomId,
+      publicRoom.seat.seatId,
+      { questionId: privateQuestionId!, answer: "cross-room answer" },
+      events(),
+    ).ok,
+    false,
+  );
+  assert.equal(
+    submitAnswer(
+      publicRoom.metadata.roomId,
+      publicGuest.seat.seatId,
+      { questionId: publicQuestionId!, answer: "public guest answer" },
+      events(),
+    ).ok,
+    true,
+  );
+  assert.equal(getMatchState(publicRoom.metadata.roomId)?.phase, "REVEAL");
+  assert.equal(getMatchState(publicRoom.metadata.roomId)?.submissions[publicRoom.seat.seatId]?.answer, "public answer");
+  assert.equal(getMatchState(privateRoom.metadata.roomId)?.submissions[privateRoom.seat.seatId]?.answer, null);
   clearMatchesForTests();
   clearRoomsForTests();
 });
