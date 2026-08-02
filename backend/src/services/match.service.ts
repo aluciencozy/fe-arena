@@ -77,6 +77,7 @@ type MatchRecord = {
   startedAt: number;
   seed: string;
   questionIds: string[];
+  usedQuestionIds: string[];
   roundResponseMs: Record<number, Record<string, number>>;
   terminalPersistence: "idle" | "pending" | "persisted";
   timer: ReturnType<typeof setTimeout> | undefined;
@@ -177,17 +178,15 @@ const selectFreshQuestions = (seed: string, config: MatchConfig, previousIds: re
         : !config.topicIds.length || config.topicIds.includes(question.topicId),
     );
   const fresh = eligible.filter((question) => !previousIds.includes(question.id));
-  if (fresh.length >= config.roundCount) {
-    const selected = selectSeededQuestions(
-      fresh,
-      seed,
-      config.roundCount,
-      config.topicIds,
-      includeCoding && fresh.some((question) => question.type === "coding"),
-    );
-    if (selected.length === config.roundCount) return selected;
-  }
-  return [];
+  const pool = fresh.length >= config.roundCount ? fresh : eligible;
+  if (pool.length < config.roundCount) return [];
+  const selectionIncludesCoding =
+    includeCoding &&
+    (fresh.length < config.roundCount
+      ? pool.some((question) => question.type === "coding")
+      : fresh.some((question) => question.type === "coding"));
+  const selected = selectSeededQuestions(pool, seed, config.roundCount, config.topicIds, selectionIncludesCoding);
+  return selected.length === config.roundCount ? selected : [];
 };
 const guestSessionOwner = (reconnectToken: string) => createHash("sha256").update(reconnectToken).digest("hex");
 const terminalSnapshot = (record: MatchRecord): TerminalMatchSnapshot | undefined => {
@@ -309,6 +308,7 @@ export const ensureMatch = (roomId: string, events?: MatchEvents) => {
     startedAt: Date.now(),
     seed: `${roomId}:${metadata.hostSeatId}`,
     questionIds: questions.map((question) => question.id),
+    usedQuestionIds: questions.map((question) => question.id),
     roundResponseMs: {},
     terminalPersistence: "idle",
     timer: undefined,
@@ -509,6 +509,7 @@ export const configureMatch = (roomId: string, seatId: string, config: MatchConf
   record.state.config = config;
   record.state.phase = "SETUP";
   record.questionIds = questions.map((question) => question.id);
+  record.usedQuestionIds = questions.map((question) => question.id);
   record.state.totalRounds = config.roundCount;
   record.state.ready = makeReady(roomId);
   record.state.codingReady = makeReady(roomId);
@@ -681,7 +682,7 @@ export const requestRematch = (roomId: string, seatId: string, events: MatchEven
     return { ok: true as const, state: record.state };
   }
 
-  const previousQuestionIds = [...record.questionIds];
+  const previousQuestionIds = record.usedQuestionIds;
   record.seed = randomUUID();
   const questions = selectFreshQuestions(record.seed, record.state.config, previousQuestionIds);
   if (questions.length !== record.state.config.roundCount) {
@@ -689,6 +690,7 @@ export const requestRematch = (roomId: string, seatId: string, events: MatchEven
     emit(record, events);
     return { ok: false as const, error: "There are not enough reviewed questions for a rematch." };
   }
+  record.usedQuestionIds = [...new Set([...record.usedQuestionIds, ...questions.map((question) => question.id)])];
   record.questionIds = questions.map((question) => question.id);
   record.state.phase = "REMATCH";
   record.matchId = randomUUID();

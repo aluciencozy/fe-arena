@@ -327,6 +327,86 @@ test("mixed rematches do not reuse an exhausted coding question", (t) => {
   }
 });
 
+test("rematches exclude every previously used question while fresh questions remain", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
+  clearMatchesForTests();
+  clearRoomsForTests();
+  const coding = QUESTION_BANK.find((question) => question.type === "coding");
+  const graph = QUESTION_BANK.find((question) => question.id === "q-graph-bfs");
+  const extra = QUESTION_BANK.find((question) => question.id === "q-tree-height");
+  assert.ok(coding && coding.type === "coding");
+  assert.ok(graph && graph.type === "graph");
+  assert.ok(extra);
+  if (!coding || coding.type !== "coding" || !graph || graph.type !== "graph" || !extra) return;
+  let available: Question[] = [coding, graph];
+  setQuestionRepository({
+    list: () => [...available],
+    select: (_seed, count) => available.slice(0, count),
+    get: (id) => available.find((question) => question.id === id),
+  });
+  const mixedConfig = {
+    topicIds: [graph.topicId],
+    roundCount: 1,
+    questionTimerSeconds: 30,
+    includeCoding: true,
+  } as MatchConfig;
+  try {
+    const room = createRoom("private", mixedConfig, "Host");
+    attachSeat(room.metadata.roomId, room.seat, "history-host");
+    const guest = joinRoom(room.metadata.roomId, "Guest", "history-guest");
+    assert.equal(guest.ok, true);
+    if (!guest.ok) return;
+    ensureMatch(room.metadata.roomId);
+    toggleReady(room.metadata.roomId, room.seat.seatId, events());
+    toggleReady(room.metadata.roomId, guest.seat.seatId, events());
+    markCodingReady(room.metadata.roomId, room.seat.seatId, events());
+    markCodingReady(room.metadata.roomId, guest.seat.seatId, events());
+    t.mock.timers.tick(3_000);
+    const first = getMatchState(room.metadata.roomId)!;
+    assert.equal(first.question?.id, coding.id);
+    const codingResult = {
+      questionId: coding.id,
+      passed: false,
+      tests: [{ index: 1, name: "sum", passed: false }],
+      outcome: "compile-error" as const,
+    };
+    assert.equal(submitCodingResult(room.metadata.roomId, room.seat.seatId, codingResult, events()).ok, true);
+    assert.equal(submitCodingResult(room.metadata.roomId, guest.seat.seatId, codingResult, events()).ok, true);
+    t.mock.timers.tick(60_000);
+    assert.equal(getMatchState(room.metadata.roomId)?.phase, "RESULTS");
+
+    assert.equal(requestRematch(room.metadata.roomId, room.seat.seatId, events()).ok, true);
+    assert.equal(requestRematch(room.metadata.roomId, guest.seat.seatId, events()).ok, true);
+    toggleReady(room.metadata.roomId, room.seat.seatId, events());
+    toggleReady(room.metadata.roomId, guest.seat.seatId, events());
+    t.mock.timers.tick(3_000);
+    const second = getMatchState(room.metadata.roomId)!;
+    assert.equal(second.question?.id, graph.id);
+    assert.equal(
+      submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId: graph.id, answer: ["wrong"] }, events()).ok,
+      true,
+    );
+    assert.equal(
+      submitAnswer(room.metadata.roomId, guest.seat.seatId, { questionId: graph.id, answer: ["wrong"] }, events()).ok,
+      true,
+    );
+    t.mock.timers.tick(30_000);
+    assert.equal(getMatchState(room.metadata.roomId)?.phase, "RESULTS");
+
+    available = [coding, graph, extra];
+    assert.equal(requestRematch(room.metadata.roomId, room.seat.seatId, events()).ok, true);
+    assert.equal(requestRematch(room.metadata.roomId, guest.seat.seatId, events()).ok, true);
+    toggleReady(room.metadata.roomId, room.seat.seatId, events());
+    toggleReady(room.metadata.roomId, guest.seat.seatId, events());
+    t.mock.timers.tick(3_000);
+    assert.equal(getMatchState(room.metadata.roomId)?.question?.id, extra.id);
+  } finally {
+    setQuestionRepository(inMemoryQuestionRepository);
+    clearMatchesForTests();
+    clearRoomsForTests();
+  }
+});
+
 test("reveal lasts thirty seconds, supports one-sided review, and both skips advance", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
   clearMatchesForTests();
