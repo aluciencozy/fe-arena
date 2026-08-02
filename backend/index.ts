@@ -29,7 +29,7 @@ io.use(async (socket, next) => {
   }
   next();
 });
-io.on("connection", (socket) => registerHandlers(io, socket));
+io.on("connection", (socket) => registerHandlers(io, socket, authVerifier));
 
 const port = Number(process.env.PORT ?? 3001);
 httpServer.listen(port, () => console.log(`FE Arena server listening on http://localhost:${port}`));

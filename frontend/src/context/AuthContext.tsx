@@ -21,6 +21,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAccessToken(data.session?.access_token ?? null);
       setSocketAccessToken(data.session?.access_token ?? null);
       setLoading(false);
+    }).catch((reason: unknown) => {
+      if (!mounted) return;
+      setError(authError(reason));
+      setUser(null);
+      setAccessToken(null);
+      setSocketAccessToken(null);
+      setLoading(false);
     });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session: Session | null) => {
       if (!mounted) return;
@@ -55,4 +62,3 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
-

@@ -57,3 +57,15 @@ test("queue reattachment preserves the original position and deadline", () => {
   if (third.status === "matched") assert.equal(third.opponent.username, "Ada");
   clearQueueForTests();
 });
+
+test("expired queue tokens cannot start a new wait", (t) => {
+  t.mock.timers.enable({ apis: ["Date", "setTimeout"], now: 0 });
+  clearQueueForTests();
+  const first = enqueue({ socketId: "socket-a", username: "Ada", queuedAt: 0 });
+  assert.equal(first.status, "waiting");
+  if (first.status !== "waiting") return;
+  t.mock.timers.tick(300_000);
+  const retry = enqueue({ socketId: "socket-a-new", username: "Ada", queuedAt: Date.now(), queueToken: first.queueToken });
+  assert.equal(retry.status, "expired");
+  clearQueueForTests();
+});

@@ -4,9 +4,7 @@ export const socket = io(import.meta.env.VITE_SOCKET_URL ?? "http://localhost:30
 
 export const setSocketAccessToken = (accessToken: string | null) => {
   socket.auth = accessToken ? { accessToken } : {};
-  // A refreshed identity is applied to the next handshake. Reconnecting keeps
-  // the existing opaque room token and never changes guest-first room behavior.
-  if (socket.connected) { socket.disconnect(); socket.connect(); }
+  if (socket.connected) socket.emit("auth:update", { accessToken });
 };
 let disconnectTimer: ReturnType<typeof window.setTimeout> | undefined;
 export const connectSocket = () => { if (disconnectTimer) window.clearTimeout(disconnectTimer); if (!socket.connected) socket.connect(); };

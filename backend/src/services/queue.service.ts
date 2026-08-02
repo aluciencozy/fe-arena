@@ -33,6 +33,7 @@ const scheduleExpiry = (entry: StoredQueueEntry, onExpire?: () => void) => {
 
 export const enqueue = (entry: QueueEntry, onExpire?: () => void) => {
   const existing = entry.queueToken ? entries.find((candidate) => candidate.queueToken === entry.queueToken) : undefined;
+  if (entry.queueToken && !existing) return { status: "expired" as const };
   if (existing) {
     if (existing.socketId !== entry.socketId) dequeue(entry.socketId);
     existing.socketId = entry.socketId;
