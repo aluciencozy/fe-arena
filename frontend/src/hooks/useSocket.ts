@@ -46,6 +46,7 @@ export const useArenaSocket = (roomId: string, playerName: string) => {
     configure: (config: unknown) => socket.emit("match:configure", config),
     ready: () => socket.emit("match:ready"),
     submit: (answer: unknown) => socket.emit("match:submit", answer),
+    skipReveal: () => socket.emit("match:reveal-skip"),
     rematch: () => socket.emit("match:rematch"),
     leave: () => { clearStoredToken(roomId); socket.emit("room:leave"); },
   };

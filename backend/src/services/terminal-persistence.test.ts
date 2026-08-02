@@ -94,7 +94,7 @@ test("persists a completed result and maps an exact tie to draw", async (t) => {
   const wrong: QuestionAttempt = { questionId, answer: "not-the-answer" };
   assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, wrong, events()).ok, true);
   assert.equal(submitAnswer(room.metadata.roomId, guest.seat.seatId, wrong, events()).ok, true);
-  t.mock.timers.tick(1_800);
+  t.mock.timers.tick(30_000);
   await waitForMatchPersistenceForTests();
   assert.equal(getMatchState(room.metadata.roomId)?.endReason, "completed");
   assert.equal(repository.snapshots[0]?.terminalOutcome, "draw");
@@ -145,7 +145,7 @@ test("ignores client-supplied scoring fields and persists only server results", 
   assert.deepEqual(Object.keys(forgedAttempt).sort(), ["answer", "questionId"]);
   assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, forgedAttempt, events()).ok, true);
   assert.equal(submitAnswer(room.metadata.roomId, guest.seat.seatId, { questionId, answer: "not-the-answer" }, events()).ok, true);
-  t.mock.timers.tick(1_800);
+  t.mock.timers.tick(30_000);
   await waitForMatchPersistenceForTests();
   const stored = repository.snapshots[0]!;
   assert.equal(stored.terminalOutcome, "completed");

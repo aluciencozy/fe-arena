@@ -6,8 +6,8 @@ FE Arena is an unofficial UCF Computer Science Foundation Exam study tool. It is
 
 - Private host-configured two-seat rooms with a stable guest seat and refresh recovery.
 - Public random-player queue with a five-minute maximum wait and five-minute question timer.
-- Five-round server-authoritative matches, explicit confirmed leave/forfeit, 30-second disconnect pause, rematch, and current-run results.
-- Solo practice using the same question repository, normalization, grading, and scoring functions.
+- Five-round server-authoritative matches, explicit confirmed leave/forfeit, 30-second disconnect pause, up-to-30-second answer reveals with per-seat skip, rematch, and current-run topic feedback.
+- Solo practice using the same question repository, normalization, grading, and scoring functions, with account-free current-run feedback and no durable answer history.
 - Original reviewed prompts across twelve topic families and six domain question types: multiple choice, numeric, normalized short answer, curated C output tracing, ordered sequence, and graph reasoning.
 - Collapsible room chat limited to one message per second.
 
@@ -38,9 +38,9 @@ The frontend runs at `http://localhost:5173`; the backend runs at `http://localh
 
 ### Synchronization and safety
 
-Match states carry absolute `questionStartedAt`, `questionEndsAt`, and countdown deadlines. A temporary disconnect changes the match to `PAUSED`, clears timers, and extends the saved deadline by the actual pause duration on reconnect. Expiry becomes an explicit `EXPIRED` outcome; an intentional leave becomes `FORFEIT`. A reconnect token restores the same seat rather than creating a new guest.
+Match states carry absolute question, countdown, and reveal deadlines. A temporary disconnect changes the match to `PAUSED`, clears timers, and extends the saved deadline by the actual pause duration on reconnect. Each reveal can last up to 30 seconds while both seats review the answer and reasoning; either seat can skip, but the next round starts early only after both seats skip. Expiry becomes an explicit `EXPIRED` outcome; an intentional leave becomes `FORFEIT`. A reconnect token restores the same seat rather than creating a new guest.
 
-The server emits a public question view without answer, explanation, assumptions, provenance, or opponent answers. Reveal and results are the first phases that include solution fields. Late, duplicate, wrong-question, malformed, and client-invented submissions are rejected. C prompts show a reviewed, syntax-preserving code block and are graded against curated expected output; FE Arena never compiles or executes arbitrary submitted code. Graph prompts show a deterministic unweighted directed or undirected diagram; BFS/DFS use preorder and displayed node-order neighbor traversal, adjacency returns direct neighbors in displayed node order, reachability follows arrows, and shortest paths count unit-weight edges.
+The server emits a public question view without answer, explanation, assumptions, provenance, or opponent answers. Solution fields are exposed only during reveal or terminal result views, and current-run summaries include per-topic attempts, correctness, accuracy, score, and response timing. Late, duplicate, wrong-question, malformed, and client-invented submissions are rejected. C prompts show a reviewed, syntax-preserving code block and are graded against curated expected output; FE Arena never compiles or executes arbitrary submitted code. Graph prompts show a deterministic unweighted directed or undirected diagram; BFS/DFS use preorder and displayed node-order neighbor traversal, adjacency returns direct neighbors in displayed node order, reachability follows arrows, and shortest paths count unit-weight edges.
 
 Scores are `1,000` correctness points plus a maximum `300` speed bonus. A wrong answer is zero. Correct count wins; ties compare server-computed total score, then aggregate response time, then remain a draw.
 
@@ -70,7 +70,7 @@ cd backend && npm run typecheck && npm test
 cd ../frontend && npm run lint && npm run build
 ```
 
-The backend tests cover normalization, all six question types, Supabase row compatibility, seeded selection, score boundaries, hidden answers, ready/countdown transitions, graph/C lifecycle submissions, duplicate-safe service behavior, queue expiry/cancellation, room isolation, and reconnect seat restoration. Production hosting needs a Node process for the backend and a static host/reverse proxy for the Vite build; runtime match state is intentionally in memory for this MVP. Supabase question loading and terminal persistence use the server-only secret key.
+The backend tests cover normalization, all six question types, Supabase row compatibility, seeded selection, score boundaries, hidden answers, reveal deadlines and skips, topic summaries, solo deadline handling, ready/countdown transitions, graph/C lifecycle submissions, duplicate-safe service behavior, queue expiry/cancellation, room isolation, and reconnect seat restoration. Production hosting needs a Node process for the backend and a static host/reverse proxy for the Vite build; runtime match state is intentionally in memory for this MVP. Supabase question loading and terminal persistence use the server-only secret key.
 
 ## Explicit exclusions
 

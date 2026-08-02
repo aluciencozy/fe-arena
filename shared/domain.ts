@@ -253,6 +253,7 @@ export const QUESTION_TIMER_MAX_SECONDS = 300;
 export const PUBLIC_QUESTION_SECONDS = 300;
 export const PUBLIC_QUEUE_MAX_WAIT_SECONDS = 300;
 export const PAUSE_SECONDS = 30;
+export const REVEAL_SECONDS = 30;
 export const DEFAULT_ROUND_COUNT = 5;
 export const MAX_ROUND_COUNT = 5;
 
@@ -287,13 +288,17 @@ export const seededShuffle = <T>(items: readonly T[], seed: string | number): T[
 };
 
 export const selectSeededQuestions = (questions: readonly Question[], seed: string | number, count: number, topicIds?: readonly TopicId[]) => {
-  const allowed = topicIds?.length ? questions.filter((question) => topicIds.includes(question.topicId)) : [...questions];
+  const unique = new Map<string, Question>();
+  for (const question of questions) unique.set(question.id, question);
+  const allowed = topicIds?.length ? [...unique.values()].filter((question) => topicIds.includes(question.topicId)) : [...unique.values()];
   if (!allowed.length || count <= 0 || allowed.length < count) return [];
   const shuffled = seededShuffle(allowed, seed);
   return shuffled.slice(0, count);
 };
 
 export type MatchScore = { playerId: string; playerName: string; total: number; correct: number; responseMs: number };
+export type TopicPerformance = { attempted: number; correct: number; incorrect: number; accuracy: number; score: number; responseMs: number };
+export const emptyTopicPerformance = (): TopicPerformance => ({ attempted: 0, correct: 0, incorrect: 0, accuracy: 0, score: 0, responseMs: 0 });
 export const compareScores = (left: MatchScore, right: MatchScore): MatchScore => {
   if (left.correct !== right.correct) return left.correct > right.correct ? left : right;
   if (left.total !== right.total) return left.total > right.total ? left : right;
@@ -368,10 +373,14 @@ export const MatchPublicStateSchema = z.object({
   questionStartedAt: z.number().nullable(),
   questionEndsAt: z.number().nullable(),
   countdownEndsAt: z.number().nullable(),
+  revealStartedAt: z.number().nullable(),
+  revealEndsAt: z.number().nullable(),
+  revealSkips: z.record(z.string(), z.boolean()),
   pause: z.object({ seatName: z.string().min(1), expiresAt: z.number() }).nullable(),
   ready: z.record(z.string(), z.boolean()),
   submissions: z.record(z.string(), SubmissionPublicSchema),
   scores: z.record(z.string(), z.object({ total: z.number().nonnegative(), correct: z.number().int().nonnegative(), responseMs: z.number().nonnegative() })),
+  topicSummary: z.record(TopicIdSchema, z.object({ attempted: z.number().int().nonnegative(), correct: z.number().int().nonnegative(), incorrect: z.number().int().nonnegative(), accuracy: z.number().nonnegative().max(1), score: z.number().nonnegative(), responseMs: z.number().nonnegative() })),
   winnerSeatId: z.string().uuid().nullable(),
   endReason: z.enum(["completed", "forfeit", "abandoned", "expired"]).nullable(),
   history: z.array(RoundHistorySchema),
@@ -383,6 +392,7 @@ export const SoloStateSchema = z.object({
   questionStartedAt: z.number().nullable(),
   questionEndsAt: z.number().nullable(),
   result: z.object({ correct: z.boolean(), score: ScoreBreakdownSchema }).nullable(),
+  topicSummary: z.record(TopicIdSchema, z.object({ attempted: z.number().int().nonnegative(), correct: z.number().int().nonnegative(), incorrect: z.number().int().nonnegative(), accuracy: z.number().nonnegative().max(1), score: z.number().nonnegative(), responseMs: z.number().nonnegative() })),
   runScore: z.number().nonnegative(),
   runCorrect: z.number().int().nonnegative(),
   runTotal: z.number().int().nonnegative(),
@@ -400,6 +410,7 @@ export const ClientEventSchemas = {
   "match:configure": MatchConfigSchema,
   "match:ready": NoPayloadSchema,
   "match:submit": SubmitSchema,
+  "match:reveal-skip": NoPayloadSchema,
   "match:rematch": NoPayloadSchema,
   "chat:send": ChatSchema,
   "solo:start": SoloStartSchema,
