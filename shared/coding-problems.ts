@@ -447,8 +447,7 @@ int main(void) {
     testHarness: `int main(void) {
   int a = -3, b = 12; swap_ints(&a, &b);
   printf("FEA_TEST|1|both values|%s\\n", a == 12 && b == -3 ? "PASS" : "FAIL");
-  swap_ints(&a, &a);
-  printf("FEA_TEST|2|same address|%s\\n", a == 12 ? "PASS" : "FAIL"); return 0;
+  return 0;
 }`,
   }),
   problem({

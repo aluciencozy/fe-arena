@@ -19,4 +19,3 @@ comment on column public.question_bank.version is
   'Monotonic authored content version; retired versions remain for history and are not selected for new play.';
 comment on column public.question_bank.published is
   'Reviewed publication flag. False retires content without destructive deletion.';
-EOF
