@@ -18,7 +18,7 @@ export const TOPICS = [
 
 export type TopicId = (typeof TOPICS)[number]["id"];
 export type QuestionType =
-  "multiple-choice" | "numeric" | "short-answer" | "code-output" | "ordered-sequence" | "graph";
+  "multiple-choice" | "numeric" | "short-answer" | "code-output" | "ordered-sequence" | "graph" | "coding";
 export type GraphOperation = "bfs-order" | "dfs-order" | "adjacency" | "reachability" | "shortest-path";
 export type MatchSource = "private" | "public";
 export type MatchPhase =
@@ -42,6 +42,7 @@ export const QuestionTypeSchema = z.enum([
   "code-output",
   "ordered-sequence",
   "graph",
+  "coding",
 ]);
 export const GraphOperationSchema = z.enum(["bfs-order", "dfs-order", "adjacency", "reachability", "shortest-path"]);
 export const GraphNodeSchema = z.object({
@@ -95,6 +96,22 @@ const BaseQuestionSchema = z.object({
   difficulty: z.enum(["intro", "core", "stretch"]),
 });
 
+export const CodingProblemSchema = z.object({
+  id: z.string().regex(/^c-[a-z0-9-]+$/),
+  title: z.string().min(3),
+  description: z.string().min(10),
+  functionSignature: z
+    .string()
+    .min(3)
+    .refine((value) => !/[{};]/.test(value), {
+      message: "Function signatures cannot contain a body or statement delimiter.",
+    }),
+  starterCode: z.string().min(1),
+  prefix: z.string().min(1),
+  testHarness: z.string().min(1),
+});
+export type CodingProblem = z.infer<typeof CodingProblemSchema>;
+
 export const QuestionSchema = z.discriminatedUnion("type", [
   BaseQuestionSchema.extend({
     type: z.literal("multiple-choice"),
@@ -121,6 +138,10 @@ export const QuestionSchema = z.discriminatedUnion("type", [
     type: z.literal("ordered-sequence"),
     items: z.array(z.object({ id: z.string().min(1), label: z.string().min(1) })).min(2),
     answerOrder: z.array(z.string().min(1)).min(2),
+  }),
+  BaseQuestionSchema.extend({
+    type: z.literal("coding"),
+    problem: CodingProblemSchema,
   }),
   BaseQuestionSchema.extend({
     type: z.literal("graph"),
@@ -224,6 +245,7 @@ export type PublicQuestion = {
   startNode?: string;
   targetNode?: string;
   nodeId?: string;
+  problem?: CodingProblem;
 };
 
 export type RevealedQuestion = PublicQuestion & {
@@ -244,6 +266,7 @@ export const toPublicQuestion = (question: Question): PublicQuestion => {
   if (question.type === "multiple-choice") return { ...base, options: question.options };
   if (question.type === "numeric") return question.unit ? { ...base, unit: question.unit } : base;
   if (question.type === "code-output") return { ...base, language: question.language, code: question.code };
+  if (question.type === "coding") return { ...base, problem: question.problem };
   if (question.type === "ordered-sequence")
     return { ...base, items: question.items, orderLength: question.answerOrder.length };
   if (question.type === "graph") {
@@ -274,15 +297,17 @@ export const toRevealedQuestion = (question: Question): RevealedQuestion => {
           ? question.answers
           : question.type === "code-output"
             ? question.output
-            : question.type === "ordered-sequence"
-              ? question.answerOrder
-              : question.operation === "bfs-order" || question.operation === "dfs-order"
-                ? question.answerOrder!
-                : question.operation === "adjacency"
-                  ? question.adjacentNodes!
-                  : question.operation === "reachability"
-                    ? question.reachable!
-                    : question.distance!;
+            : question.type === "coding"
+              ? []
+              : question.type === "ordered-sequence"
+                ? question.answerOrder
+                : question.operation === "bfs-order" || question.operation === "dfs-order"
+                  ? question.answerOrder!
+                  : question.operation === "adjacency"
+                    ? question.adjacentNodes!
+                    : question.operation === "reachability"
+                      ? question.reachable!
+                      : question.distance!;
   return {
     ...publicQuestion,
     explanation: question.explanation,
@@ -323,6 +348,7 @@ export const gradeQuestion = (question: Question, attempt: QuestionAttempt): boo
     const candidate = Array.isArray(attempt.answer) ? attempt.answer : attempt.answer.split(/\r?\n/);
     return normalizeSequence(candidate).join("\n") === normalizeSequence(question.output).join("\n");
   }
+  if (question.type === "coding") return false;
   if (question.type === "ordered-sequence") {
     if (!Array.isArray(attempt.answer)) return false;
     return normalizeSequence(attempt.answer).join("|") === normalizeSequence(question.answerOrder).join("|");
@@ -406,9 +432,10 @@ export const selectSeededQuestions = (
 ) => {
   const unique = new Map<string, Question>();
   for (const question of questions) unique.set(question.id, question);
+  // Coding practice is deliberately browser-only and never enters a server-authoritative run.
   const allowed = topicIds?.length
-    ? [...unique.values()].filter((question) => topicIds.includes(question.topicId))
-    : [...unique.values()];
+    ? [...unique.values()].filter((question) => question.type !== "coding" && topicIds.includes(question.topicId))
+    : [...unique.values()].filter((question) => question.type !== "coding");
   if (!allowed.length || count <= 0 || allowed.length < count) return [];
   const shuffled = seededShuffle(allowed, seed);
   return shuffled.slice(0, count);
@@ -491,6 +518,7 @@ export const PublicQuestionSchema = z.object({
   startNode: z.string().optional(),
   targetNode: z.string().optional(),
   nodeId: z.string().optional(),
+  problem: CodingProblemSchema.optional(),
 });
 export const RevealedQuestionSchema = PublicQuestionSchema.and(
   z.object({

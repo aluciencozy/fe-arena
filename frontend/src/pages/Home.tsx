@@ -5,6 +5,7 @@ import {
   BookOpen,
   Check,
   Clock3,
+  Code2,
   Hash,
   LockKeyhole,
   Menu,
@@ -203,6 +204,9 @@ export default function Home() {
               </button>
               <Link to="/solo" className="button button-ghost">
                 <BookOpen size={16} /> solo practice
+              </Link>
+              <Link to="/practice/c" className="button button-ghost">
+                <Code2 size={16} /> C practice lab
               </Link>
             </div>
           </div>

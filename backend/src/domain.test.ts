@@ -25,17 +25,18 @@ test("normalization is stable and explicit aliases grade short answers", () => {
 
 test("reviewed bank has complete topic/type coverage, valid unique IDs, and hidden public solutions", () => {
   const questions = validateQuestionBank();
-  assert.equal(questions.length, 125);
+  assert.equal(questions.length, 128);
   assert.equal(new Set(questions.map((question) => question.id)).size, questions.length);
   assert.equal(questions.filter((question) => question.type === "graph").length, 5);
-  assert.equal(new Set(questions.map((question) => question.type)).size, 6);
+  assert.equal(questions.filter((question) => question.type === "coding").length, 3);
+  assert.equal(new Set(questions.map((question) => question.type)).size, 7);
   assert.equal(new Set(questions.map((question) => question.topicId)).size, TOPICS.length);
   for (const topic of TOPICS) {
     const topicQuestions = questions.filter((question) => question.topicId === topic.id);
     assert.ok(topicQuestions.length >= 8, topic.id);
     assert.ok(new Set(topicQuestions.map((question) => question.type)).size >= 5, topic.id);
   }
-  assert.equal(new Set(questions.map((question) => question.type)).size, 6);
+  assert.equal(new Set(questions.map((question) => question.type)).size, 7);
   for (const question of questions) {
     const publicView = toPublicQuestion(question);
     assert.equal("answer" in publicView, false);
@@ -47,6 +48,11 @@ test("reviewed bank has complete topic/type coverage, valid unique IDs, and hidd
     assert.equal("assumptions" in publicView, false);
     assert.equal("provenance" in publicView, false);
     if (question.type === "code-output") assert.equal(publicView.code, question.code);
+    if (question.type === "coding") {
+      assert.equal(publicView.problem?.id, question.problem.id);
+      assert.equal("explanation" in publicView, false);
+      assert.equal("answer" in publicView, false);
+    }
     if (question.type === "graph") {
       assert.deepEqual(publicView.graph, question.graph);
       assert.equal("reachable" in publicView, false);
