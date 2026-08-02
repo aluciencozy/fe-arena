@@ -7,7 +7,7 @@ FE Arena is an unofficial UCF Computer Science Foundation Exam study tool. It is
 - Private host-configured two-seat rooms with a stable guest seat and refresh recovery.
 - Public random-player queue with a five-minute maximum wait and five-minute question timer.
 - Five-round server-authoritative matches, explicit confirmed leave/forfeit, 30-second disconnect pause, up-to-30-second answer reveals with per-seat skip, rematch, and current-run topic feedback.
-- Solo practice using the same question repository, normalization, grading, and scoring functions, with guest-first current-run feedback and optional private account history/progress.
+- Solo practice using the same question repository, normalization, grading, and scoring functions, with guest-first current-run feedback. Optional signed-in 1v1 matches provide private account history/progress.
 - Original reviewed prompts across twelve topic families and six domain question types: multiple choice, numeric, normalized short answer, curated C output tracing, ordered sequence, and graph reasoning.
 - Collapsible room chat limited to one message per second.
 
@@ -32,7 +32,7 @@ The frontend runs at `http://localhost:5173`; the backend runs at `http://localh
 - `shared/domain.ts` is the framework-free domain boundary. It defines discriminated question types, stable topic IDs, Zod schemas, normalization, grading, seeded selection, score calculation, and tie-breakers.
 - `backend/src/data/questions.ts` is the reviewed in-memory fallback. `question-bank.service.ts` loads the same validated content from the server-only Supabase `question_bank` repository when configured, without changing match orchestration.
 - `backend/src/services/match.service.ts` owns the explicit state machine and absolute deadlines. The server selects questions, accepts exactly one submission per seat, grades privately, and calculates timing and scores.
-- `backend/src/services/room.service.ts` owns stable guest seats, reconnect tokens, and room isolation. `queue.service.ts` owns FIFO public matching and expiry. `solo.service.ts` reuses the repository and grading engine without durable history.
+- `backend/src/services/room.service.ts` owns stable guest seats, reconnect tokens, and room isolation. `queue.service.ts` owns FIFO public matching and expiry. `solo.service.ts` reuses the repository and grading engine for current-run-only practice.
 - `backend/src/sockets/handlers.ts` is the validated Socket.IO contract for room, queue, match, chat, reconnect, state-request, solo, and error events. Incoming payloads are parsed with Zod before services run.
 - `frontend/` contains the responsive React/Vite UI and a small Zustand cache. It never selects a question, grades an answer, or supplies a score. Optional Supabase Auth uses only `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`; the frontend never receives or bundles `SUPABASE_SECRET_KEY`.
 
@@ -61,7 +61,7 @@ The bank covers:
 11. Recursion
 12. Algorithm analysis and representation
 
-Every item carries an answer, explanation, assumptions, and provenance. Content is validated at module load and in tests for schema shape, unique IDs, option/sequence/graph references, and complete type coverage. Apply the ordered migrations `supabase/migrations/202603080003_question_bank.sql` and `supabase/migrations/202603080004_question_bank_graph.sql` to create and extend the server-only table, then `cd backend && npm run seed:questions` idempotently upserts the reviewed bank when `SUPABASE_URL` and `SUPABASE_SECRET_KEY` are configured. The original 120-question reviewed bank remains intact, with five graph questions added to the current experience. Existing C rows without a stored code remain loadable through the compatibility mapper; new C rows always include curated code. Graph content is presentation-only: users cannot edit graphs or submit graph code. If either Supabase variable is absent, local development and tests use the in-memory fallback. New content requires normal PR review plus validation. The public UCF index and supplied reference PDFs are provenance anchors for topic planning only: https://www.cs.ucf.edu/registration/exm/. They are not a license to copy, and FE Arena does not claim to match any future exam format.
+Every item carries an answer, explanation, assumptions, and provenance. Content is validated at module load and in tests for schema shape, unique IDs, option/sequence/graph references, and complete type coverage. Apply the ordered migrations `supabase/migrations/202603080003_question_bank.sql` and `supabase/migrations/202603080004_question_bank_graph.sql` to create and extend the server-only table, then `cd backend && npm run seed:questions` idempotently upserts the reviewed bank when `SUPABASE_URL` and `SUPABASE_SECRET_KEY` are configured. The original 120-question reviewed bank remains intact, with five graph questions added to the current experience. Existing C rows without a stored code remain loadable through the compatibility mapper; new C rows always include curated code. Graph content is presentation-only: users cannot edit graphs or submit graph code. If either server-side question-bank variable is absent, local development and tests use the in-memory fallback. New content requires normal PR review plus validation. The public UCF index and supplied reference PDFs are provenance anchors for topic planning only: https://www.cs.ucf.edu/registration/exm/. They are not a license to copy, and FE Arena does not claim to match any future exam format.
 
 ## Verification
 
@@ -70,7 +70,7 @@ cd backend && npm run typecheck && npm test
 cd ../frontend && npm run lint && npm run build
 ```
 
-The backend tests cover normalization, all six question types, Supabase row compatibility, seeded selection, score boundaries, hidden answers, reveal deadlines and skips, topic summaries, solo deadline handling, ready/countdown transitions, graph/C lifecycle submissions, duplicate-safe service behavior, queue expiry/cancellation, room isolation, and reconnect seat restoration. Production hosting needs a Node process for the backend and a static host/reverse proxy for the Vite build; runtime match state is intentionally in memory for this MVP. Supabase question loading and terminal persistence use the server-only secret key. Authenticated terminal summaries use server-verified Auth IDs, while local development without Supabase uses an in-memory history fallback.
+The backend tests cover normalization, all six question types, Supabase row compatibility, seeded selection, score boundaries, hidden answers, reveal deadlines and skips, topic summaries, solo deadline handling, ready/countdown transitions, graph/C lifecycle submissions, duplicate-safe service behavior, queue expiry/cancellation, room isolation, reconnect seat restoration, Auth token verification, private history authorization and isolation, account progress aggregation, and guest fallback. Production hosting needs a Node process for the backend and a static host/reverse proxy for the Vite build; live room and match state are intentionally in memory for this MVP. Supabase question loading and terminal persistence use the server-only secret key. Authenticated terminal summaries use server-verified Auth IDs, while local development without Supabase uses an in-memory history fallback.
 
 ## Optional Supabase Auth and account history
 
@@ -83,7 +83,7 @@ Manual captain setup (not performed by this task):
 3. In Authentication → URL Configuration, add the deployed frontend origin and local `http://localhost:5173` as allowed Site URLs (and redirect URLs if the project’s email-confirmation flow requires them).
 4. Set frontend `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` to the project URL and publishable key. Set backend `SUPABASE_URL` and server-only `SUPABASE_SECRET_KEY`; optionally set backend `SUPABASE_PUBLISHABLE_KEY` for Auth verification. Never place the secret key in frontend `.env`, Vite code, browser storage, or deployment variables exposed to the browser.
 
-Privacy boundary: persisted records contain only terminal match IDs, source/outcome, dates, topic IDs, player/opponent name snapshots, scores/correct counts, response timing, and aggregate per-topic attempts/correct/incorrect/accuracy/score/response time. They do not contain raw answers, answer keys, copied question text, arbitrary code, or chat. History is read only after a server-verified token and is scoped to that Auth user; anonymous requests receive 401 and cannot receive another user’s history. RLS remains closed to browser roles; the server-only persistence/history RPC is the database boundary.
+Account history is private and server-authorized. See [`backend/PERSISTENCE.md`](backend/PERSISTENCE.md) for its persisted fields, excluded content, in-memory fallback, and RLS boundary.
 
 ## Explicit exclusions
 

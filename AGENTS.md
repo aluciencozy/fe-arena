@@ -2,7 +2,7 @@
 
 ## Project snapshot
 
-FE Arena is an unofficial UCF Computer Science Foundation Exam study tool. It is an original black/dark-grey/gold React/Vite + Node/Express + Socket.IO application; it is not affiliated with UCF. Runtime room, match, queue, solo, and reconnect state is in memory for the MVP.
+FE Arena is an unofficial UCF Computer Science Foundation Exam study tool. It is an original black/dark-grey/gold React/Vite + Node/Express + Socket.IO application; it is not affiliated with UCF. Live room, match, queue, solo, and reconnect state is in memory for the MVP; optional signed-in account history/progress has a server-backed path with an in-memory fallback.
 
 ## Common commands
 
