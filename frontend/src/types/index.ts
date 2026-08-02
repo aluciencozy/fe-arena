@@ -2,6 +2,7 @@ import type {
   MatchConfig,
   MatchPhase,
   MatchSource,
+  PublicAnswer,
   PublicQuestion,
   QuestionAttempt,
   QuestionType,
@@ -15,6 +16,7 @@ export type {
   MatchConfig,
   MatchPhase,
   MatchSource,
+  PublicAnswer,
   PublicQuestion,
   QuestionAttempt,
   QuestionType,
@@ -33,7 +35,7 @@ export type SubmissionPublic = {
   submitted: boolean;
   correct: boolean | null;
   score: ScoreBreakdown | null;
-  answer: string | number | boolean | string[] | null;
+  answer: PublicAnswer | null;
 };
 export type RoundHistory = { round: number; question: RevealedQuestion; submissions: Record<string, SubmissionPublic> };
 export type MatchPublicState = {
@@ -51,6 +53,7 @@ export type MatchPublicState = {
   revealStartedAt: number | null;
   revealEndsAt: number | null;
   revealSkips: Record<string, boolean>;
+  rematchRequests: Record<string, boolean>;
   pause: { seatName: string; expiresAt: number } | null;
   ready: Record<string, boolean>;
   codingReady: Record<string, boolean>;

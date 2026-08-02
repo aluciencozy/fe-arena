@@ -22,6 +22,7 @@ import {
   submitAnswer,
   submitCodingResult,
   toggleReady,
+  requestRematch,
 } from "./match.service.js";
 import { QUESTION_BANK } from "../data/questions.js";
 import { inMemoryQuestionRepository, setQuestionRepository, type QuestionRepository } from "./question-bank.service.js";
@@ -258,6 +259,78 @@ test("reveal lasts thirty seconds, supports one-sided review, and both skips adv
   assert.equal(getMatchState(room.metadata.roomId)?.phase, "RESULTS");
   clearMatchesForTests();
   clearRoomsForTests();
+});
+
+test("rematch is two-sided, preserves results while pending, and selects a fresh pool after reconnect", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
+  clearMatchesForTests();
+  clearRoomsForTests();
+  const eligible = QUESTION_BANK.filter((question) => question.topicId === "stacks");
+  const first = eligible[0];
+  const second = eligible[1];
+  assert.ok(first && second);
+  if (!first || !second) return;
+  setQuestionRepository(fixedQuestionRepository([first, second]));
+  const oneRound = { topicIds: ["stacks"], roundCount: 1, questionTimerSeconds: 30 } as MatchConfig;
+  try {
+    const room = createRoom("private", oneRound, "Host");
+    attachSeat(room.metadata.roomId, room.seat, "host");
+    const guest = joinRoom(room.metadata.roomId, "Guest", "guest");
+    assert.equal(guest.ok, true);
+    if (!guest.ok) return;
+    ensureMatch(room.metadata.roomId);
+    toggleReady(room.metadata.roomId, room.seat.seatId, events());
+    toggleReady(room.metadata.roomId, guest.seat.seatId, events());
+    t.mock.timers.tick(3_000);
+    const questionId = getMatchState(room.metadata.roomId)?.question?.id;
+    assert.equal(questionId, first.id);
+    assert.ok(questionId);
+    assert.equal(
+      submitAnswer(
+        room.metadata.roomId,
+        "00000000-0000-0000-0000-000000000000",
+        { questionId, answer: "intruder" },
+        events(),
+      ).ok,
+      false,
+    );
+    submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId, answer: "host answer" }, events());
+    submitAnswer(room.metadata.roomId, guest.seat.seatId, { questionId, answer: "guest answer" }, events());
+    const reveal = getMatchState(room.metadata.roomId)!;
+    assert.equal(reveal.phase, "REVEAL");
+    assert.equal(reveal.submissions[room.seat.seatId]?.correct, false);
+    assert.equal(reveal.submissions[room.seat.seatId]?.answer, "host answer");
+    assert.equal(reveal.submissions[guest.seat.seatId]?.answer, "guest answer");
+    assert.equal(reveal.scores[room.seat.seatId]?.total, 0);
+    assert.equal(reveal.submissions[room.seat.seatId]?.score, null);
+    assert.ok(reveal.revealedQuestion?.answer !== undefined);
+    t.mock.timers.tick(30_000);
+    const results = getMatchState(room.metadata.roomId)!;
+    assert.equal(results.phase, "RESULTS");
+    assert.equal(results.history.length, 1);
+
+    assert.equal(requestRematch(room.metadata.roomId, room.seat.seatId, events()).ok, true);
+    const pending = getMatchState(room.metadata.roomId)!;
+    assert.equal(pending.phase, "RESULTS");
+    assert.equal(pending.rematchRequests[room.seat.seatId], true);
+    assert.equal(pending.history.length, 1);
+
+    assert.ok(disconnectSocket("guest"));
+    assert.ok(reconnectRoom(room.metadata.roomId, guest.seat.reconnectToken, "guest-reconnected").ok);
+    assert.equal(requestRematch(room.metadata.roomId, guest.seat.seatId, events()).ok, true);
+    const rematch = getMatchState(room.metadata.roomId)!;
+    assert.equal(rematch.phase, "REMATCH");
+    assert.equal(rematch.history.length, 0);
+    assert.equal(rematch.rematchRequests[room.seat.seatId], false);
+    toggleReady(room.metadata.roomId, room.seat.seatId, events());
+    toggleReady(room.metadata.roomId, guest.seat.seatId, events());
+    t.mock.timers.tick(3_000);
+    assert.equal(getMatchState(room.metadata.roomId)?.question?.id, second.id);
+  } finally {
+    setQuestionRepository(inMemoryQuestionRepository);
+    clearMatchesForTests();
+    clearRoomsForTests();
+  }
 });
 
 test("reconnect pauses and resumes the reveal deadline without exposing answers early", (t) => {
