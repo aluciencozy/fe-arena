@@ -9,7 +9,7 @@ This document prepares deployable artifacts; it does **not** deploy FE Arena, ap
 3. Serve `frontend/dist` from a static host. The backend is a long-running Node process and must not be replaced by a static function: live rooms, queues, reconnects, and matches remain in memory for this MVP.
 4. Configure the backend health checks as `GET /healthz` (process liveness) and `GET /readyz` (persistence readiness). `/readyz` reports a safe `fallback` state when Supabase is intentionally omitted and returns HTTP 503 in production for that degraded configuration.
 
-No secret is needed for a guest-only local or CI run. Backend startup prints only non-secret mode, port, origin, proxy, persistence mode, and auth-enabled diagnostics.
+No secret is needed for a guest-only local or CI run. Backend startup prints only non-secret mode, configured frontend origins, port, proxy, persistence mode, guest-gameplay, and Auth diagnostics.
 
 ## Backend environment
 
