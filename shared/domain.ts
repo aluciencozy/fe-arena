@@ -316,7 +316,7 @@ export type MatchConfig = z.infer<typeof MatchConfigSchema>;
 export const CreatePrivateSchema = z.object({ username: z.string().trim().min(1).max(24), config: MatchConfigSchema });
 export const JoinRoomSchema = z.object({ roomId: z.string().trim().regex(/^[A-Z0-9]{6}$/i), username: z.string().trim().min(1).max(24) });
 export const ReconnectSchema = z.object({ roomId: z.string().trim().regex(/^[A-Z0-9]{6}$/i), reconnectToken: z.string().uuid() });
-export const QueueJoinSchema = z.object({ username: z.string().trim().min(1).max(24) });
+export const QueueJoinSchema = z.object({ username: z.string().trim().min(1).max(24), queueToken: z.string().uuid().optional() });
 export const ChatSchema = z.object({ message: z.string().trim().min(1).max(280) });
 export const SubmitSchema = QuestionAttemptSchema;
 export const SoloStartSchema = z.object({
@@ -324,6 +324,7 @@ export const SoloStartSchema = z.object({
   count: z.number().int().min(1).max(MAX_ROUND_COUNT).default(DEFAULT_ROUND_COUNT),
   timerSeconds: z.number().int().min(QUESTION_TIMER_MIN_SECONDS).max(QUESTION_TIMER_MAX_SECONDS).default(120),
 });
+export const AuthUpdateSchema = z.object({ accessToken: z.string().max(8192).nullable() });
 
 export const PublicQuestionSchema = z.object({
   id: z.string().min(1),
@@ -416,6 +417,7 @@ export const ClientEventSchemas = {
   "solo:start": SoloStartSchema,
   "solo:submit": SubmitSchema,
   "solo:next": NoPayloadSchema,
+  "auth:update": AuthUpdateSchema,
 } as const;
 export const ServerEventSchemas = {
   "room:created": z.object({ roomId: z.string().regex(/^[A-Z0-9]{6}$/), metadata: RoomMetadataSchema, seatId: z.string().uuid(), reconnectToken: z.string().uuid() }),
@@ -423,7 +425,7 @@ export const ServerEventSchemas = {
   "room:state": RoomStateSchema,
   "room:reconnect-failed": z.object({ message: z.string().min(1) }),
   "queue:state": z.discriminatedUnion("status", [
-    z.object({ status: z.literal("waiting"), expiresAt: z.number() }),
+    z.object({ status: z.literal("waiting"), expiresAt: z.number(), queueToken: z.string().uuid() }),
     z.object({ status: z.enum(["expired", "cancelled"]) }),
   ]),
   "queue:matched": z.object({ roomId: z.string().regex(/^[A-Z0-9]{6}$/), metadata: RoomMetadataSchema }),

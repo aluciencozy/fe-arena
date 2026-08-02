@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { clearQueueForTests, dequeue, enqueue, publicConfig, queuePosition } from "./queue.service.js";
+import { clearQueueForTests, dequeue, enqueue, publicConfig, queuePosition, suspend } from "./queue.service.js";
 
 test("public queue matches FIFO entries and uses fixed five-minute settings", () => {
   clearQueueForTests();
@@ -24,7 +24,7 @@ test("queue leave is idempotent", () => {
 });
 
 test("queue entries expire after five minutes", (t) => {
-  t.mock.timers.enable({ apis: ["setTimeout"], now: 0 });
+  t.mock.timers.enable({ apis: ["Date", "setTimeout"], now: 0 });
   clearQueueForTests();
   let expired = false;
   enqueue({ socketId: "socket-a", username: "Ada", queuedAt: 0 }, () => { expired = true; });
@@ -34,5 +34,38 @@ test("queue entries expire after five minutes", (t) => {
   t.mock.timers.tick(1);
   assert.equal(expired, true);
   assert.equal(queuePosition("socket-a"), 0);
+  clearQueueForTests();
+});
+
+test("queue reattachment preserves the original position and deadline", () => {
+  clearQueueForTests();
+  const queuedAt = Date.now();
+  const first = enqueue({ socketId: "socket-a", username: "Ada", queuedAt });
+  assert.equal(first.status, "waiting");
+  if (first.status !== "waiting") return;
+  assert.equal(suspend("socket-a"), true);
+  const second = enqueue({ socketId: "socket-b", username: "Grace", queuedAt: queuedAt + 1 });
+  assert.equal(second.status, "waiting");
+  assert.equal(queuePosition("socket-b"), 2);
+  const reattached = enqueue({ socketId: "socket-a-new", username: "Ada", queuedAt: Date.now(), queueToken: first.queueToken });
+  assert.equal(reattached.status, "waiting");
+  if (reattached.status !== "waiting") return;
+  assert.equal(reattached.expiresAt, first.expiresAt);
+  assert.equal(queuePosition("socket-a-new"), 1);
+  const third = enqueue({ socketId: "socket-c", username: "Lin", queuedAt: Date.now() });
+  assert.equal(third.status, "matched");
+  if (third.status === "matched") assert.equal(third.opponent.username, "Ada");
+  clearQueueForTests();
+});
+
+test("expired queue tokens cannot start a new wait", (t) => {
+  t.mock.timers.enable({ apis: ["Date", "setTimeout"], now: 0 });
+  clearQueueForTests();
+  const first = enqueue({ socketId: "socket-a", username: "Ada", queuedAt: 0 });
+  assert.equal(first.status, "waiting");
+  if (first.status !== "waiting") return;
+  t.mock.timers.tick(300_000);
+  const retry = enqueue({ socketId: "socket-a-new", username: "Ada", queuedAt: Date.now(), queueToken: first.queueToken });
+  assert.equal(retry.status, "expired");
   clearQueueForTests();
 });

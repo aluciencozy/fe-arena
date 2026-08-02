@@ -4,8 +4,9 @@ import {
   ServerEventSchemas,
   type QuestionAttempt,
 } from "../../../shared/domain.js";
-import { createRoom, attachSeat, disconnectSocket, getMetadata, getRoomForSocket, getSeatForSocket, getSeats, joinRoom, reconnectRoom, removeSeat } from "../services/room.service.js";
-import { enqueue, dequeue, publicConfig } from "../services/queue.service.js";
+import type { AuthVerifier } from "../services/auth.service.js";
+import { createRoom, attachSeat, bindSeatAuthIdentity, disconnectSocket, getMetadata, getRoomForSocket, getSeatForSocket, getSeats, joinRoom, reconnectRoom, removeSeat } from "../services/room.service.js";
+import { enqueue, dequeue, publicConfig, suspend } from "../services/queue.service.js";
 import { clearMatch, configureMatch, ensureMatch, getMatchState, leaveMatch, pauseForDisconnect, resumeAfterReconnect, skipReveal, submitAnswer, toggleReady, requestRematch } from "../services/match.service.js";
 import { soloNext, soloSubmit, startSolo } from "../services/solo.service.js";
 
@@ -26,6 +27,10 @@ const makeEvents = (io: Server, roomId: string) => ({
   message: (text: string) => io.to(roomId).emit("chat:message", output(ServerEventSchemas["chat:message"], { type: "system", sender: "FE Arena", text, sentAt: Date.now() })),
 });
 const error = (socket: Socket, message: string, code = "BAD_REQUEST") => socket.emit("server:error", output(ServerEventSchemas["server:error"], { code, message }));
+const bindVerifiedIdentity = (socket: Socket, roomId: string, seatId: string) => {
+  const authUserId = (socket.data as { authUserId?: unknown }).authUserId;
+  bindSeatAuthIdentity(roomId, seatId, typeof authUserId === "string" ? authUserId : undefined);
+};
 const session = (socket: Socket) => {
   const seat = getSeatForSocket(socket.id);
   const roomId = getRoomForSocket(socket.id);
@@ -69,12 +74,25 @@ const validateEmpty = (socket: Socket, schema: { safeParse: (value: unknown) => 
   return false;
 };
 
-export const registerHandlers = (io: Server, socket: Socket) => {
+export const registerHandlers = (io: Server, socket: Socket, authVerifier: AuthVerifier) => {
+  socket.on("auth:update", async (payload: unknown) => {
+    const input = validate(socket, ClientEventSchemas["auth:update"], payload);
+    if (!input) return;
+    let authUserId: string | undefined;
+    if (input.accessToken) {
+      try { authUserId = (await authVerifier.verifyAccessToken(input.accessToken))?.id; } catch { authUserId = undefined; }
+    }
+    socket.data.authUserId = authUserId;
+    const current = session(socket);
+    if (current) bindSeatAuthIdentity(current.roomId, current.seat.seatId, authUserId);
+  });
+
   socket.on("room:create-private", (payload: unknown) => {
     const input = validate(socket, ClientEventSchemas["room:create-private"], payload);
     if (!input) return;
     const created = createRoom("private", input.config, input.username);
     attachSeat(created.metadata.roomId, created.seat, socket.id);
+    bindVerifiedIdentity(socket, created.metadata.roomId, created.seat.seatId);
     enterRoom(io, socket, created.metadata.roomId, created.seat);
     socket.emit("room:created", output(ServerEventSchemas["room:created"], { roomId: created.metadata.roomId, metadata: created.metadata, seatId: created.seat.seatId, reconnectToken: created.seat.reconnectToken }));
   });
@@ -84,6 +102,7 @@ export const registerHandlers = (io: Server, socket: Socket) => {
     if (!input) return;
     const result = joinRoom(input.roomId, input.username, socket.id);
     if (!result.ok) { error(socket, result.error, "ROOM_NOT_FOUND"); return; }
+    bindVerifiedIdentity(socket, result.metadata.roomId, result.seat.seatId);
     enterRoom(io, socket, result.metadata.roomId, result.seat);
     io.to(result.metadata.roomId).emit("chat:message", output(ServerEventSchemas["chat:message"], { type: "system", sender: "FE Arena", text: `${result.seat.name} joined the study room.`, sentAt: Date.now() }));
   });
@@ -91,18 +110,21 @@ export const registerHandlers = (io: Server, socket: Socket) => {
   socket.on("queue:join", (payload: unknown) => {
     const input = validate(socket, ClientEventSchemas["queue:join"], payload);
     if (!input) return;
-    const result = enqueue({ socketId: socket.id, username: input.username, queuedAt: Date.now() }, () => socket.emit("queue:state", output(ServerEventSchemas["queue:state"], { status: "expired" })));
-    if (result.status === "waiting") { socket.emit("queue:state", output(ServerEventSchemas["queue:state"], { status: "waiting", expiresAt: result.expiresAt })); return; }
+    const result = enqueue({ socketId: socket.id, username: input.username, queueToken: input.queueToken, queuedAt: Date.now() }, () => socket.emit("queue:state", output(ServerEventSchemas["queue:state"], { status: "expired" })));
+    if (result.status === "expired") { socket.emit("queue:state", output(ServerEventSchemas["queue:state"], { status: "expired" })); return; }
+    if (result.status === "waiting") { socket.emit("queue:state", output(ServerEventSchemas["queue:state"], { status: "waiting", expiresAt: result.expiresAt, queueToken: result.queueToken })); return; }
     const opponentSocket = io.sockets.sockets.get(result.opponent.socketId);
     if (!opponentSocket) {
-      const retry = enqueue({ socketId: socket.id, username: input.username, queuedAt: Date.now() }, () => socket.emit("queue:state", output(ServerEventSchemas["queue:state"], { status: "expired" })));
-      if (retry.status === "waiting") socket.emit("queue:state", output(ServerEventSchemas["queue:state"], { status: "waiting", expiresAt: retry.expiresAt }));
+      const retry = enqueue({ socketId: socket.id, username: result.entry.username, queuedAt: result.entry.queuedAt }, () => socket.emit("queue:state", output(ServerEventSchemas["queue:state"], { status: "expired" })));
+      if (retry.status === "waiting") socket.emit("queue:state", output(ServerEventSchemas["queue:state"], { status: "waiting", expiresAt: retry.expiresAt, queueToken: retry.queueToken }));
       return;
     }
     const created = createRoom("public", publicConfig, result.opponent.username);
     attachSeat(created.metadata.roomId, created.seat, result.opponent.socketId);
+    bindVerifiedIdentity(opponentSocket, created.metadata.roomId, created.seat.seatId);
     const joined = joinRoom(created.metadata.roomId, input.username, socket.id);
     if (!joined.ok) { error(socket, "The public match could not be seated. Try again.", "QUEUE_RETRY"); return; }
+    bindVerifiedIdentity(socket, created.metadata.roomId, joined.seat.seatId);
     enterRoom(io, opponentSocket, created.metadata.roomId, created.seat);
     enterRoom(io, socket, created.metadata.roomId, joined.seat);
     io.to(created.metadata.roomId).emit("queue:matched", output(ServerEventSchemas["queue:matched"], { roomId: created.metadata.roomId, metadata: created.metadata }));
@@ -119,6 +141,7 @@ export const registerHandlers = (io: Server, socket: Socket) => {
     const timer = reconnectTimers.get(result.seat.reconnectToken);
     if (timer) clearTimeout(timer);
     reconnectTimers.delete(result.seat.reconnectToken);
+    bindVerifiedIdentity(socket, result.metadata.roomId, result.seat.seatId);
     enterRoom(io, socket, result.metadata.roomId, result.seat);
     resumeAfterReconnect(result.metadata.roomId, makeEvents(io, result.metadata.roomId));
     emitRoom(io, result.metadata.roomId);
@@ -210,7 +233,7 @@ export const registerHandlers = (io: Server, socket: Socket) => {
   });
 
   socket.on("disconnect", () => {
-    dequeue(socket.id);
+    suspend(socket.id);
     chatTimes.delete(socket.id);
     const current = session(socket);
     if (!current) return;

@@ -2,7 +2,7 @@
 
 ## Project snapshot
 
-FE Arena is an unofficial UCF Computer Science Foundation Exam study tool. It is an original black/dark-grey/gold React/Vite + Node/Express + Socket.IO application; it is not affiliated with UCF. Runtime room, match, queue, solo, and reconnect state is in memory for the MVP.
+FE Arena is an unofficial UCF Computer Science Foundation Exam study tool. It is an original black/dark-grey/gold React/Vite + Node/Express + Socket.IO application; it is not affiliated with UCF. Live room, match, queue, solo, and reconnect state is in memory for the MVP; optional signed-in account history/progress has a server-backed path with an in-memory fallback.
 
 ## Common commands
 
@@ -22,8 +22,9 @@ Defaults are frontend `http://localhost:5173` and backend `http://localhost:3001
 - Match state machine/deadlines/scoring: `backend/src/services/match.service.ts`.
 - Stable seats/reconnect tokens: `backend/src/services/room.service.ts`.
 - FIFO public queue and five-minute expiry: `backend/src/services/queue.service.ts`.
-- Validated Socket.IO event surface: `backend/src/sockets/handlers.ts`.
-- Responsive product UI: `frontend/src/pages/Home.tsx`, `frontend/src/pages/Room.tsx`, and `frontend/src/pages/Solo.tsx`.
+- Validated Socket.IO event surface and server-verified Auth seat linking: `backend/src/sockets/handlers.ts`, `backend/src/services/auth.service.ts`, and `backend/src/services/room.service.ts`.
+- Optional account history/progress persistence and aggregation: `backend/src/persistence/account-history.ts`, `backend/src/services/account-history.service.ts`, and `supabase/migrations/202603080005_account_history.sql`.
+- Responsive product UI: `frontend/src/pages/Home.tsx`, `frontend/src/pages/Room.tsx`, `frontend/src/pages/Solo.tsx`, and optional account view `frontend/src/pages/Account.tsx`.
 
 ## Durable implementation notes
 

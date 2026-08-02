@@ -1,4 +1,5 @@
-import type { MatchConfig, MatchSource } from "../../../shared/domain.js";
+import type { MatchConfig, MatchSource, TopicId } from "../../../shared/domain.js";
+import type { AccountHistory } from "./account-history.js";
 
 export const PERSISTENCE_SCHEMA_VERSION = 1;
 export const QUESTION_BANK_VERSION = "fe-arena-question-bank-v2";
@@ -8,6 +9,8 @@ export type TerminalOutcome = "completed" | "draw" | "forfeit" | "abandoned" | "
 export type TerminalPlayerSummary = {
   seatId: string;
   guestSessionOwner: string;
+  /** Only populated from a server-verified Supabase Auth identity. */
+  authUserId?: string;
   username: string;
   scoreTotal: number;
   correctCount: number;
@@ -18,9 +21,12 @@ export type TerminalPlayerSummary = {
 export type TerminalRoundSummary = {
   roundNumber: number;
   questionId: string;
+  /** The topic is a stable server-selected ID, never copied prompt content. */
+  topicId?: TopicId;
   questionBankVersion: string;
   correctness: Record<string, boolean | null>;
   responseMs: Record<string, number | null>;
+  score?: Record<string, number | null>;
 };
 
 export type TerminalMatchSnapshot = {
@@ -51,4 +57,8 @@ export type PersistTerminalResult = {
  */
 export interface MatchRepository {
   persistTerminalMatch(snapshot: TerminalMatchSnapshot): Promise<PersistTerminalResult>;
+}
+
+export interface AccountHistoryRepository {
+  getAccountHistory(authUserId: string): Promise<AccountHistory>;
 }
