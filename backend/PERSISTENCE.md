@@ -16,4 +16,6 @@ The server sends opaque guest-session owner identifiers (a hash of the server-is
 
 All tables have RLS enabled with no anonymous or authenticated policies. The server-only API-key path is the only intended write path today. Authenticated terminal summaries are linked only when the server has verified the Supabase access token. `account_match_history` and `account_topic_progress` are read through a server-only RPC scoped by the verified Auth user ID; browser roles remain denied by RLS. Missing Supabase configuration uses the in-memory repository, including private account-history fallback for local development.
 
+`account_match_history.source` preserves the terminal snapshot's match source as `private` or `public`, and `get_account_history` returns that value to the authorized account view.
+
 Socket.IO is intentionally retained. A separate, explicitly scoped transport migration should evaluate whether it can eventually be removed; durable persistence is not that migration.
