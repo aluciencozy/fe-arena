@@ -34,7 +34,13 @@ export const generateRoomId = () => {
 };
 
 export const createRoom = (source: MatchSource, config: MatchConfig, hostName: string) => {
-  const seat: RoomSeat = { seatId: randomUUID(), name: hostName.trim(), reconnectToken: randomUUID(), socketId: null, connected: false };
+  const seat: RoomSeat = {
+    seatId: randomUUID(),
+    name: hostName.trim(),
+    reconnectToken: randomUUID(),
+    socketId: null,
+    connected: false,
+  };
   const metadata: RoomMetadata = { roomId: generateRoomId(), source, hostSeatId: seat.seatId, config };
   rooms.set(metadata.roomId, { metadata, seats: [seat] });
   tokenSeats.set(seat.reconnectToken, { roomId: metadata.roomId, seatId: seat.seatId });
@@ -44,7 +50,8 @@ export const createRoom = (source: MatchSource, config: MatchConfig, hostName: s
 export const getRoom = (roomId: string) => rooms.get(normalizeRoomId(roomId));
 export const getMetadata = (roomId: string) => getRoom(roomId)?.metadata;
 export const getSeats = (roomId: string) => getRoom(roomId)?.seats ?? [];
-export const getSeat = (roomId: string, seatId: string) => getRoom(roomId)?.seats.find((seat) => seat.seatId === seatId);
+export const getSeat = (roomId: string, seatId: string) =>
+  getRoom(roomId)?.seats.find((seat) => seat.seatId === seatId);
 export const bindSeatAuthIdentity = (roomId: string, seatId: string, authUserId: string | undefined) => {
   const seat = getSeat(roomId, seatId);
   if (!seat) return false;
@@ -89,11 +96,17 @@ export const reconnectRoom = (roomIdInput: string, token: string, socketId: stri
   const roomId = normalizeRoomId(roomIdInput);
   const location = tokenSeats.get(token);
   const current = socketSeats.get(socketId);
-  if (!location || location.roomId !== roomId || (current && (current.roomId !== roomId || current.seatId !== location.seatId))) return { ok: false as const, error: "That guest seat is no longer available." };
+  if (
+    !location ||
+    location.roomId !== roomId ||
+    (current && (current.roomId !== roomId || current.seatId !== location.seatId))
+  )
+    return { ok: false as const, error: "That guest seat is no longer available." };
   const seat = getSeat(roomId, location.seatId);
   const metadata = getMetadata(roomId);
   if (!seat || !metadata) return { ok: false as const, error: "That match has expired." };
-  if (seat.socketId && seat.socketId !== socketId) return { ok: false as const, error: "That guest seat is connected elsewhere." };
+  if (seat.socketId && seat.socketId !== socketId)
+    return { ok: false as const, error: "That guest seat is connected elsewhere." };
   attachSeat(roomId, seat, socketId);
   return { ok: true as const, seat, metadata };
 };
@@ -136,4 +149,8 @@ export const removeRoom = (roomIdInput: string) => {
 };
 
 export const seatNames = (roomId: string) => getSeats(roomId).map((seat) => seat.name);
-export const clearRoomsForTests = () => { rooms.clear(); socketSeats.clear(); tokenSeats.clear(); };
+export const clearRoomsForTests = () => {
+  rooms.clear();
+  socketSeats.clear();
+  tokenSeats.clear();
+};

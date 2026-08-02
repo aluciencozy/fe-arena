@@ -36,7 +36,8 @@ export class InMemoryMatchRepository implements MatchRepository, AccountHistoryR
 
   getForOwner(matchId: string, guestSessionOwner: string): TerminalMatchSnapshot | undefined {
     const snapshot = this.records.get(matchId);
-    if (!snapshot || !snapshot.players.some((player) => player.guestSessionOwner === guestSessionOwner)) return undefined;
+    if (!snapshot || !snapshot.players.some((player) => player.guestSessionOwner === guestSessionOwner))
+      return undefined;
     return structuredClone(snapshot);
   }
 

@@ -1,12 +1,22 @@
 import { randomUUID } from "node:crypto";
-import { PUBLIC_QUEUE_MAX_WAIT_SECONDS, PUBLIC_QUESTION_SECONDS, DEFAULT_ROUND_COUNT, TOPICS, type MatchConfig } from "../../../shared/domain.js";
+import {
+  PUBLIC_QUEUE_MAX_WAIT_SECONDS,
+  PUBLIC_QUESTION_SECONDS,
+  DEFAULT_ROUND_COUNT,
+  TOPICS,
+  type MatchConfig,
+} from "../../../shared/domain.js";
 
 export type QueueEntry = { socketId: string; username: string; queuedAt: number; queueToken?: string };
 type StoredQueueEntry = QueueEntry & { queueToken: string; connected: boolean };
 const entries: StoredQueueEntry[] = [];
 const queueTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const expiryHandlers = new Map<string, () => void>();
-export const publicConfig: MatchConfig = { topicIds: TOPICS.map((topic) => topic.id), roundCount: DEFAULT_ROUND_COUNT, questionTimerSeconds: PUBLIC_QUESTION_SECONDS };
+export const publicConfig: MatchConfig = {
+  topicIds: TOPICS.map((topic) => topic.id),
+  roundCount: DEFAULT_ROUND_COUNT,
+  questionTimerSeconds: PUBLIC_QUESTION_SECONDS,
+};
 
 const clearTimer = (queueToken: string) => {
   const timer = queueTimers.get(queueToken);
@@ -28,11 +38,16 @@ const expire = (queueToken: string) => {
 const scheduleExpiry = (entry: StoredQueueEntry, onExpire?: () => void) => {
   if (onExpire) expiryHandlers.set(entry.queueToken, onExpire);
   const delay = Math.max(0, entry.queuedAt + PUBLIC_QUEUE_MAX_WAIT_SECONDS * 1000 - Date.now());
-  queueTimers.set(entry.queueToken, setTimeout(() => expire(entry.queueToken), delay));
+  queueTimers.set(
+    entry.queueToken,
+    setTimeout(() => expire(entry.queueToken), delay),
+  );
 };
 
 export const enqueue = (entry: QueueEntry, onExpire?: () => void) => {
-  const existing = entry.queueToken ? entries.find((candidate) => candidate.queueToken === entry.queueToken) : undefined;
+  const existing = entry.queueToken
+    ? entries.find((candidate) => candidate.queueToken === entry.queueToken)
+    : undefined;
   if (entry.queueToken && !existing) return { status: "expired" as const };
   if (existing) {
     if (existing.socketId !== entry.socketId) dequeue(entry.socketId);
@@ -40,7 +55,11 @@ export const enqueue = (entry: QueueEntry, onExpire?: () => void) => {
     existing.username = entry.username;
     existing.connected = true;
     if (onExpire) expiryHandlers.set(existing.queueToken, onExpire);
-    return { status: "waiting" as const, expiresAt: existing.queuedAt + PUBLIC_QUEUE_MAX_WAIT_SECONDS * 1000, queueToken: existing.queueToken };
+    return {
+      status: "waiting" as const,
+      expiresAt: existing.queuedAt + PUBLIC_QUEUE_MAX_WAIT_SECONDS * 1000,
+      queueToken: existing.queueToken,
+    };
   }
 
   dequeue(entry.socketId);
@@ -55,7 +74,11 @@ export const enqueue = (entry: QueueEntry, onExpire?: () => void) => {
 
   entries.push(normalized);
   scheduleExpiry(normalized, onExpire);
-  return { status: "waiting" as const, expiresAt: normalized.queuedAt + PUBLIC_QUEUE_MAX_WAIT_SECONDS * 1000, queueToken: normalized.queueToken };
+  return {
+    status: "waiting" as const,
+    expiresAt: normalized.queuedAt + PUBLIC_QUEUE_MAX_WAIT_SECONDS * 1000,
+    queueToken: normalized.queueToken,
+  };
 };
 
 export const dequeue = (socketId: string) => {
@@ -72,4 +95,9 @@ export const suspend = (socketId: string) => {
   return true;
 };
 export const queuePosition = (socketId: string) => entries.findIndex((entry) => entry.socketId === socketId) + 1;
-export const clearQueueForTests = () => { for (const timer of queueTimers.values()) clearTimeout(timer); entries.length = 0; queueTimers.clear(); expiryHandlers.clear(); };
+export const clearQueueForTests = () => {
+  for (const timer of queueTimers.values()) clearTimeout(timer);
+  entries.length = 0;
+  queueTimers.clear();
+  expiryHandlers.clear();
+};

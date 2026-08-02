@@ -14,9 +14,8 @@ export type ServerPersistenceEnvironment = {
   SUPABASE_SECRET_KEY?: string;
 };
 
-export const hasSupabaseConfiguration = (environment: ServerPersistenceEnvironment): boolean => Boolean(
-  environment.SUPABASE_URL?.trim() && environment.SUPABASE_SECRET_KEY?.trim(),
-);
+export const hasSupabaseConfiguration = (environment: ServerPersistenceEnvironment): boolean =>
+  Boolean(environment.SUPABASE_URL?.trim() && environment.SUPABASE_SECRET_KEY?.trim());
 
 export const createMatchRepository = (
   environment: ServerPersistenceEnvironment = process.env,

@@ -71,7 +71,8 @@ printf("%d", x);`,
 };
 
 const makeInMemoryRepository = (questions: readonly Question[]): QuestionRepository => ({
-  list: (topicIds) => topicIds?.length ? questions.filter((question) => topicIds.includes(question.topicId)) : [...questions],
+  list: (topicIds) =>
+    topicIds?.length ? questions.filter((question) => topicIds.includes(question.topicId)) : [...questions],
   select: (seed, count, topicIds) => selectSeededQuestions(questions, seed, count, topicIds),
   get: (id) => questions.find((question) => question.id === id),
 });
@@ -100,7 +101,17 @@ export type QuestionBankRow = {
 
 export const questionToRow = (question: Question): Omit<QuestionBankRow, "schema_version" | "published"> => {
   const { id, topicId, type, prompt, explanation, assumptions, provenance, difficulty, ...content } = question;
-  return { id, topic_id: topicId, question_type: type, prompt, explanation, assumptions, provenance, difficulty, content };
+  return {
+    id,
+    topic_id: topicId,
+    question_type: type,
+    prompt,
+    explanation,
+    assumptions,
+    provenance,
+    difficulty,
+    content,
+  };
 };
 
 export const questionFromRow = (row: QuestionBankRow): Question => {
@@ -134,7 +145,9 @@ export class SupabaseQuestionRepository implements QuestionRepository {
   }
 
   list(topicIds?: readonly TopicId[]): Question[] {
-    return topicIds?.length ? this.questions.filter((question) => topicIds.includes(question.topicId)) : [...this.questions];
+    return topicIds?.length
+      ? this.questions.filter((question) => topicIds.includes(question.topicId))
+      : [...this.questions];
   }
 
   select(seed: string, count: number, topicIds?: readonly TopicId[]): Question[] {
@@ -147,18 +160,19 @@ export class SupabaseQuestionRepository implements QuestionRepository {
 }
 
 export type QuestionBankEnvironment = { SUPABASE_URL?: string; SUPABASE_SECRET_KEY?: string };
-export const hasQuestionBankConfiguration = (environment: QuestionBankEnvironment): boolean => Boolean(
-  environment.SUPABASE_URL?.trim() && environment.SUPABASE_SECRET_KEY?.trim(),
-);
+export const hasQuestionBankConfiguration = (environment: QuestionBankEnvironment): boolean =>
+  Boolean(environment.SUPABASE_URL?.trim() && environment.SUPABASE_SECRET_KEY?.trim());
 
 export const loadQuestionRepository = async (
   environment: QuestionBankEnvironment = process.env,
   client?: SupabaseClient,
 ): Promise<QuestionRepository> => {
   if (!hasQuestionBankConfiguration(environment)) return inMemoryQuestionRepository;
-  const supabase = client ?? createClient(environment.SUPABASE_URL!.trim(), environment.SUPABASE_SECRET_KEY!.trim(), {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
+  const supabase =
+    client ??
+    createClient(environment.SUPABASE_URL!.trim(), environment.SUPABASE_SECRET_KEY!.trim(), {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
   const { data, error } = await supabase
     .from("question_bank")
     .select("*")
@@ -172,7 +186,9 @@ export const loadQuestionRepository = async (
 
 /** The match and solo services use this live binding; startup swaps it after the DB load. */
 export let questionRepository: QuestionRepository = inMemoryQuestionRepository;
-export const setQuestionRepository = (repository: QuestionRepository) => { questionRepository = repository; };
+export const setQuestionRepository = (repository: QuestionRepository) => {
+  questionRepository = repository;
+};
 
 export const publicQuestion = (question: Question): PublicQuestion => toPublicQuestion(question);
 export const revealedQuestion = (question: Question): RevealedQuestion => toRevealedQuestion(question);
@@ -181,6 +197,10 @@ export const questionBankStats = () => {
   return {
     total: questions.length,
     topics: new Set(questions.map((question) => question.topicId)).size,
-    types: Object.fromEntries([...new Set(questions.map((question) => question.type))].sort().map((type) => [type, questions.filter((question) => question.type === type).length])),
+    types: Object.fromEntries(
+      [...new Set(questions.map((question) => question.type))]
+        .sort()
+        .map((type) => [type, questions.filter((question) => question.type === type).length]),
+    ),
   };
 };

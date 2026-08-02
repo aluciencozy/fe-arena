@@ -28,7 +28,11 @@ export const createServerRuntime = async (config: RuntimeConfig): Promise<Server
     runtimeConfig: config,
     authVerifier,
     accountHistoryRepository: matchRepository,
-    persistence: { configured: config.supabase.configured, mode: config.supabase.configured ? "supabase" : "in-memory-fallback", ready: true },
+    persistence: {
+      configured: config.supabase.configured,
+      mode: config.supabase.configured ? "supabase" : "in-memory-fallback",
+      ready: true,
+    },
   });
 
   const httpServer = createHttpServer(app);
@@ -38,13 +42,18 @@ export const createServerRuntime = async (config: RuntimeConfig): Promise<Server
   const connectionLimiter = new FixedWindowLimiter(60, 60_000);
   const activeByAddress = new Map<string, number>();
   const io = new Server(httpServer, {
-    cors: { origin: [...config.frontendOrigins], methods: ["GET", "POST"], allowedHeaders: ["Content-Type", "Authorization"] },
+    cors: {
+      origin: [...config.frontendOrigins],
+      methods: ["GET", "POST"],
+      allowedHeaders: ["Content-Type", "Authorization"],
+    },
     maxHttpBufferSize: 16 * 1024,
     pingTimeout: 20_000,
     pingInterval: 25_000,
     allowRequest: (request, callback) => {
       const origin = typeof request.headers.origin === "string" ? request.headers.origin : undefined;
-      if (!isAllowedOrigin(origin, config.frontendOrigins, config.isProduction)) return callback("Origin is not allowed.", false);
+      if (!isAllowedOrigin(origin, config.frontendOrigins, config.isProduction))
+        return callback("Origin is not allowed.", false);
       const address = request.socket.remoteAddress ?? "unknown";
       const decision = connectionLimiter.check(address);
       if (!decision.allowed) return callback("Connection rate limit exceeded.", false);
@@ -89,7 +98,10 @@ export const createServerRuntime = async (config: RuntimeConfig): Promise<Server
 export const startServer = async (config: RuntimeConfig): Promise<ServerRuntime> => {
   const runtime = await createServerRuntime(config);
   await new Promise<void>((resolve, reject) => {
-    const onError = (error: Error) => { runtime.httpServer.off("error", onError); reject(error); };
+    const onError = (error: Error) => {
+      runtime.httpServer.off("error", onError);
+      reject(error);
+    };
     runtime.httpServer.once("error", onError);
     runtime.httpServer.listen(config.port, () => {
       runtime.httpServer.off("error", onError);

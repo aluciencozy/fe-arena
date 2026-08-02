@@ -18,6 +18,7 @@ create table if not exists public.account_match_history (
   player_identity_id uuid not null references public.player_identities(id),
   username_snapshot text not null,
   opponent_username_snapshot text null,
+  source text not null,
   result text not null,
   terminal_outcome text not null,
   player_score integer not null default 0,
@@ -29,8 +30,34 @@ create table if not exists public.account_match_history (
   finished_at timestamptz not null,
   schema_version integer not null,
   primary key (auth_user_id, match_id),
+  constraint account_history_source check (source in ('private', 'public')),
   constraint account_history_result check (result in ('win', 'loss', 'draw', 'forfeit', 'abandoned', 'expired'))
 );
+
+-- Keep reruns safe for an account-history table created by an earlier version of this migration.
+alter table public.account_match_history add column if not exists source text;
+update public.account_match_history as history
+set source = matches.source
+from public.matches
+where matches.id = history.match_id
+  and history.source is null;
+alter table public.account_match_history alter column source set not null;
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'account_history_source'
+      and conrelid = 'public.account_match_history'::regclass
+  ) then
+    alter table public.account_match_history
+      add constraint account_history_source check (source in ('private', 'public'));
+  end if;
+end;
+$$;
+
+comment on column public.account_match_history.source is
+  'Terminal match source copied from matches.source: private or public.';
 
 create table if not exists public.account_topic_progress (
   auth_user_id uuid not null,
@@ -157,12 +184,12 @@ begin
     end;
     insert into public.account_match_history (
       auth_user_id, match_id, player_identity_id, username_snapshot, opponent_username_snapshot,
-      result, terminal_outcome, player_score, opponent_score, player_correct_count,
+      source, result, terminal_outcome, player_score, opponent_score, player_correct_count,
       opponent_correct_count, topic_ids, started_at, finished_at, schema_version
     ) values (
       v_auth_user_id, v_match_id,
       (select id from public.player_identities where guest_session_owner = v_player->>'guest_session_owner'),
-      v_player->>'chosen_username', v_opponent->>'chosen_username', v_result,
+      v_player->>'chosen_username', v_opponent->>'chosen_username', p_match->>'source', v_result,
       p_match->>'terminal_outcome', (v_player->>'score_total')::integer,
       nullif(v_opponent->>'score_total', '')::integer, (v_player->>'correct_count')::integer,
       nullif(v_opponent->>'correct_count', '')::integer,

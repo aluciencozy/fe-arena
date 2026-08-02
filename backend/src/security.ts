@@ -7,7 +7,10 @@ type Bucket = { count: number; resetAt: number };
 export class FixedWindowLimiter {
   private readonly buckets = new Map<string, Bucket>();
 
-  constructor(private readonly limit: number, private readonly windowMs: number) {}
+  constructor(
+    private readonly limit: number,
+    private readonly windowMs: number,
+  ) {}
 
   check(key: string, now = Date.now()): RateDecision {
     let bucket = this.buckets.get(key);
@@ -38,17 +41,23 @@ export const createIpRateLimit = (limit: number, windowMs: number): RequestHandl
   };
 };
 
-export const isAllowedOrigin = (origin: string | undefined, allowedOrigins: readonly string[], requireOrigin = false): boolean => {
+export const isAllowedOrigin = (
+  origin: string | undefined,
+  allowedOrigins: readonly string[],
+  requireOrigin = false,
+): boolean => {
   if (!origin) return !requireOrigin;
   return allowedOrigins.includes(origin);
 };
 
-export const securityHeaders = (production: boolean) => (_request: Request, response: Response, next: NextFunction): void => {
-  response.setHeader("X-Content-Type-Options", "nosniff");
-  response.setHeader("X-Frame-Options", "DENY");
-  response.setHeader("Referrer-Policy", "no-referrer");
-  response.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  response.setHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
-  if (production) response.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-  next();
-};
+export const securityHeaders =
+  (production: boolean) =>
+  (_request: Request, response: Response, next: NextFunction): void => {
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    response.setHeader("X-Frame-Options", "DENY");
+    response.setHeader("Referrer-Policy", "no-referrer");
+    response.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    response.setHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
+    if (production) response.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    next();
+  };

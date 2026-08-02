@@ -17,7 +17,8 @@ export const useArenaSocket = (roomId: string, playerName: string) => {
 
   useEffect(() => {
     if (!roomId || !playerName) return;
-    const addMessage = (incoming: Omit<ChatMessage, "id">) => setMessages((current) => [...current, { ...incoming, id: `${incoming.sentAt}-${Math.random()}` }].slice(-80));
+    const addMessage = (incoming: Omit<ChatMessage, "id">) =>
+      setMessages((current) => [...current, { ...incoming, id: `${incoming.sentAt}-${Math.random()}` }].slice(-80));
     const join = () => {
       setConnection("connecting");
       const token = storedTokenForRoom(roomId);
@@ -26,28 +27,73 @@ export const useArenaSocket = (roomId: string, playerName: string) => {
     };
     const onConnect = () => join();
     const onDisconnect = () => setConnection("disconnected");
-    const onSession = (payload: { roomId: string; seatId: string; reconnectToken: string }) => { if (payload.roomId === roomId) { setSession(payload.seatId, payload.reconnectToken, roomId); setConnection("connected"); } };
-    const onRoom = (state: RoomState) => { if (state.metadata.roomId === roomId) { setRoom(state); setConnection("connected"); } };
-    const onMatch = (state: MatchPublicState) => { if (state.roomId === roomId) setMatch(state); };
+    const onSession = (payload: { roomId: string; seatId: string; reconnectToken: string }) => {
+      if (payload.roomId === roomId) {
+        setSession(payload.seatId, payload.reconnectToken, roomId);
+        setConnection("connected");
+      }
+    };
+    const onRoom = (state: RoomState) => {
+      if (state.metadata.roomId === roomId) {
+        setRoom(state);
+        setConnection("connected");
+      }
+    };
+    const onMatch = (state: MatchPublicState) => {
+      if (state.roomId === roomId) setMatch(state);
+    };
     const onChat = (message: Omit<ChatMessage, "id">) => addMessage(message);
-    const onError = (payload: { message?: string } | string) => setErrorNotice(typeof payload === "string" ? payload : payload.message ?? "Something went wrong.");
-    const onReconnectFailed = (payload?: { message?: string }) => { clearStoredToken(roomId); setErrorNotice(payload?.message ?? "The guest seat expired. The match ended safely."); setTimeout(() => navigate("/", { replace: true }), 1800); };
-    const onAck = (payload: { correct: boolean; score: { total: number } }) => setLastSubmission({ correct: payload.correct, total: payload.score.total });
-    socket.on("connect", onConnect); socket.on("disconnect", onDisconnect); socket.on("room:session", onSession); socket.on("room:state", onRoom); socket.on("match:state", onMatch); socket.on("chat:message", onChat); socket.on("server:error", onError); socket.on("room:reconnect-failed", onReconnectFailed); socket.on("match:submission-ack", onAck);
+    const onError = (payload: { message?: string } | string) =>
+      setErrorNotice(typeof payload === "string" ? payload : (payload.message ?? "Something went wrong."));
+    const onReconnectFailed = (payload?: { message?: string }) => {
+      clearStoredToken(roomId);
+      setErrorNotice(payload?.message ?? "The guest seat expired. The match ended safely.");
+      setTimeout(() => navigate("/", { replace: true }), 1800);
+    };
+    const onAck = (payload: { correct: boolean; score: { total: number } }) =>
+      setLastSubmission({ correct: payload.correct, total: payload.score.total });
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("room:session", onSession);
+    socket.on("room:state", onRoom);
+    socket.on("match:state", onMatch);
+    socket.on("chat:message", onChat);
+    socket.on("server:error", onError);
+    socket.on("room:reconnect-failed", onReconnectFailed);
+    socket.on("match:submission-ack", onAck);
     connectSocket();
     if (socket.connected) join();
-    return () => { socket.off("connect", onConnect); socket.off("disconnect", onDisconnect); socket.off("room:session", onSession); socket.off("room:state", onRoom); socket.off("match:state", onMatch); socket.off("chat:message", onChat); socket.off("server:error", onError); socket.off("room:reconnect-failed", onReconnectFailed); socket.off("match:submission-ack", onAck); scheduleSocketDisconnect(); };
+    return () => {
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("room:session", onSession);
+      socket.off("room:state", onRoom);
+      socket.off("match:state", onMatch);
+      socket.off("chat:message", onChat);
+      socket.off("server:error", onError);
+      socket.off("room:reconnect-failed", onReconnectFailed);
+      socket.off("match:submission-ack", onAck);
+      scheduleSocketDisconnect();
+    };
   }, [navigate, playerName, roomId, setMatch, setRoom, setSession]);
 
   return {
-    messages, errorNotice, connection, lastSubmission,
+    messages,
+    errorNotice,
+    connection,
+    lastSubmission,
     clearSubmission,
-    sendChat: (message: string) => { if (message.trim()) socket.emit("chat:send", { message }); },
+    sendChat: (message: string) => {
+      if (message.trim()) socket.emit("chat:send", { message });
+    },
     configure: (config: unknown) => socket.emit("match:configure", config),
     ready: () => socket.emit("match:ready"),
     submit: (answer: unknown) => socket.emit("match:submit", answer),
     skipReveal: () => socket.emit("match:reveal-skip"),
     rematch: () => socket.emit("match:rematch"),
-    leave: () => { clearStoredToken(roomId); socket.emit("room:leave"); },
+    leave: () => {
+      clearStoredToken(roomId);
+      socket.emit("room:leave");
+    },
   };
 };

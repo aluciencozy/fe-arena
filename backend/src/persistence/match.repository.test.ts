@@ -26,16 +26,34 @@ const snapshot = (overrides: Partial<TerminalMatchSnapshot> = {}): TerminalMatch
   startedAt: "2026-03-08T00:00:00.000Z",
   finishedAt: "2026-03-08T00:00:30.000Z",
   players: [
-    { seatId: "22222222-2222-4222-8222-222222222222", guestSessionOwner: "owner-one", username: "Host", scoreTotal: 1300, correctCount: 1, responseMsTotal: 500, isWinner: true },
-    { seatId: "33333333-3333-4333-8333-333333333333", guestSessionOwner: "owner-two", username: "Guest", scoreTotal: 0, correctCount: 0, responseMsTotal: 30000, isWinner: false },
+    {
+      seatId: "22222222-2222-4222-8222-222222222222",
+      guestSessionOwner: "owner-one",
+      username: "Host",
+      scoreTotal: 1300,
+      correctCount: 1,
+      responseMsTotal: 500,
+      isWinner: true,
+    },
+    {
+      seatId: "33333333-3333-4333-8333-333333333333",
+      guestSessionOwner: "owner-two",
+      username: "Guest",
+      scoreTotal: 0,
+      correctCount: 0,
+      responseMsTotal: 30000,
+      isWinner: false,
+    },
   ],
-  rounds: [{
-    roundNumber: 1,
-    questionId: "q-stacks-lifo",
-    questionBankVersion: QUESTION_BANK_VERSION,
-    correctness: { "22222222-2222-4222-8222-222222222222": true, "33333333-3333-4333-8333-333333333333": false },
-    responseMs: { "22222222-2222-4222-8222-222222222222": 500, "33333333-3333-4333-8333-333333333333": 30000 },
-  }],
+  rounds: [
+    {
+      roundNumber: 1,
+      questionId: "q-stacks-lifo",
+      questionBankVersion: QUESTION_BANK_VERSION,
+      correctness: { "22222222-2222-4222-8222-222222222222": true, "33333333-3333-4333-8333-333333333333": false },
+      responseMs: { "22222222-2222-4222-8222-222222222222": 500, "33333333-3333-4333-8333-333333333333": 30000 },
+    },
+  ],
   ...overrides,
 });
 
@@ -68,7 +86,9 @@ test("durable persistence replays a failed terminal write after process restart"
   const directory = await mkdtemp(join(process.cwd(), ".terminal-outbox-test-"));
   const first = snapshot();
   const failing: MatchRepository = {
-    persistTerminalMatch: async () => { throw new Error("database unavailable"); },
+    persistTerminalMatch: async () => {
+      throw new Error("database unavailable");
+    },
   };
   const delivered: TerminalMatchSnapshot[] = [];
   const succeeding: MatchRepository = {
@@ -102,16 +122,22 @@ test("stages a current terminal snapshot while startup replay is blocked", async
     idempotencyKey: "55555555-5555-4555-8555-555555555555",
   });
   const unavailable: MatchRepository = {
-    persistTerminalMatch: async () => { throw new Error("database unavailable"); },
+    persistTerminalMatch: async () => {
+      throw new Error("database unavailable");
+    },
   };
   let releaseBacklog: (() => void) | undefined;
   let signalBacklogStarted: (() => void) | undefined;
-  const backlogStarted = new Promise<void>((resolve) => { signalBacklogStarted = resolve; });
+  const backlogStarted = new Promise<void>((resolve) => {
+    signalBacklogStarted = resolve;
+  });
   const blocked: MatchRepository = {
     persistTerminalMatch: async (value) => {
       if (value.matchId === backlog.matchId) {
         signalBacklogStarted?.();
-        await new Promise<void>((resolve) => { releaseBacklog = resolve; });
+        await new Promise<void>((resolve) => {
+          releaseBacklog = resolve;
+        });
       }
       return { status: "inserted", matchId: value.matchId };
     },
@@ -153,7 +179,11 @@ test("delivers the staged snapshot when a retry payload changes", async () => {
     const repository = new DurableMatchRepository(delegate, directory, 60_000);
     await assert.rejects(repository.persistTerminalMatch(first));
     unavailable = false;
-    await repository.persistTerminalMatch({ ...first, terminalOutcome: "draw", finishedAt: "2026-03-08T00:01:00.000Z" });
+    await repository.persistTerminalMatch({
+      ...first,
+      terminalOutcome: "draw",
+      finishedAt: "2026-03-08T00:01:00.000Z",
+    });
     assert.deepEqual(delivered, [first]);
     repository.close();
   } finally {
@@ -165,9 +195,14 @@ test("memory persistence is idempotent and rejects key reuse", async () => {
   const repository = new InMemoryMatchRepository();
   const first = snapshot();
   assert.deepEqual(await repository.persistTerminalMatch(first), { status: "inserted", matchId: first.matchId });
-  assert.deepEqual(await repository.persistTerminalMatch({ ...first, terminalOutcome: "draw" }), { status: "already_exists", matchId: first.matchId });
+  assert.deepEqual(await repository.persistTerminalMatch({ ...first, terminalOutcome: "draw" }), {
+    status: "already_exists",
+    matchId: first.matchId,
+  });
   assert.equal(repository.size, 1);
-  await assert.rejects(repository.persistTerminalMatch({ ...first, idempotencyKey: "44444444-4444-4444-8444-444444444444" }));
+  await assert.rejects(
+    repository.persistTerminalMatch({ ...first, idempotencyKey: "44444444-4444-4444-8444-444444444444" }),
+  );
   await assert.rejects(repository.persistTerminalMatch({ ...first, matchId: "55555555-5555-4555-8555-555555555555" }));
 });
 
@@ -195,7 +230,9 @@ test("all terminal outcomes are valid repository records", async () => {
   const repository = new InMemoryMatchRepository();
   for (const [index, terminalOutcome] of outcomes.entries()) {
     const id = `aaaaaaaa-aaaa-4aaa-8aaa-${String(index + 1).padStart(12, "0")}`;
-    const result = await repository.persistTerminalMatch(snapshot({ matchId: id, idempotencyKey: id, terminalOutcome }));
+    const result = await repository.persistTerminalMatch(
+      snapshot({ matchId: id, idempotencyKey: id, terminalOutcome }),
+    );
     assert.equal(result.status, "inserted");
   }
   assert.equal(repository.size, outcomes.length);

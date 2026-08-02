@@ -1,7 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { attachSeat, clearRoomsForTests, createRoom, disconnectSocket, joinRoom, reconnectRoom } from "./room.service.js";
-import { clearMatch, clearMatchesForTests, configureMatch, ensureMatch, getMatchState, leaveMatch, pauseForDisconnect, resumeAfterReconnect, skipReveal, submitAnswer, toggleReady } from "./match.service.js";
+import {
+  attachSeat,
+  clearRoomsForTests,
+  createRoom,
+  disconnectSocket,
+  joinRoom,
+  reconnectRoom,
+} from "./room.service.js";
+import {
+  clearMatch,
+  clearMatchesForTests,
+  configureMatch,
+  ensureMatch,
+  getMatchState,
+  leaveMatch,
+  pauseForDisconnect,
+  resumeAfterReconnect,
+  skipReveal,
+  submitAnswer,
+  toggleReady,
+} from "./match.service.js";
 import { QUESTION_BANK } from "../data/questions.js";
 import { inMemoryQuestionRepository, setQuestionRepository, type QuestionRepository } from "./question-bank.service.js";
 import { TOPICS, type MatchConfig, type Question } from "../../../shared/domain.js";
@@ -17,7 +36,8 @@ const fixedQuestionRepository = (questions: readonly Question[]): QuestionReposi
 
 test("match transitions through question, reveal, and results with locked private submissions", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
-  clearMatchesForTests(); clearRoomsForTests();
+  clearMatchesForTests();
+  clearRoomsForTests();
   const oneRound = { ...config, roundCount: 1, questionTimerSeconds: 30 };
   const room = createRoom("private", oneRound, "Host");
   attachSeat(room.metadata.roomId, room.seat, "a");
@@ -50,12 +70,15 @@ test("match transitions through question, reveal, and results with locked privat
   assert.equal(getMatchState(room.metadata.roomId)?.phase, "REVEAL");
   t.mock.timers.tick(30_000);
   assert.equal(getMatchState(room.metadata.roomId)?.phase, "RESULTS");
-  clearMatch(room.metadata.roomId); clearMatchesForTests(); clearRoomsForTests();
+  clearMatch(room.metadata.roomId);
+  clearMatchesForTests();
+  clearRoomsForTests();
 });
 
 test("graph and C submissions stay server-authoritative through the match lifecycle", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
-  clearMatchesForTests(); clearRoomsForTests();
+  clearMatchesForTests();
+  clearRoomsForTests();
   const graph = QUESTION_BANK.find((question) => question.id === "q-graph-bfs");
   const code = QUESTION_BANK.find((question) => question.id === "q-array-c-output");
   assert.ok(graph?.type === "graph");
@@ -76,10 +99,42 @@ test("graph and C submissions stay server-authoritative through the match lifecy
 
     const first = getMatchState(room.metadata.roomId)?.question;
     assert.equal(first?.id, graph.id);
-    assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId: "q-wrong", answer: graph.answerOrder! }, events()).ok, false);
-    assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId: graph.id, answer: ["a", "unknown", "c", "d", "e"] }, events()).ok, true);
-    assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId: graph.id, answer: graph.answerOrder! }, events()).ok, false);
-    assert.equal(submitAnswer(room.metadata.roomId, guest.seat.seatId, { questionId: graph.id, answer: graph.answerOrder! }, events()).ok, true);
+    assert.equal(
+      submitAnswer(
+        room.metadata.roomId,
+        room.seat.seatId,
+        { questionId: "q-wrong", answer: graph.answerOrder! },
+        events(),
+      ).ok,
+      false,
+    );
+    assert.equal(
+      submitAnswer(
+        room.metadata.roomId,
+        room.seat.seatId,
+        { questionId: graph.id, answer: ["a", "unknown", "c", "d", "e"] },
+        events(),
+      ).ok,
+      true,
+    );
+    assert.equal(
+      submitAnswer(
+        room.metadata.roomId,
+        room.seat.seatId,
+        { questionId: graph.id, answer: graph.answerOrder! },
+        events(),
+      ).ok,
+      false,
+    );
+    assert.equal(
+      submitAnswer(
+        room.metadata.roomId,
+        guest.seat.seatId,
+        { questionId: graph.id, answer: graph.answerOrder! },
+        events(),
+      ).ok,
+      true,
+    );
 
     t.mock.timers.tick(30_000);
     t.mock.timers.tick(3_000);
@@ -87,22 +142,36 @@ test("graph and C submissions stay server-authoritative through the match lifecy
     assert.equal(second?.id, code.id);
     assert.equal(getMatchState(room.metadata.roomId)?.history.length, 0);
     assert.equal(getMatchState(room.metadata.roomId)?.revealedQuestion, null);
-    assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId: "q-wrong", answer: code.output }, events()).ok, false);
-    assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId: code.id, answer: code.output }, events()).ok, true);
-    assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId: code.id, answer: code.output }, events()).ok, false);
+    assert.equal(
+      submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId: "q-wrong", answer: code.output }, events()).ok,
+      false,
+    );
+    assert.equal(
+      submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId: code.id, answer: code.output }, events()).ok,
+      true,
+    );
+    assert.equal(
+      submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId: code.id, answer: code.output }, events()).ok,
+      false,
+    );
     t.mock.timers.tick(30_000);
     assert.equal(getMatchState(room.metadata.roomId)?.phase, "REVEAL");
-    assert.equal(submitAnswer(room.metadata.roomId, guest.seat.seatId, { questionId: code.id, answer: code.output }, events()).ok, false);
+    assert.equal(
+      submitAnswer(room.metadata.roomId, guest.seat.seatId, { questionId: code.id, answer: code.output }, events()).ok,
+      false,
+    );
     clearMatch(room.metadata.roomId);
   } finally {
     setQuestionRepository(inMemoryQuestionRepository);
-    clearMatchesForTests(); clearRoomsForTests();
+    clearMatchesForTests();
+    clearRoomsForTests();
   }
 });
 
 test("reveal lasts thirty seconds, supports one-sided review, and both skips advance", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
-  clearMatchesForTests(); clearRoomsForTests();
+  clearMatchesForTests();
+  clearRoomsForTests();
   const oneRound = { ...config, roundCount: 1, questionTimerSeconds: 30 };
   const room = createRoom("private", oneRound, "Host");
   attachSeat(room.metadata.roomId, room.seat, "a");
@@ -127,12 +196,14 @@ test("reveal lasts thirty seconds, supports one-sided review, and both skips adv
   assert.equal(getMatchState(room.metadata.roomId)?.phase, "REVEAL");
   assert.equal(skipReveal(room.metadata.roomId, guest.seat.seatId, events()).ok, true);
   assert.equal(getMatchState(room.metadata.roomId)?.phase, "RESULTS");
-  clearMatchesForTests(); clearRoomsForTests();
+  clearMatchesForTests();
+  clearRoomsForTests();
 });
 
 test("reconnect pauses and resumes the reveal deadline without exposing answers early", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
-  clearMatchesForTests(); clearRoomsForTests();
+  clearMatchesForTests();
+  clearRoomsForTests();
   const oneRound = { ...config, roundCount: 1, questionTimerSeconds: 30 };
   const room = createRoom("private", oneRound, "Host");
   attachSeat(room.metadata.roomId, room.seat, "a");
@@ -159,12 +230,14 @@ test("reconnect pauses and resumes the reveal deadline without exposing answers 
   assert.equal(getMatchState(room.metadata.roomId)?.phase, "REVEAL");
   t.mock.timers.tick(1);
   assert.equal(getMatchState(room.metadata.roomId)?.phase, "RESULTS");
-  clearMatchesForTests(); clearRoomsForTests();
+  clearMatchesForTests();
+  clearRoomsForTests();
 });
 
 test("late submissions and cleared match timers cannot advance state", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
-  clearMatchesForTests(); clearRoomsForTests();
+  clearMatchesForTests();
+  clearRoomsForTests();
   const oneRound = { topicIds: [TOPICS[2].id], roundCount: 1, questionTimerSeconds: 30 } as MatchConfig;
   const room = createRoom("private", oneRound, "Host");
   attachSeat(room.metadata.roomId, room.seat, "a");
@@ -180,16 +253,21 @@ test("late submissions and cleared match timers cannot advance state", (t) => {
   assert.ok(questionId);
   t.mock.timers.tick(30_000);
   assert.equal(getMatchState(room.metadata.roomId)?.phase, "REVEAL");
-  assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId, answer: "late" }, events()).ok, false);
+  assert.equal(
+    submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId, answer: "late" }, events()).ok,
+    false,
+  );
   clearMatch(room.metadata.roomId);
   t.mock.timers.tick(10_000);
   assert.equal(getMatchState(room.metadata.roomId), undefined);
-  clearMatchesForTests(); clearRoomsForTests();
+  clearMatchesForTests();
+  clearRoomsForTests();
 });
 
 test("a submission at the server deadline is rejected before grading", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
-  clearMatchesForTests(); clearRoomsForTests();
+  clearMatchesForTests();
+  clearRoomsForTests();
   const oneRound = { topicIds: [TOPICS[2].id], roundCount: 1, questionTimerSeconds: 30 } as MatchConfig;
   const room = createRoom("private", oneRound, "Host");
   attachSeat(room.metadata.roomId, room.seat, "a");
@@ -203,15 +281,20 @@ test("a submission at the server deadline is rejected before grading", (t) => {
   const questionId = getMatchState(room.metadata.roomId)?.question?.id;
   assert.ok(questionId);
   t.mock.timers.setTime(34_000);
-  assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId, answer: "late" }, events()).ok, false);
+  assert.equal(
+    submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId, answer: "late" }, events()).ok,
+    false,
+  );
   assert.equal(getMatchState(room.metadata.roomId)?.phase, "REVEAL");
   assert.equal(getMatchState(room.metadata.roomId)?.submissions[room.seat.seatId]?.submitted, false);
-  clearMatchesForTests(); clearRoomsForTests();
+  clearMatchesForTests();
+  clearRoomsForTests();
 });
 
 test("question timeouts count unanswered seats as incorrect topic attempts", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
-  clearMatchesForTests(); clearRoomsForTests();
+  clearMatchesForTests();
+  clearRoomsForTests();
   const oneRound = { topicIds: [TOPICS[2].id], roundCount: 1, questionTimerSeconds: 30 } as MatchConfig;
   const room = createRoom("private", oneRound, "Host");
   attachSeat(room.metadata.roomId, room.seat, "a");
@@ -224,13 +307,18 @@ test("question timeouts count unanswered seats as incorrect topic attempts", (t)
   t.mock.timers.tick(3_000);
   t.mock.timers.tick(30_000);
   const summary = getMatchState(room.metadata.roomId)?.topicSummary[TOPICS[2].id];
-  assert.deepEqual(summary && { attempted: summary.attempted, correct: summary.correct, incorrect: summary.incorrect }, { attempted: 2, correct: 0, incorrect: 2 });
-  clearMatchesForTests(); clearRoomsForTests();
+  assert.deepEqual(
+    summary && { attempted: summary.attempted, correct: summary.correct, incorrect: summary.incorrect },
+    { attempted: 2, correct: 0, incorrect: 2 },
+  );
+  clearMatchesForTests();
+  clearRoomsForTests();
 });
 
 test("reconnect waits for both guests and abandoned matches have no winner", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
-  clearMatchesForTests(); clearRoomsForTests();
+  clearMatchesForTests();
+  clearRoomsForTests();
   const oneRound = { ...config, roundCount: 1 };
   const room = createRoom("private", oneRound, "Host");
   attachSeat(room.metadata.roomId, room.seat, "host");
@@ -253,12 +341,14 @@ test("reconnect waits for both guests and abandoned matches have no winner", (t)
   assert.equal(getMatchState(room.metadata.roomId)?.phase, "QUESTION");
   leaveMatch(room.metadata.roomId, guest.seat.seatId, "abandoned", events());
   assert.equal(getMatchState(room.metadata.roomId)?.winnerSeatId, null);
-  clearMatchesForTests(); clearRoomsForTests();
+  clearMatchesForTests();
+  clearRoomsForTests();
 });
 
 test("forfeiting during a question finalizes the current topic summary", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
-  clearMatchesForTests(); clearRoomsForTests();
+  clearMatchesForTests();
+  clearRoomsForTests();
   const oneRound = { topicIds: [TOPICS[2].id], roundCount: 1, questionTimerSeconds: 30 } as MatchConfig;
   const room = createRoom("private", oneRound, "Host");
   attachSeat(room.metadata.roomId, room.seat, "a");
@@ -271,15 +361,23 @@ test("forfeiting during a question finalizes the current topic summary", (t) => 
   t.mock.timers.tick(3_000);
   const questionId = getMatchState(room.metadata.roomId)?.question?.id;
   assert.ok(questionId);
-  assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId, answer: "wrong" }, events()).ok, true);
+  assert.equal(
+    submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId, answer: "wrong" }, events()).ok,
+    true,
+  );
   leaveMatch(room.metadata.roomId, guest.seat.seatId, "forfeit", events());
   const summary = getMatchState(room.metadata.roomId)?.topicSummary[TOPICS[2].id];
-  assert.deepEqual(summary && { attempted: summary.attempted, correct: summary.correct, incorrect: summary.incorrect }, { attempted: 1, correct: 0, incorrect: 1 });
-  clearMatchesForTests(); clearRoomsForTests();
+  assert.deepEqual(
+    summary && { attempted: summary.attempted, correct: summary.correct, incorrect: summary.incorrect },
+    { attempted: 1, correct: 0, incorrect: 1 },
+  );
+  clearMatchesForTests();
+  clearRoomsForTests();
 });
 
 test("leaving an active match records a forfeit", () => {
-  clearMatchesForTests(); clearRoomsForTests();
+  clearMatchesForTests();
+  clearRoomsForTests();
   const room = createRoom("private", config, "Host");
   const guest = joinRoom(room.metadata.roomId, "Guest", "b");
   assert.equal(guest.ok, true);
@@ -288,11 +386,13 @@ test("leaving an active match records a forfeit", () => {
   leaveMatch(room.metadata.roomId, guest.seat.seatId, "forfeit", events());
   assert.equal(getMatchState(room.metadata.roomId)?.phase, "FORFEIT");
   assert.equal(getMatchState(room.metadata.roomId)?.winnerSeatId, room.seat.seatId);
-  clearMatchesForTests(); clearRoomsForTests();
+  clearMatchesForTests();
+  clearRoomsForTests();
 });
 
 test("simultaneous rooms have isolated state", () => {
-  clearMatchesForTests(); clearRoomsForTests();
+  clearMatchesForTests();
+  clearRoomsForTests();
   const first = createRoom("private", { topicIds: [TOPICS[2].id], roundCount: 1, questionTimerSeconds: 30 }, "A");
   const second = createRoom("private", { topicIds: [TOPICS[3].id], roundCount: 1, questionTimerSeconds: 30 }, "B");
   const firstState = ensureMatch(first.metadata.roomId)!;
@@ -300,5 +400,6 @@ test("simultaneous rooms have isolated state", () => {
   assert.notEqual(firstState.roomId, secondState.roomId);
   assert.equal(firstState.config.topicIds[0], TOPICS[2].id);
   assert.equal(secondState.config.topicIds[0], TOPICS[3].id);
-  clearMatchesForTests(); clearRoomsForTests();
+  clearMatchesForTests();
+  clearRoomsForTests();
 });

@@ -7,7 +7,7 @@ import { inMemoryQuestionRepository, setQuestionRepository, type QuestionReposit
 const fixedQuestionRepository = (question: (typeof QUESTION_BANK)[number]): QuestionRepository => ({
   list: () => [question],
   select: (_seed, count) => Array.from({ length: count }, () => question),
-  get: (id) => id === question.id ? question : undefined,
+  get: (id) => (id === question.id ? question : undefined),
 });
 
 test("solo submissions at the server deadline are rejected before grading", (t) => {
@@ -18,9 +18,19 @@ test("solo submissions at the server deadline are rejected before grading", (t) 
   setQuestionRepository(fixedQuestionRepository(question));
   try {
     let state: SoloState | undefined;
-    assert.equal(startSolo("solo-deadline", ["stacks"], 1, 30, (next) => { state = next; }).ok, true);
+    assert.equal(
+      startSolo("solo-deadline", ["stacks"], 1, 30, (next) => {
+        state = next;
+      }).ok,
+      true,
+    );
     t.mock.timers.setTime(31_000);
-    assert.equal(soloSubmit("solo-deadline", { questionId: question.id, answer: "late" }, (next) => { state = next; }).ok, false);
+    assert.equal(
+      soloSubmit("solo-deadline", { questionId: question.id, answer: "late" }, (next) => {
+        state = next;
+      }).ok,
+      false,
+    );
     assert.ok(state);
     assert.ok(state.result);
     assert.ok(state.topicSummary.stacks);

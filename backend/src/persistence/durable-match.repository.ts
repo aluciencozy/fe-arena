@@ -32,7 +32,9 @@ export class DurableMatchRepository implements MatchRepository, AccountHistoryRe
 
   async getAccountHistory(authUserId: string): Promise<AccountHistory> {
     const reader = this.delegate as Partial<AccountHistoryRepository>;
-    return typeof reader.getAccountHistory === "function" ? reader.getAccountHistory(authUserId) : emptyAccountHistory();
+    return typeof reader.getAccountHistory === "function"
+      ? reader.getAccountHistory(authUserId)
+      : emptyAccountHistory();
   }
 
   persistTerminalMatch(snapshot: TerminalMatchSnapshot): Promise<PersistTerminalResult> {
