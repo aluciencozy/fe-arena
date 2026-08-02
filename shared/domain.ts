@@ -224,8 +224,13 @@ export const QuestionSchema = z.discriminatedUnion("type", [
 export type Question = z.infer<typeof QuestionSchema>;
 
 export const QuestionAttemptSchema = z.object({
-  questionId: z.string().min(1),
-  answer: z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]),
+  questionId: z.string().min(1).max(128),
+  answer: z.union([
+    z.string().max(4096),
+    z.number(),
+    z.boolean(),
+    z.array(z.string().max(256)).max(100),
+  ]),
 });
 export type QuestionAttempt = z.infer<typeof QuestionAttemptSchema>;
 
@@ -726,7 +731,6 @@ export const ServerEventSchemas = {
     reconnectToken: z.string().uuid(),
   }),
   "match:state": MatchPublicStateSchema,
-  "match:submission-ack": z.object({ correct: z.boolean(), score: ScoreBreakdownSchema }),
   "chat:message": z.object({
     type: z.enum(["system", "user"]),
     sender: z.string().min(1),

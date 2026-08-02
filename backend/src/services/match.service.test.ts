@@ -62,6 +62,24 @@ test("match transitions through question, reveal, and results with locked privat
   assert.ok(questionState.question);
   if (!questionState.question) return;
   assert.equal("answer" in questionState.question, false);
+  assert.equal(
+    submitAnswer(
+      room.metadata.roomId,
+      room.seat.seatId,
+      { questionId: questionState.question.id, answer: "x".repeat(4097) },
+      events(),
+    ).ok,
+    false,
+  );
+  assert.equal(
+    submitAnswer(
+      room.metadata.roomId,
+      room.seat.seatId,
+      { questionId: questionState.question.id, answer: Array.from({ length: 101 }, () => "x") },
+      events(),
+    ).ok,
+    false,
+  );
   const attempt = { questionId: questionState.question.id, answer: "not-the-answer" };
   assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, attempt, events()).ok, true);
   assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, attempt, events()).ok, false);
@@ -322,6 +340,16 @@ test("rematch is two-sided, preserves results while pending, and selects a fresh
     assert.equal(rematch.phase, "REMATCH");
     assert.equal(rematch.history.length, 0);
     assert.equal(rematch.rematchRequests[room.seat.seatId], false);
+    assert.equal(
+      configureMatch(
+        room.metadata.roomId,
+        room.seat.seatId,
+        { ...oneRound, topicIds: ["queues"] },
+        events(),
+      ).ok,
+      false,
+    );
+    assert.equal(getMatchState(room.metadata.roomId)?.question, null);
     toggleReady(room.metadata.roomId, room.seat.seatId, events());
     toggleReady(room.metadata.roomId, guest.seat.seatId, events());
     t.mock.timers.tick(3_000);

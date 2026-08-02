@@ -20,6 +20,8 @@ import {
   type CodingProgress,
   type CodingRunResult,
   type CodingAnswer,
+  CodingRunResultSchema,
+  QuestionAttemptSchema,
   selectSeededQuestions,
 } from "../../../shared/domain.js";
 import { questionRepository, publicQuestion, revealedQuestion } from "./question-bank.service.js";
@@ -479,7 +481,9 @@ export const configureMatch = (roomId: string, seatId: string, config: MatchConf
   const metadata = getMetadata(roomId);
   if (!record || !metadata || metadata.hostSeatId !== seatId)
     return { ok: false as const, error: "Only the host can change match settings." };
-  if (!(record.state.phase === "LOBBY" || record.state.phase === "SETUP" || record.state.phase === "REMATCH"))
+  if (record.state.phase === "REMATCH")
+    return { ok: false as const, error: "Rematch settings are locked to the fresh question pool." };
+  if (!(record.state.phase === "LOBBY" || record.state.phase === "SETUP"))
     return { ok: false as const, error: "Settings can only change before a round begins." };
   if (!config.topicIds.length || !config.roundCount) return { ok: false as const, error: "Choose at least one topic." };
   const questions = questionRepository.select(
@@ -569,43 +573,45 @@ export const submitCodingResult = (roomId: string, seatId: string, result: Codin
   if (!record || !question || question.type !== "coding" || record.state.phase !== "QUESTION")
     return { ok: false as const, error: "Coding results are not accepted right now." };
   if (!seatIds(roomId).includes(seatId)) return { ok: false as const, error: "You are not seated in this match." };
+  const parsed = CodingRunResultSchema.safeParse(result);
+  if (!parsed.success) return { ok: false as const, error: "That coding result is invalid." };
   if (record.state.questionEndsAt !== null && record.state.questionEndsAt <= Date.now()) {
     revealRound(roomId, events);
     return { ok: false as const, error: "Question time has expired." };
   }
-  if (result.questionId !== question.id)
+  if (parsed.data.questionId !== question.id)
     return { ok: false as const, error: "That coding question is no longer active." };
   const progress = record.state.codingProgress[seatId];
   const submission = record.state.submissions[seatId];
   if (!progress || !submission || progress.status === "complete" || submission.submitted)
     return { ok: false as const, error: "Your coding result is already locked." };
   const elapsedMs = Math.max(0, Date.now() - (record.state.questionStartedAt ?? Date.now()));
-  const score = calculateScore(result.passed, elapsedMs, questionTimerSeconds(record, question) * 1000);
+  const score = calculateScore(parsed.data.passed, elapsedMs, questionTimerSeconds(record, question) * 1000);
   progress.status = "complete";
   progress.completedAt = Date.now();
-  progress.passed = result.passed;
-  progress.tests = result.tests;
-  progress.outcome = result.outcome;
+  progress.passed = parsed.data.passed;
+  progress.tests = parsed.data.tests;
+  progress.outcome = parsed.data.outcome;
   submission.submitted = true;
-  submission.correct = result.passed;
+  submission.correct = parsed.data.passed;
   submission.score = score;
   submission.answer = {
     type: "coding",
-    passed: result.passed,
-    outcome: result.outcome,
-    tests: structuredClone(result.tests),
+    passed: parsed.data.passed,
+    outcome: parsed.data.outcome,
+    tests: structuredClone(parsed.data.tests),
   };
   const current = record.state.scores[seatId] ?? { total: 0, correct: 0, responseMs: 0 };
   record.state.scores[seatId] = {
     total: current.total + score.total,
-    correct: current.correct + (result.passed ? 1 : 0),
+    correct: current.correct + (parsed.data.passed ? 1 : 0),
     responseMs: current.responseMs + elapsedMs,
   };
   const roundTiming = record.roundResponseMs[record.state.roundIndex] ?? {};
   roundTiming[seatId] = elapsedMs;
   record.roundResponseMs[record.state.roundIndex] = roundTiming;
   emit(record, events);
-  if (result.passed || allSubmitted(record)) revealRound(roomId, events);
+  if (parsed.data.passed || allSubmitted(record)) revealRound(roomId, events);
   return { ok: true as const, score };
 };
 
@@ -621,15 +627,17 @@ export const submitAnswer = (roomId: string, seatId: string, attempt: QuestionAt
     return { ok: false as const, error: "Question time has expired." };
   }
   if (submission.submitted) return { ok: false as const, error: "Your answer is already locked for this question." };
-  if (attempt.questionId !== question.id) return { ok: false as const, error: "That question is no longer active." };
+  const parsed = QuestionAttemptSchema.safeParse(attempt);
+  if (!parsed.success || parsed.data.questionId !== question.id)
+    return { ok: false as const, error: "That question is no longer active." };
   // Grading happens only here, on the server, against the private repository record.
-  const correct = gradeQuestion(question, attempt);
+  const correct = gradeQuestion(question, parsed.data);
   const elapsedMs = Math.max(0, Date.now() - (record.state.questionStartedAt ?? Date.now()));
   const score = calculateScore(correct, elapsedMs, record.state.config.questionTimerSeconds * 1000);
   submission.submitted = true;
   submission.correct = correct;
   submission.score = score;
-  submission.answer = structuredClone(attempt.answer);
+  submission.answer = structuredClone(parsed.data.answer);
   const current = record.state.scores[seatId] ?? { total: 0, correct: 0, responseMs: 0 };
   record.state.scores[seatId] = {
     total: current.total + score.total,

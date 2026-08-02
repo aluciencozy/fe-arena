@@ -362,11 +362,6 @@ export const registerHandlers = (io: Server, socket: Socket, authVerifier: AuthV
     if (!input) return;
     const result = submitAnswer(current.roomId, current.seat.seatId, input, makeEvents(io, current.roomId));
     if (!result.ok) error(socket, result.error, "SUBMISSION_ERROR");
-    else
-      socket.emit(
-        "match:submission-ack",
-        output(ServerEventSchemas["match:submission-ack"], { correct: result.correct, score: result.score }),
-      );
   });
   socket.on("match:reveal-skip", (payload?: unknown) => {
     if (!validateEmpty(socket, ClientEventSchemas["match:reveal-skip"], payload)) return;

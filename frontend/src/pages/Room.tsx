@@ -147,7 +147,8 @@ export default function Room() {
   const seats = room?.seats ?? [];
   const self = seats.find((seat) => seat.seatId === seatId);
   const opponent = seats.find((seat) => seat.seatId !== seatId);
-  const host = room ? canConfigureMatch(room.metadata.source, room.metadata.hostSeatId, seatId) : false;
+  const host =
+    room && match?.phase !== "REMATCH" ? canConfigureMatch(room.metadata.source, room.metadata.hostSeatId, seatId) : false;
   const isSubmitted = seatId ? Boolean(match?.submissions[seatId]?.submitted) : false;
   const seconds =
     match?.phase === "COUNTDOWN"
@@ -157,7 +158,6 @@ export default function Room() {
         : null;
   const configure = () => {
     if (selectedTopics.length) {
-      api.clearSubmission();
       api.configure({ topicIds: selectedTopics, roundCount: 5, questionTimerSeconds: timer, includeCoding });
     }
     setSettingsOpen(false);
@@ -197,7 +197,6 @@ export default function Room() {
       (match.question.type === "graph" &&
         ["bfs-order", "dfs-order", "adjacency"].includes(match.question.operation ?? ""));
     const value = sequence ? ordered : answer;
-    api.clearSubmission();
     api.submit({ questionId: match.question.id, answer: value });
   };
 
@@ -307,7 +306,6 @@ export default function Room() {
               setOrdered={setOrdered}
               submitted={isSubmitted}
               submit={submit}
-              lastSubmission={isSubmitted ? api.lastSubmission : null}
             />
           )
         ) : match.phase === "REVEAL" ? (
@@ -623,7 +621,6 @@ const QuestionStage = ({
   setOrdered,
   submitted,
   submit,
-  lastSubmission,
 }: {
   match: MatchPublicState;
   seatId: string | null;
@@ -635,7 +632,6 @@ const QuestionStage = ({
   setOrdered: (items: string[]) => void;
   submitted: boolean;
   submit: () => void;
-  lastSubmission: { correct: boolean; total: number } | null;
 }) => {
   const question = match.question;
   if (!question) return null;
@@ -687,12 +683,6 @@ const QuestionStage = ({
               </>
             )}
           </button>
-          {lastSubmission && (
-            <p className="mt-4 text-center text-sm text-muted" role="status">
-              Server received your answer.{" "}
-              {lastSubmission.correct ? "Correctness confirmed." : "Keep going; reveal is after the round."}
-            </p>
-          )}
         </article>
         <aside className="space-y-3">
           <MiniScore
