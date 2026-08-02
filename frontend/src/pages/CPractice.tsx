@@ -75,7 +75,10 @@ export default function CPractice() {
             </article>
             <div className="notice-info">
               <Clock3 size={16} className="mt-0.5 shrink-0" />
-              <span>Runs are capped at 30 seconds. Infinite loops recover by terminating the worker.</span>
+              <span>
+                Worker startup, compilation, and execution each have a 30-second limit. Infinite loops recover by
+                terminating the worker.
+              </span>
             </div>
           </aside>
           <section className="min-w-0">
