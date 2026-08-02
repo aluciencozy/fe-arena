@@ -71,7 +71,7 @@ export default function Room() {
   const [codingReadyError, setCodingReadyError] = useState("");
   const [codingReadyRetry, setCodingReadyRetry] = useState(0);
   const codingReadyAttempted = useRef(false);
-  const codingReadyAttempts = useRef(0);
+  const [codingReadyAttempts, setCodingReadyAttempts] = useState(0);
   const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const codingEnvironmentError = window.crossOriginIsolated
@@ -83,7 +83,7 @@ export default function Room() {
   const setAnswer = (value: string | number | boolean | string[]) => setAnswerState({ questionId, value });
   const setOrdered = (value: string[]) => setOrderedState({ questionId, value });
   const retryCodingReady = () => {
-    if (codingReadyAttempts.current >= MAX_CODING_READY_ATTEMPTS) return;
+    if (codingReadyAttempts >= MAX_CODING_READY_ATTEMPTS) return;
     codingReadyAttempted.current = false;
     setCodingReadyError("");
     setCodingReadyRetry((attempt) => attempt + 1);
@@ -99,24 +99,24 @@ export default function Room() {
   useEffect(() => {
     if (!match?.config.includeCoding) {
       codingReadyAttempted.current = false;
-      codingReadyAttempts.current = 0;
+      queueMicrotask(() => setCodingReadyAttempts(0));
       return;
     }
     if (match.phase === "REMATCH") {
       codingReadyAttempted.current = false;
-      codingReadyAttempts.current = 0;
+      queueMicrotask(() => setCodingReadyAttempts(0));
       return;
     }
     if (
       !seatId ||
       match.codingReady[seatId] ||
       codingReadyAttempted.current ||
-      codingReadyAttempts.current >= MAX_CODING_READY_ATTEMPTS ||
+      codingReadyAttempts >= MAX_CODING_READY_ATTEMPTS ||
       !["LOBBY", "SETUP", "READY"].includes(match.phase)
     )
       return;
     codingReadyAttempted.current = true;
-    codingReadyAttempts.current += 1;
+    queueMicrotask(() => setCodingReadyAttempts((attempts) => attempts + 1));
     if (!window.crossOriginIsolated) return;
     // Match updates must not cancel this browser-local initialization. The server
     // accepts readiness only after the worker has initialized successfully.
@@ -129,7 +129,15 @@ export default function Room() {
         codingReadyAttempted.current = false;
         setCodingReadyError(error instanceof Error ? error.message : "The browser C compiler could not initialize.");
       });
-  }, [codingReadyRetry, markCodingReady, match?.codingReady, match?.config.includeCoding, match?.phase, seatId]);
+  }, [
+    codingReadyAttempts,
+    codingReadyRetry,
+    markCodingReady,
+    match?.codingReady,
+    match?.config.includeCoding,
+    match?.phase,
+    seatId,
+  ]);
   const seats = room?.seats ?? [];
   const self = seats.find((seat) => seat.seatId === seatId);
   const opponent = seats.find((seat) => seat.seatId !== seatId);
@@ -240,7 +248,7 @@ export default function Room() {
             <button
               className="button button-primary shrink-0"
               onClick={retryCodingReady}
-              disabled={codingReadyAttempts.current >= MAX_CODING_READY_ATTEMPTS}
+              disabled={codingReadyAttempts >= MAX_CODING_READY_ATTEMPTS}
             >
               retry readiness
             </button>
