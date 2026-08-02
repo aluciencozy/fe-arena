@@ -14,7 +14,12 @@ import {
   type Question,
 } from "../../shared/domain.js";
 import { QUESTION_BANK, validateQuestionBank } from "./data/questions.js";
-import { loadQuestionRepository, questionFromRow, questionToRow } from "./services/question-bank.service.js";
+import {
+  inMemoryQuestionRepository,
+  loadQuestionRepository,
+  questionFromRow,
+  questionToRow,
+} from "./services/question-bank.service.js";
 
 test("normalization is stable and explicit aliases grade short answers", () => {
   assert.equal(normalizeAnswer("  Little–Endian! "), "little endian");
@@ -25,10 +30,13 @@ test("normalization is stable and explicit aliases grade short answers", () => {
 
 test("reviewed bank has complete topic/type coverage, valid unique IDs, and hidden public solutions", () => {
   const questions = validateQuestionBank();
-  assert.equal(questions.length, 128);
+  assert.equal(questions.length, 201);
   assert.equal(new Set(questions.map((question) => question.id)).size, questions.length);
-  assert.equal(questions.filter((question) => question.type === "graph").length, 5);
-  assert.equal(questions.filter((question) => question.type === "coding").length, 3);
+  assert.equal(questions.filter((question) => question.type === "graph").length, 19);
+  assert.equal(questions.filter((question) => question.type === "coding").length, 38);
+  assert.ok(questions.filter((question) => question.difficulty === "stretch").length >= 70);
+  assert.ok(questions.some((question) => question.published === false));
+  assert.ok(questions.filter((question) => question.published !== false && question.type === "coding").length >= 30);
   assert.equal(new Set(questions.map((question) => question.type)).size, 7);
   assert.equal(new Set(questions.map((question) => question.topicId)).size, TOPICS.length);
   for (const topic of TOPICS) {
@@ -57,6 +65,36 @@ test("reviewed bank has complete topic/type coverage, valid unique IDs, and hidd
       assert.deepEqual(publicView.graph, question.graph);
       assert.equal("reachable" in publicView, false);
       assert.equal("distance" in publicView, false);
+    }
+  }
+});
+
+test("publication policy retains retired content but excludes it from play", () => {
+  const retired = QUESTION_BANK.find((question) => question.published === false)!;
+  assert.ok(retired);
+  assert.equal(inMemoryQuestionRepository.get(retired.id), undefined);
+  assert.equal(
+    inMemoryQuestionRepository.list().some((question) => question.id === retired.id),
+    false,
+  );
+  assert.ok(inMemoryQuestionRepository.list().every((question) => question.published !== false));
+});
+
+test("reviewed stretch grading fixtures are deterministic", () => {
+  for (const question of QUESTION_BANK) {
+    if (question.type === "code-output") {
+      assert.equal(gradeQuestion(question, { questionId: question.id, answer: question.output }), true, question.id);
+    }
+    if (question.type === "graph") {
+      const answer =
+        question.operation === "bfs-order" || question.operation === "dfs-order"
+          ? question.answerOrder!
+          : question.operation === "adjacency"
+            ? question.adjacentNodes!
+            : question.operation === "reachability"
+              ? question.reachable!
+              : question.distance!;
+      assert.equal(gradeQuestion(question, { questionId: question.id, answer }), true, question.id);
     }
   }
 });

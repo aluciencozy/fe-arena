@@ -72,10 +72,12 @@ printf("%d", x);`,
 
 const makeInMemoryRepository = (questions: readonly Question[]): QuestionRepository => ({
   list: (topicIds) =>
-    topicIds?.length ? questions.filter((question) => topicIds.includes(question.topicId)) : [...questions],
+    topicIds?.length
+      ? questions.filter((question) => question.published !== false && topicIds.includes(question.topicId))
+      : questions.filter((question) => question.published !== false),
   select: (seed, count, topicIds, includeCoding = false) =>
     selectSeededQuestions(questions, seed, count, topicIds, includeCoding),
-  get: (id) => questions.find((question) => question.id === id),
+  get: (id) => questions.find((question) => question.published !== false && question.id === id),
 });
 export type QuestionRepository = {
   list(topicIds?: readonly TopicId[]): Question[];
@@ -98,10 +100,23 @@ export type QuestionBankRow = {
   content: unknown;
   schema_version: number;
   published: boolean;
+  version: number;
 };
 
-export const questionToRow = (question: Question): Omit<QuestionBankRow, "schema_version" | "published"> => {
-  const { id, topicId, type, prompt, explanation, assumptions, provenance, difficulty, ...content } = question;
+export const questionToRow = (question: Question): Omit<QuestionBankRow, "schema_version"> => {
+  const {
+    id,
+    topicId,
+    type,
+    prompt,
+    explanation,
+    assumptions,
+    provenance,
+    difficulty,
+    published,
+    version,
+    ...content
+  } = question;
   return {
     id,
     topic_id: topicId,
@@ -112,6 +127,8 @@ export const questionToRow = (question: Question): Omit<QuestionBankRow, "schema
     provenance,
     difficulty,
     content,
+    published: published !== false,
+    version: version ?? 1,
   };
 };
 
@@ -135,6 +152,8 @@ export const questionFromRow = (row: QuestionBankRow): Question => {
     assumptions: row.assumptions,
     provenance: row.provenance,
     difficulty: row.difficulty,
+    published: row.published !== false,
+    version: row.version ?? 1,
   });
 };
 
@@ -147,8 +166,8 @@ export class SupabaseQuestionRepository implements QuestionRepository {
 
   list(topicIds?: readonly TopicId[]): Question[] {
     return topicIds?.length
-      ? this.questions.filter((question) => topicIds.includes(question.topicId))
-      : [...this.questions];
+      ? this.questions.filter((question) => question.published !== false && topicIds.includes(question.topicId))
+      : this.questions.filter((question) => question.published !== false);
   }
 
   select(seed: string, count: number, topicIds?: readonly TopicId[], includeCoding = false): Question[] {
@@ -156,7 +175,7 @@ export class SupabaseQuestionRepository implements QuestionRepository {
   }
 
   get(id: string): Question | undefined {
-    return this.questions.find((question) => question.id === id);
+    return this.questions.find((question) => question.published !== false && question.id === id);
   }
 }
 

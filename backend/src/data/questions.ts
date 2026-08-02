@@ -1,5 +1,6 @@
 import { CODING_PROBLEMS } from "../../../shared/coding-problems.js";
 import { QuestionSchema, type Question } from "../../../shared/domain.js";
+import { HARD_QUESTIONS } from "./hard-questions.js";
 
 /**
  * Reviewed, original study prompts. The provenance field records public topic
@@ -1644,11 +1645,12 @@ const additionalQuestions: Question[] = [
 
 QUESTION_BANK.push(
   ...additionalQuestions,
+  ...HARD_QUESTIONS,
   ...CODING_PROBLEMS.map((problem) => ({
     id: `q-${problem.id}`,
     topicId: "arrays-memory" as const,
     type: "coding" as const,
-    difficulty: "core" as const,
+    difficulty: "stretch" as const,
     prompt: problem.description,
     explanation: "Run the complete function against the reviewed browser test harness.",
     assumptions: [
@@ -1659,6 +1661,16 @@ QUESTION_BANK.push(
     problem,
   })),
 );
+
+/**
+ * Published policy v2: retain introductory material for audit/history, but do
+ * not select it for new play. The reviewed stretch set is published by
+ * default; a question can be retired in-place without deleting terminal data.
+ */
+for (const question of QUESTION_BANK) {
+  question.published = question.difficulty !== "intro";
+  question.version = question.difficulty === "intro" ? 1 : 2;
+}
 
 export const validateQuestionBank = (questions: readonly Question[] = QUESTION_BANK) => {
   const parsed = questions.map((question) => QuestionSchema.parse(question));
