@@ -192,10 +192,7 @@ test("reviewed C traces match independent output oracles", () => {
   const codeQuestions = QUESTION_BANK.filter(
     (question): question is Extract<Question, { type: "code-output" }> => question.type === "code-output",
   );
-  assert.deepEqual(
-    codeQuestions.map((question) => question.id).sort(),
-    Object.keys(CODE_OUTPUT_ORACLE).sort(),
-  );
+  assert.deepEqual(codeQuestions.map((question) => question.id).sort(), Object.keys(CODE_OUTPUT_ORACLE).sort());
   for (const question of codeQuestions) {
     const expected = CODE_OUTPUT_ORACLE[question.id]!;
     assert.deepEqual(question.output, expected, question.id);
@@ -235,7 +232,10 @@ test("browser coding fixtures are schema-valid and bounded", () => {
       markers.map((_, index) => index + 1),
       problem.id,
     );
-    assert.equal(QUESTION_BANK.some((question) => question.id === `q-${problem.id}` && question.type === "coding"), true);
+    assert.equal(
+      QUESTION_BANK.some((question) => question.id === `q-${problem.id}` && question.type === "coding"),
+      true,
+    );
   }
 });
 
