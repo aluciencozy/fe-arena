@@ -44,7 +44,9 @@ const expireDisconnectedSeat = (io: Server, roomId: string, seatId: string, toke
   const seat = getSeats(roomId).find((candidate) => candidate.seatId === seatId);
   if (!seat || seat.connected) return;
   const state = getMatchState(roomId);
-  if (state && ACTIVE_PHASES.has(state.phase)) leaveMatch(roomId, seatId, "expired", makeEvents(io, roomId));
+  const seats = getSeats(roomId);
+  const abandoned = seats.length > 0 && seats.every((candidate) => !candidate.connected);
+  if (state && ACTIVE_PHASES.has(state.phase)) leaveMatch(roomId, seatId, abandoned ? "abandoned" : "expired", makeEvents(io, roomId));
   const removal = removeSeat(roomId, seatId);
   if (!removal) return;
   emitRoom(io, roomId);

@@ -108,8 +108,13 @@ const syncSeats = (record: MatchRecord) => {
     record.state.submissions[id] ??= emptySubmission();
   }
 };
+const ANSWER_VISIBLE_PHASES = new Set(["REVEAL", "RESULTS", "FORFEIT", "ABANDONED", "EXPIRED"]);
 const publicSnapshot = (state: MatchPublicState): MatchPublicState => {
   const safeState = structuredClone(state);
+  if (!ANSWER_VISIBLE_PHASES.has(safeState.phase)) {
+    safeState.revealedQuestion = null;
+    safeState.history = [];
+  }
   if (["COUNTDOWN", "QUESTION", "PAUSED"].includes(safeState.phase)) {
     for (const submission of Object.values(safeState.submissions)) {
       submission.correct = null;
@@ -283,12 +288,29 @@ const advanceOrFinish = (roomId: string, events: MatchEvents) => {
   startCountdown(roomId, events);
 };
 
+const finalizeRound = (record: MatchRecord, question: NonNullable<ReturnType<typeof questionFor>>) => {
+  const round = record.state.roundIndex + 1;
+  const existing = record.state.history.find((entry) => entry.round === round);
+  if (existing) return existing.question;
+  const revealed = revealedQuestion(question);
+  record.state.history.push({ round, question: revealed, submissions: structuredClone(record.state.submissions) });
+  const summary = record.state.topicSummary[question.topicId] ?? emptyTopicPerformance();
+  const attempts = Object.values(record.state.submissions);
+  const attempted = attempts.filter((submission) => submission.submitted).length;
+  const correct = attempts.filter((submission) => submission.correct === true).length;
+  const score = attempts.reduce((total, submission) => total + (submission.score?.total ?? 0), 0);
+  const responseMs = Object.values(record.roundResponseMs[record.state.roundIndex] ?? {}).reduce((total, value) => total + value, 0);
+  const totalAttempted = summary.attempted + attempted;
+  record.state.topicSummary[question.topicId] = { attempted: totalAttempted, correct: summary.correct + correct, incorrect: summary.incorrect + attempted - correct, accuracy: totalAttempted ? (summary.correct + correct) / totalAttempted : 0, score: summary.score + score, responseMs: summary.responseMs + responseMs };
+  return revealed;
+};
+
 const revealRound = (roomId: string, events: MatchEvents) => {
   const record = matches.get(roomId);
   const question = record && questionFor(record);
   if (!record || !question || (record.state.phase !== "QUESTION" && record.state.phase !== "PAUSED")) return;
   clearTimer(record);
-  const revealed = revealedQuestion(question);
+  const revealed = finalizeRound(record, question);
   record.state.phase = "REVEAL";
   record.state.question = null;
   record.state.revealedQuestion = revealed;
@@ -299,15 +321,6 @@ const revealRound = (roomId: string, events: MatchEvents) => {
   record.state.revealStartedAt = now;
   record.state.revealEndsAt = now + REVEAL_SECONDS * 1000;
   record.state.revealSkips = makeRevealSkips(roomId);
-  record.state.history.push({ round: record.state.roundIndex + 1, question: revealed, submissions: structuredClone(record.state.submissions) });
-  const summary = record.state.topicSummary[question.topicId] ?? emptyTopicPerformance();
-  const attempts = Object.values(record.state.submissions);
-  const attempted = attempts.filter((submission) => submission.submitted).length;
-  const correct = attempts.filter((submission) => submission.correct === true).length;
-  const score = attempts.reduce((total, submission) => total + (submission.score?.total ?? 0), 0);
-  const responseMs = Object.values(record.roundResponseMs[record.state.roundIndex] ?? {}).reduce((total, value) => total + value, 0);
-  const totalAttempted = summary.attempted + attempted;
-  record.state.topicSummary[question.topicId] = { attempted: totalAttempted, correct: summary.correct + correct, incorrect: summary.incorrect + attempted - correct, accuracy: totalAttempted ? (summary.correct + correct) / totalAttempted : 0, score: summary.score + score, responseMs: summary.responseMs + responseMs };
   emit(record, events);
   record.timer = setTimeout(() => advanceOrFinish(roomId, events), REVEAL_SECONDS * 1000);
 };
@@ -375,6 +388,10 @@ export const submitAnswer = (roomId: string, seatId: string, attempt: QuestionAt
   if (!record || !question || record.state.phase !== "QUESTION") return { ok: false as const, error: "Answers are not being accepted right now." };
   const submission = record.state.submissions[seatId];
   if (!submission) return { ok: false as const, error: "You are not seated in this match." };
+  if (record.state.questionEndsAt !== null && record.state.questionEndsAt <= Date.now()) {
+    revealRound(roomId, events);
+    return { ok: false as const, error: "Question time has expired." };
+  }
   if (submission.submitted) return { ok: false as const, error: "Your answer is already locked for this question." };
   if (attempt.questionId !== question.id) return { ok: false as const, error: "That question is no longer active." };
   // Grading happens only here, on the server, against the private repository record.
@@ -422,7 +439,10 @@ export const leaveMatch = (roomId: string, leavingSeatId: string, reason: "forfe
   const record = matches.get(roomId);
   if (!record) return;
   clearTimer(record);
-  const winner = seatIds(roomId).find((id) => id !== leavingSeatId) ?? null;
+  const phase = record.state.phase === "PAUSED" ? record.pausedFrom : record.state.phase;
+  const question = phase === "QUESTION" ? questionFor(record) : undefined;
+  if (question) finalizeRound(record, question);
+  const winner = reason === "abandoned" ? null : seatIds(roomId).find((id) => id !== leavingSeatId) ?? null;
   record.state.phase = reason === "forfeit" ? "FORFEIT" : reason === "expired" ? "EXPIRED" : "ABANDONED";
   record.state.winnerSeatId = winner;
   record.state.endReason = reason;
@@ -436,6 +456,8 @@ export const leaveMatch = (roomId: string, leavingSeatId: string, reason: "forfe
   record.state.revealStartedAt = null;
   record.state.revealEndsAt = null;
   record.state.revealSkips = makeRevealSkips(roomId);
+  record.pausedFrom = null;
+  record.pausedAt = null;
   emit(record, events);
   events.message(winner ? `${winner === leavingSeatId ? "A guest" : "Your opponent"} left; the match is over.` : "The match ended because the room was abandoned.");
 };
@@ -458,6 +480,7 @@ export const pauseForDisconnect = (roomId: string, seatId: string, events: Match
 export const resumeAfterReconnect = (roomId: string, events: MatchEvents) => {
   const record = matches.get(roomId);
   if (!record || record.state.phase !== "PAUSED" || !record.pausedFrom || record.pausedAt === null) return false;
+  if (!getSeats(roomId).length || getSeats(roomId).some((seat) => !seat.connected)) return false;
   const pausedMs = Math.max(0, Date.now() - record.pausedAt);
   if (record.state.questionStartedAt !== null) record.state.questionStartedAt += pausedMs;
   if (record.state.questionEndsAt !== null) record.state.questionEndsAt += pausedMs;
