@@ -6,33 +6,19 @@ import { generateCSource, parseExecutionOutput, runCInWorker, type CExecutionOut
 test("generates a complete C translation unit without allowing signature edits", () => {
   const problem = CODING_PROBLEMS[0]!;
   const source = generateCSource(problem, "return 42;");
-  assert.equal(source, `${problem.prefix}\n${problem.functionSignature} {\nreturn 42;\n}\n${problem.testHarness}\n`);
-  assert.match(source, /int sum_array\(const int values\[\], size_t length\) \{/);
+  assert.equal(
+    source,
+    `${problem.prefix}\n${problem.functionSignature};\n${problem.testHarness}\n${problem.functionSignature} {\nreturn 42;\n}\n`,
+  );
+  assert.match(source, /int sum_array\(const int values\[\], size_t length\);/);
   assert.match(source, /FEA_TEST\|1\|mixed values/);
 });
 
-test("rejects preprocessor directives from the editable function body", () => {
+test("keeps the test harness before editable preprocessor directives", () => {
   const problem = CODING_PROBLEMS[0]!;
-  assert.throws(() => generateCSource(problem, "#define FEA_TEST|1|mixed values|PASS"), /preprocessor directives/);
-  assert.throws(() => generateCSource(problem, "\\\n#define FEA_TEST|1|mixed values|PASS"), /preprocessor directives/);
-  assert.doesNotThrow(() => generateCSource(problem, "/*\n#define not_a_directive\n*/\nreturn 0;"));
-});
-
-test("returns a compile error before creating a worker for an invalid body", async () => {
-  let created = false;
-  const outcome = await runCInWorker(CODING_PROBLEMS[0]!, "#include <stdlib.h>", {
-    createWorker: () => {
-      created = true;
-      throw new Error("worker should not start");
-    },
-  });
-  assert.deepEqual(outcome, {
-    kind: "compile-error",
-    stdout: "",
-    stderr: "Function bodies cannot contain preprocessor directives.",
-    tests: [],
-  });
-  assert.equal(created, false);
+  const studentCode = 'const char marker[] = "/* */";\n#define sum_array(...) 0\nreturn 42;';
+  const source = generateCSource(problem, studentCode);
+  assert.ok(source.indexOf(problem.testHarness) < source.lastIndexOf(studentCode));
 });
 
 test("parses machine-readable test results while preserving student stdout", () => {

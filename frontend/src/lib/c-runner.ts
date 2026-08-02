@@ -21,18 +21,8 @@ type WorkerLike = {
 };
 type WorkerFactory = () => WorkerLike;
 
-const hasPreprocessorDirective = (studentCode: string): boolean => {
-  const logicalSource = studentCode.replace(/\\(?:\r\n?|\n)/g, "");
-  const sourceWithoutComments = logicalSource
-    .replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\r\n]/g, " "))
-    .replace(/\/\/[^\r\n]*/g, "");
-  return sourceWithoutComments.split(/\r\n?|\n/).some((line) => /^\s*#/.test(line));
-};
-
-export const generateCSource = (problem: CodingProblem, studentCode: string): string => {
-  if (hasPreprocessorDirective(studentCode)) throw new Error("Function bodies cannot contain preprocessor directives.");
-  return `${problem.prefix}\n${problem.functionSignature} {\n${studentCode}\n}\n${problem.testHarness}\n`;
-};
+export const generateCSource = (problem: CodingProblem, studentCode: string): string =>
+  `${problem.prefix}\n${problem.functionSignature};\n${problem.testHarness}\n${problem.functionSignature} {\n${studentCode}\n}\n`;
 
 export const parseExecutionOutput = (stdout: string, stderr: string, exitCode: number): CExecutionOutcome => {
   const tests: CTestResult[] = [];
@@ -62,17 +52,7 @@ export const runCInWorker = (
 ): Promise<CExecutionOutcome> => {
   const executionTimeoutMs = options.timeoutMs ?? 2_500;
   const initializationTimeoutMs = options.initializationTimeoutMs ?? 30_000;
-  let source: string;
-  try {
-    source = generateCSource(problem, studentCode);
-  } catch (error) {
-    return Promise.resolve({
-      kind: "compile-error",
-      stdout: "",
-      stderr: error instanceof Error ? error.message : "The function body is not valid for this exercise.",
-      tests: [],
-    });
-  }
+  const source = generateCSource(problem, studentCode);
   return new Promise((resolve) => {
     let worker: WorkerLike;
     try {
