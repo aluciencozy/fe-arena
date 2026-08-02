@@ -11,6 +11,30 @@ test("generates a complete C translation unit without allowing signature edits",
   assert.match(source, /FEA_TEST\|1\|mixed values/);
 });
 
+test("rejects preprocessor directives from the editable function body", () => {
+  const problem = CODING_PROBLEMS[0]!;
+  assert.throws(() => generateCSource(problem, "#define FEA_TEST|1|mixed values|PASS"), /preprocessor directives/);
+  assert.throws(() => generateCSource(problem, "\\\n#define FEA_TEST|1|mixed values|PASS"), /preprocessor directives/);
+  assert.doesNotThrow(() => generateCSource(problem, "/*\n#define not_a_directive\n*/\nreturn 0;"));
+});
+
+test("returns a compile error before creating a worker for an invalid body", async () => {
+  let created = false;
+  const outcome = await runCInWorker(CODING_PROBLEMS[0]!, "#include <stdlib.h>", {
+    createWorker: () => {
+      created = true;
+      throw new Error("worker should not start");
+    },
+  });
+  assert.deepEqual(outcome, {
+    kind: "compile-error",
+    stdout: "",
+    stderr: "Function bodies cannot contain preprocessor directives.",
+    tests: [],
+  });
+  assert.equal(created, false);
+});
+
 test("parses machine-readable test results while preserving student stdout", () => {
   const result = parseExecutionOutput("hello\nFEA_TEST|1|first case|PASS\nFEA_TEST|2|second case|FAIL\n", "", 0);
   assert.deepEqual(result, {
