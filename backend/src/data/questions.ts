@@ -8,7 +8,8 @@ const provenance = { source: "UCF Foundation Exam public index and reference PDF
 
 export const QUESTION_BANK: Question[] = [
   { id: "q-array-offset", topicId: "arrays-memory", type: "numeric", difficulty: "intro", prompt: "A zero-based int array starts at index 0. Which index contains the fifth element?", answer: 4, tolerance: 0, explanation: "Zero-based indexing assigns the first element index 0, so the fifth is at 5 − 1 = 4.", assumptions: ["The array has at least five elements.", "Indexing is zero-based."], provenance },
-  { id: "q-array-c-output", topicId: "arrays-memory", type: "code-output", difficulty: "core", language: "c", prompt: "What line does this C fragment print? int a[3] = {2, 4, 6}; printf(\"%d\", a[1] + a[2]);", output: ["10"], explanation: "The expression reads 4 and 6, then adds them to produce 10.", assumptions: ["The array is initialized as shown.", "Only the printed digits matter."], provenance },
+  { id: "q-array-c-output", topicId: "arrays-memory", type: "code-output", difficulty: "core", language: "c", code: `int a[3] = {2, 4, 6};
+printf("%d", a[1] + a[2]);`, prompt: "What line does this C fragment print? int a[3] = {2, 4, 6}; printf(\"%d\", a[1] + a[2]);", output: ["10"], explanation: "The expression reads 4 and 6, then adds them to produce 10.", assumptions: ["The array is initialized as shown.", "Only the printed digits matter."], provenance },
   { id: "q-list-empty-head", topicId: "linked-lists", type: "short-answer", difficulty: "intro", prompt: "What pointer value conventionally represents an empty singly linked list in C?", answers: ["null", "null pointer", "nullptr", "nil"], explanation: "An empty list has no first node, so its head is represented by a null pointer.", assumptions: ["The list uses a head pointer.", "The question asks for the empty-list sentinel."], provenance },
   { id: "q-list-delete-order", topicId: "linked-lists", type: "ordered-sequence", difficulty: "core", prompt: "Order these steps to delete a known middle node from a singly linked list: bypass the node, save the successor, free the removed node.", items: [{ id: "successor", label: "Save the successor" }, { id: "bypass", label: "Make the predecessor point to the successor" }, { id: "free", label: "Free the removed node" }], answerOrder: ["successor", "bypass", "free"], explanation: "The successor must remain reachable before links change; after bypassing the node, its storage can be released.", assumptions: ["The predecessor and target node are valid.", "The successor pointer is needed by the new link."], provenance },
   { id: "q-stack-pop", topicId: "stacks", type: "ordered-sequence", difficulty: "intro", prompt: "A stack receives push(A), push(B), pop(), push(C), pop(). List the two values returned by pop, in order.", items: [{ id: "b", label: "B" }, { id: "c", label: "C" }, { id: "a", label: "A" }], answerOrder: ["b", "c"], explanation: "A stack is LIFO: B is removed first, then C after it is pushed.", assumptions: ["No operation fails.", "The sequence is evaluated from left to right."], provenance },
@@ -27,10 +28,21 @@ export const QUESTION_BANK: Question[] = [
   { id: "q-trie-root", topicId: "tries", type: "multiple-choice", difficulty: "intro", prompt: "In a trie for lowercase words, what does the root represent?", options: [{ id: "a", label: "The empty prefix" }, { id: "b", label: "The alphabetically first word" }, { id: "c", label: "The final character of every word" }, { id: "d", label: "A hash bucket" }], answer: "a", explanation: "The root corresponds to the empty prefix; edges below it add characters.", assumptions: ["The trie has one root and character-labelled edges."], provenance },
   { id: "q-sort-complexity", topicId: "sorting", type: "multiple-choice", difficulty: "core", prompt: "Which sorting algorithm has a worst-case comparison count that grows quadratically for its usual in-place implementation?", options: [{ id: "a", label: "Insertion sort" }, { id: "b", label: "Merge sort" }, { id: "c", label: "Binary search" }, { id: "d", label: "Breadth-first search" }], answer: "a", explanation: "Insertion sort can shift a linear number of items for each of a linear number of positions, giving O(n²) worst-case work.", assumptions: ["The question concerns comparison-based insertion sort without a special bound on input order."], provenance },
   { id: "q-sort-passes", topicId: "sorting", type: "ordered-sequence", difficulty: "core", prompt: "For insertion sort, order these actions for one non-empty pass: choose the next key, shift larger sorted items, place the key.", items: [{ id: "choose", label: "Choose the next key" }, { id: "shift", label: "Shift larger sorted items" }, { id: "place", label: "Place the key" }], answerOrder: ["choose", "shift", "place"], explanation: "Insertion sort saves the next key, opens a position by shifting larger items, and writes the key into that position.", assumptions: ["The sorted prefix is maintained before the pass."], provenance },
-  { id: "q-recursion-c-output", topicId: "recursion", type: "code-output", difficulty: "core", language: "c", prompt: "What does this C function print for countdown(3), assuming printf prints each integer followed by a space? void countdown(int n) { if (n == 0) return; printf(\"%d \", n); countdown(n - 1); }", output: ["3 2 1 "], explanation: "Each call prints before making the smaller call, so the values appear in descending order.", assumptions: ["The base case returns without printing.", "The call starts with n = 3."], provenance },
+  { id: "q-recursion-c-output", topicId: "recursion", type: "code-output", difficulty: "core", language: "c", code: `void countdown(int n) {
+  if (n == 0) return;
+  printf("%d ", n);
+  countdown(n - 1);
+}
+
+countdown(3);`, prompt: "What does this C function print for countdown(3), assuming printf prints each integer followed by a space? void countdown(int n) { if (n == 0) return; printf(\"%d \", n); countdown(n - 1); }", output: ["3 2 1 "], explanation: "Each call prints before making the smaller call, so the values appear in descending order.", assumptions: ["The base case returns without printing.", "The call starts with n = 3."], provenance },
   { id: "q-recursion-calls", topicId: "recursion", type: "numeric", difficulty: "intro", prompt: "How many non-base calls occur when factorial recursively evaluates factorial(4) with base case factorial(1)?", answer: 3, tolerance: 0, explanation: "The calls are factorial(4), factorial(3), factorial(2), factorial(1); three calls make another recursive call.", assumptions: ["The base case is n = 1.", "Only calls that recurse are counted."], provenance },
   { id: "q-analysis-log", topicId: "analysis-mathematics", type: "numeric", difficulty: "intro", prompt: "A sorted array has 32 elements. What is the smallest integer upper bound on midpoint checks for binary search?", answer: 6, tolerance: 0, explanation: "Binary search needs floor(log2(32)) + 1 = 6 checks in the worst case when the final singleton is inspected.", assumptions: ["The array length is exactly 32.", "A midpoint check inspects one candidate."], provenance },
   { id: "q-analysis-bit", topicId: "analysis-mathematics", type: "short-answer", difficulty: "core", prompt: "What bitwise operation combines two bit masks while preserving a bit set in either mask?", answers: ["or", "bitwise or", "bitwise operator or"], explanation: "Bitwise OR sets each output bit when at least one corresponding input bit is set.", assumptions: ["The masks have equal width.", "The operation is bitwise rather than logical short-circuit OR."], provenance },
+  { id: "q-graph-bfs", topicId: "binary-trees", type: "graph", difficulty: "core", prompt: "Starting at A, give the BFS visit order for the displayed undirected graph.", graph: { directed: false, nodes: [{ id: "a", label: "A", x: 12, y: 50 }, { id: "b", label: "B", x: 36, y: 25 }, { id: "c", label: "C", x: 36, y: 75 }, { id: "d", label: "D", x: 66, y: 25 }, { id: "e", label: "E", x: 66, y: 75 }], edges: [{ from: "a", to: "b" }, { from: "a", to: "c" }, { from: "b", to: "d" }, { from: "c", to: "d" }, { from: "c", to: "e" }] }, operation: "bfs-order", startNode: "a", answerOrder: ["a", "b", "c", "d", "e"], explanation: "BFS visits A first, then its neighbors B and C in displayed node order, followed by D and E.", assumptions: ["Edges are unweighted.", "Undirected edges can be traversed in either direction.", "Neighbors are visited in displayed node order."], provenance },
+  { id: "q-graph-dfs", topicId: "sorting", type: "graph", difficulty: "core", prompt: "Starting at A, give the DFS preorder for the displayed directed graph.", graph: { directed: true, nodes: [{ id: "a", label: "A", x: 12, y: 50 }, { id: "b", label: "B", x: 35, y: 25 }, { id: "c", label: "C", x: 35, y: 75 }, { id: "d", label: "D", x: 62, y: 25 }, { id: "e", label: "E", x: 86, y: 50 }], edges: [{ from: "a", to: "b" }, { from: "a", to: "c" }, { from: "b", to: "d" }, { from: "d", to: "e" }, { from: "c", to: "e" }] }, operation: "dfs-order", startNode: "a", answerOrder: ["a", "b", "d", "e", "c"], explanation: "DFS follows A to B to D to E before backtracking to visit C.", assumptions: ["Only directed edges may be followed.", "Outgoing edges are considered in displayed node order."], provenance },
+  { id: "q-graph-adjacency", topicId: "heaps", type: "graph", difficulty: "intro", prompt: "List the neighbors of C in displayed node order.", graph: { directed: false, nodes: [{ id: "a", label: "A", x: 15, y: 50 }, { id: "b", label: "B", x: 38, y: 20 }, { id: "c", label: "C", x: 50, y: 75 }, { id: "d", label: "D", x: 80, y: 25 }, { id: "e", label: "E", x: 82, y: 80 }], edges: [{ from: "a", to: "c" }, { from: "b", to: "c" }, { from: "c", to: "d" }, { from: "c", to: "e" }] }, operation: "adjacency", nodeId: "c", adjacentNodes: ["a", "b", "d", "e"], explanation: "C shares an edge with A, B, D, and E; the answer follows the displayed node order.", assumptions: ["The graph is undirected.", "Adjacency means a direct edge, not reachability."], provenance },
+  { id: "q-graph-reachability", topicId: "analysis-mathematics", type: "graph", difficulty: "intro", prompt: "Can D be reached from A by following the directed edges?", graph: { directed: true, nodes: [{ id: "a", label: "A", x: 15, y: 30 }, { id: "b", label: "B", x: 40, y: 30 }, { id: "c", label: "C", x: 65, y: 30 }, { id: "d", label: "D", x: 40, y: 75 }, { id: "e", label: "E", x: 75, y: 75 }], edges: [{ from: "a", to: "b" }, { from: "b", to: "c" }, { from: "d", to: "e" }] }, operation: "reachability", startNode: "a", targetNode: "d", reachable: false, explanation: "A reaches B and C, but there is no directed path from that component to D.", assumptions: ["Only arrow direction shown may be followed.", "A node is reachable from itself, but A and D differ."], provenance },
+  { id: "q-graph-shortest", topicId: "arrays-memory", type: "graph", difficulty: "core", prompt: "What is the unweighted shortest-path length from A to E?", graph: { directed: false, nodes: [{ id: "a", label: "A", x: 12, y: 50 }, { id: "b", label: "B", x: 35, y: 25 }, { id: "c", label: "C", x: 35, y: 75 }, { id: "d", label: "D", x: 62, y: 50 }, { id: "e", label: "E", x: 88, y: 50 }], edges: [{ from: "a", to: "b" }, { from: "a", to: "c" }, { from: "b", to: "d" }, { from: "c", to: "d" }, { from: "d", to: "e" }] }, operation: "shortest-path", startNode: "a", targetNode: "e", distance: 3, explanation: "A reaches D in two edges through B or C, then E in one more edge.", assumptions: ["Every edge has unit weight.", "Path length counts edges, not nodes."], provenance },
 ];
 
 type ContentBase = { id: string; topicId: Question["topicId"]; prompt: string; explanation: string; assumptions?: string[]; difficulty?: Question["difficulty"] };
@@ -46,7 +58,59 @@ const base = (draft: ContentBase) => ({
 const multipleChoice = (draft: ContentBase & { options: Array<{ id: string; label: string }>; answer: string }): Question => ({ ...base(draft), type: "multiple-choice", options: draft.options, answer: draft.answer });
 const numeric = (draft: ContentBase & { answer: number; tolerance?: number; unit?: string }): Question => ({ ...base(draft), type: "numeric", answer: draft.answer, tolerance: draft.tolerance ?? 0, ...(draft.unit ? { unit: draft.unit } : {}) });
 const shortAnswer = (draft: ContentBase & { answers: string[] }): Question => ({ ...base(draft), type: "short-answer", answers: draft.answers });
-const codeOutput = (draft: ContentBase & { output: string[] }): Question => ({ ...base(draft), type: "code-output", language: "c", output: draft.output });
+const curatedCCode: Record<string, string> = {
+  "q-array-c-output-2": `int a[4] = {1, 3, 5, 7};
+printf("%d", a[0] + a[3]);`,
+  "q-list-c-output": `struct Node { int value; struct Node *next; };
+struct Node n2 = {9, 0};
+struct Node n1 = {4, &n2};
+printf("%d", n1.next->value);`,
+  "q-stack-c-output": `int top = 0;
+top++;
+top++;
+top--;
+printf("%d", top);`,
+  "q-queue-c-output": `struct Node { int value; struct Node *next; };
+struct Node n3 = {11, 0};
+struct Node n2 = {8, &n3};
+struct Node n1 = {5, &n2};
+struct Node *front = &n1;
+front = front->next;
+printf("%d", front->value);`,
+  "q-tree-c-output": `int left_key = 2;
+int key = 5;
+int right_key = 9;
+printf("%d %d %d ", left_key, key, right_key);`,
+  "q-avl-c-output": `int left_height = 2;
+int right_height = 4;
+int balance = left_height - right_height;
+printf("%d", balance);`,
+  "q-heap-c-output": `int heap[2] = {12, 7};
+printf("%d", heap[0] >= heap[1]);`,
+  "q-hash-c-output": `printf("%d", 29 % 6);`,
+  "q-trie-c-output": `int found_cat = 1;
+int found_can = 0;
+printf("%d", found_cat + found_can);`,
+  "q-sort-c-output": `int x = 3;
+int y = 1;
+if (x > y) printf("sorted");
+else printf("swap");`,
+  "q-recursion-c-output-2": `void f(int n) {
+  if (n == 0) return;
+  f(n - 1);
+  printf("%d ", n);
+}
+
+f(2);`,
+  "q-analysis-c-output": `int x = 2 + 3 * 4;
+printf("%d", x);`,
+};
+const curatedCodeFor = (id: string) => {
+  const code = curatedCCode[id];
+  if (!code) throw new Error(`Missing curated C code for ${id}.`);
+  return code;
+};
+const codeOutput = (draft: ContentBase & { output: string[] }): Question => ({ ...base(draft), type: "code-output", language: "c", code: curatedCodeFor(draft.id), output: draft.output });
 const ordered = (draft: ContentBase & { items: Array<{ id: string; label: string }>; answerOrder: string[] }): Question => ({ ...base(draft), type: "ordered-sequence", items: draft.items, answerOrder: draft.answerOrder });
 
 /** Additional reviewed content: eight distinct prompts per family, authored for FE Arena. */
@@ -172,6 +236,16 @@ export const validateQuestionBank = (questions: readonly Question[] = QUESTION_B
     if (question.type === "ordered-sequence") {
       const itemIds = new Set(question.items.map((item) => item.id));
       if (itemIds.size !== question.items.length || question.answerOrder.some((id) => !itemIds.has(id))) throw new Error(`Invalid sequence answer: ${question.id}`);
+    }
+    if (question.type === "graph") {
+      const edgeKeys = new Set<string>();
+      for (const edge of question.graph.edges) {
+        const key = question.graph.directed ? `${edge.from}->${edge.to}` : [edge.from, edge.to].sort().join("--");
+        if (edgeKeys.has(key)) throw new Error(`Duplicate graph edge: ${question.id}`);
+        edgeKeys.add(key);
+      }
+      const answer = question.operation === "bfs-order" || question.operation === "dfs-order" ? question.answerOrder! : question.operation === "adjacency" ? question.adjacentNodes! : undefined;
+      if (answer && new Set(answer).size !== answer.length) throw new Error(`Duplicate graph answer node: ${question.id}`);
     }
   }
   return parsed;
