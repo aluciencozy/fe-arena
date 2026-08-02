@@ -4,5 +4,8 @@ import type { AccountHistoryRepository } from "../persistence/match.repository.j
 
 let repository: AccountHistoryRepository = { getAccountHistory: async () => emptyAccountHistory() };
 
-export const setAccountHistoryRepository = (next: AccountHistoryRepository) => { repository = next; };
-export const getAccountHistory = (authUserId: string): Promise<AccountHistory> => repository.getAccountHistory(authUserId);
+export const setAccountHistoryRepository = (next: AccountHistoryRepository) => {
+  repository = next;
+};
+export const getAccountHistory = (authUserId: string): Promise<AccountHistory> =>
+  repository.getAccountHistory(authUserId);

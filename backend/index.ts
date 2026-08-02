@@ -12,7 +12,10 @@ try {
     if (shuttingDown) return;
     shuttingDown = true;
     console.info(`FE Arena shutting down (${signal})`);
-    void runtime.close().then(() => process.exit(0)).catch(() => process.exit(1));
+    void runtime
+      .close()
+      .then(() => process.exit(0))
+      .catch(() => process.exit(1));
   };
   process.once("SIGTERM", () => shutdown("SIGTERM"));
   process.once("SIGINT", () => shutdown("SIGINT"));

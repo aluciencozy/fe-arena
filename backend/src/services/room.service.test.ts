@@ -1,6 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { attachSeat, bindSeatAuthIdentity, clearRoomsForTests, createRoom, disconnectSocket, getMetadata, getSeats, joinRoom, reconnectRoom, removeSeat } from "./room.service.js";
+import {
+  attachSeat,
+  bindSeatAuthIdentity,
+  clearRoomsForTests,
+  createRoom,
+  disconnectSocket,
+  getMetadata,
+  getSeats,
+  joinRoom,
+  reconnectRoom,
+  removeSeat,
+} from "./room.service.js";
 import { TOPICS, type MatchConfig } from "../../../shared/domain.js";
 
 const config: MatchConfig = { topicIds: [TOPICS[0].id], roundCount: 5, questionTimerSeconds: 60 };
@@ -16,7 +27,12 @@ test("stable guest seats restore with the reconnect token", () => {
   assert.equal(detached?.seat.seatId, joined.seat.seatId);
   const restored = reconnectRoom(created.metadata.roomId, joined.seat.reconnectToken, "socket-guest-new");
   assert.equal(restored.ok, true);
-  assert.equal(getSeats(created.metadata.roomId).map((seat) => seat.name).join(","), "Host,Guest");
+  assert.equal(
+    getSeats(created.metadata.roomId)
+      .map((seat) => seat.name)
+      .join(","),
+    "Host,Guest",
+  );
   clearRoomsForTests();
 });
 
@@ -45,7 +61,10 @@ test("auth identity binding clears when the account signs out", () => {
   clearRoomsForTests();
   const created = createRoom("private", config, "Host");
   attachSeat(created.metadata.roomId, created.seat, "socket-host");
-  assert.equal(bindSeatAuthIdentity(created.metadata.roomId, created.seat.seatId, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"), true);
+  assert.equal(
+    bindSeatAuthIdentity(created.metadata.roomId, created.seat.seatId, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+    true,
+  );
   assert.equal(getSeats(created.metadata.roomId)[0]?.authUserId, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
   assert.equal(bindSeatAuthIdentity(created.metadata.roomId, created.seat.seatId, undefined), true);
   assert.equal("authUserId" in (getSeats(created.metadata.roomId)[0] ?? {}), false);

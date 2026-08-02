@@ -4,60 +4,557 @@ import { QuestionSchema, type Question } from "../../../shared/domain.js";
  * Reviewed, original study prompts. The provenance field records public topic
  * references only; no exam wording, data set, or answer key is reproduced.
  */
-const provenance = { source: "UCF Foundation Exam public index and reference PDFs", note: "Original FE Arena study prompt informed by recurring topic families; source materials were not copied or used as answer data." };
+const provenance = {
+  source: "UCF Foundation Exam public index and reference PDFs",
+  note: "Original FE Arena study prompt informed by recurring topic families; source materials were not copied or used as answer data.",
+};
 
 export const QUESTION_BANK: Question[] = [
-  { id: "q-array-offset", topicId: "arrays-memory", type: "numeric", difficulty: "intro", prompt: "A zero-based int array starts at index 0. Which index contains the fifth element?", answer: 4, tolerance: 0, explanation: "Zero-based indexing assigns the first element index 0, so the fifth is at 5 − 1 = 4.", assumptions: ["The array has at least five elements.", "Indexing is zero-based."], provenance },
-  { id: "q-array-c-output", topicId: "arrays-memory", type: "code-output", difficulty: "core", language: "c", code: `int a[3] = {2, 4, 6};
-printf("%d", a[1] + a[2]);`, prompt: "What line does this C fragment print? int a[3] = {2, 4, 6}; printf(\"%d\", a[1] + a[2]);", output: ["10"], explanation: "The expression reads 4 and 6, then adds them to produce 10.", assumptions: ["The array is initialized as shown.", "Only the printed digits matter."], provenance },
-  { id: "q-list-empty-head", topicId: "linked-lists", type: "short-answer", difficulty: "intro", prompt: "What pointer value conventionally represents an empty singly linked list in C?", answers: ["null", "null pointer", "nullptr", "nil"], explanation: "An empty list has no first node, so its head is represented by a null pointer.", assumptions: ["The list uses a head pointer.", "The question asks for the empty-list sentinel."], provenance },
-  { id: "q-list-delete-order", topicId: "linked-lists", type: "ordered-sequence", difficulty: "core", prompt: "Order these steps to delete a known middle node from a singly linked list: bypass the node, save the successor, free the removed node.", items: [{ id: "successor", label: "Save the successor" }, { id: "bypass", label: "Make the predecessor point to the successor" }, { id: "free", label: "Free the removed node" }], answerOrder: ["successor", "bypass", "free"], explanation: "The successor must remain reachable before links change; after bypassing the node, its storage can be released.", assumptions: ["The predecessor and target node are valid.", "The successor pointer is needed by the new link."], provenance },
-  { id: "q-stack-pop", topicId: "stacks", type: "ordered-sequence", difficulty: "intro", prompt: "A stack receives push(A), push(B), pop(), push(C), pop(). List the two values returned by pop, in order.", items: [{ id: "b", label: "B" }, { id: "c", label: "C" }, { id: "a", label: "A" }], answerOrder: ["b", "c"], explanation: "A stack is LIFO: B is removed first, then C after it is pushed.", assumptions: ["No operation fails.", "The sequence is evaluated from left to right."], provenance },
-  { id: "q-stack-depth", topicId: "stacks", type: "numeric", difficulty: "intro", prompt: "Starting empty, a stack performs push, push, pop, push, push. What is its final depth?", answer: 3, tolerance: 0, explanation: "The depth changes 0 → 1 → 2 → 1 → 2 → 3.", assumptions: ["Every pop is applied to a non-empty stack."], provenance },
-  { id: "q-queue-wrap", topicId: "queues", type: "numeric", difficulty: "core", prompt: "A circular queue has capacity 8 and uses zero-based positions. After position 7, which position is next?", answer: 0, tolerance: 0, explanation: "Circular indexing wraps with (7 + 1) mod 8 = 0.", assumptions: ["The queue uses modulo arithmetic for wraparound.", "Capacity is eight slots."], provenance },
-  { id: "q-queue-order", topicId: "queues", type: "ordered-sequence", difficulty: "intro", prompt: "A queue performs enqueue(A), enqueue(B), dequeue(), enqueue(C), dequeue(). List the removed values in order.", items: [{ id: "a", label: "A" }, { id: "b", label: "B" }, { id: "c", label: "C" }], answerOrder: ["a", "b"], explanation: "A queue is FIFO: A entered first and is removed first, followed by B.", assumptions: ["No operation fails.", "The sequence is evaluated from left to right."], provenance },
-  { id: "q-tree-height", topicId: "binary-trees", type: "numeric", difficulty: "intro", prompt: "A perfect binary tree has 7 nodes. How many edges are on a path from its root to a leaf?", answer: 2, tolerance: 0, explanation: "Seven nodes form three levels, so a root-to-leaf path has two edges.", assumptions: ["The tree is perfect.", "Height counts edges, not vertices."], provenance },
-  { id: "q-bst-property", topicId: "binary-trees", type: "multiple-choice", difficulty: "intro", prompt: "For a binary search tree with unique keys, where are keys smaller than a node's key stored?", options: [{ id: "a", label: "In its left subtree" }, { id: "b", label: "In its right subtree" }, { id: "c", label: "Only at the root" }, { id: "d", label: "In a separate queue" }], answer: "a", explanation: "The BST ordering rule places smaller keys in the left subtree and larger keys in the right subtree.", assumptions: ["Keys are unique.", "The tree follows the standard BST ordering rule."], provenance },
-  { id: "q-avl-balance", topicId: "avl-trees", type: "short-answer", difficulty: "core", prompt: "What is the usual allowed balance-factor range for every node in an AVL tree?", answers: ["-1 to 1", "-1, 0, or 1", "minus one to one"], explanation: "An AVL node's left and right subtree heights differ by at most one, giving a balance factor of −1, 0, or 1.", assumptions: ["Balance factor is left height minus right height."], provenance },
-  { id: "q-avl-rotation", topicId: "avl-trees", type: "ordered-sequence", difficulty: "core", prompt: "For a left-left imbalance, order the repair: rotate right at the unbalanced node, update heights, resume checking ancestors.", items: [{ id: "rotate", label: "Rotate right" }, { id: "height", label: "Update heights" }, { id: "ancestors", label: "Check ancestors" }], answerOrder: ["rotate", "height", "ancestors"], explanation: "A right rotation restores the local shape; heights are recomputed before walking toward the root.", assumptions: ["The imbalance is a single left-left case.", "No double rotation is needed."], provenance },
-  { id: "q-heap-child-index", topicId: "heaps", type: "numeric", difficulty: "core", prompt: "In a zero-based binary heap, what is the left-child index of the item at index 3?", answer: 7, tolerance: 0, explanation: "The zero-based left-child formula is 2i + 1, so 2(3) + 1 = 7.", assumptions: ["The heap uses zero-based indexing."], provenance },
-  { id: "q-heap-root", topicId: "heaps", type: "multiple-choice", difficulty: "intro", prompt: "In a min-heap, which value is guaranteed to be at the root?", options: [{ id: "a", label: "The minimum value" }, { id: "b", label: "The maximum value" }, { id: "c", label: "The most recently inserted value" }, { id: "d", label: "The median value" }], answer: "a", explanation: "Every parent in a min-heap is no greater than its children, so the minimum is at the root.", assumptions: ["The heap invariant is valid.", "Values are comparable."], provenance },
-  { id: "q-hash-modulo", topicId: "hash-tables", type: "numeric", difficulty: "intro", prompt: "With hash function h(k) = k mod 11, which bucket receives key 37?", answer: 4, tolerance: 0, explanation: "37 divided by 11 leaves remainder 4, so h(37) = 4.", assumptions: ["Buckets are numbered 0 through 10.", "The stated hash function is used directly."], provenance },
-  { id: "q-hash-probe", topicId: "hash-tables", type: "ordered-sequence", difficulty: "core", prompt: "With linear probing, a collision occurs at slot 2. List the next slots inspected in order for a table of size 5.", items: [{ id: "three", label: "3" }, { id: "four", label: "4" }, { id: "zero", label: "0" }], answerOrder: ["three", "four", "zero"], explanation: "Linear probing advances one slot at a time and wraps after slot 4.", assumptions: ["The starting slot is 2.", "The table has five slots and uses modulo wraparound."], provenance },
-  { id: "q-trie-prefix", topicId: "tries", type: "short-answer", difficulty: "intro", prompt: "In a character trie containing 'cat' and 'car', what is their longest shared non-empty prefix?", answers: ["ca"], explanation: "Both words traverse c then a before branching at their third character.", assumptions: ["Words are compared case-sensitively as shown.", "Prefix means the shared initial string."], provenance },
-  { id: "q-trie-root", topicId: "tries", type: "multiple-choice", difficulty: "intro", prompt: "In a trie for lowercase words, what does the root represent?", options: [{ id: "a", label: "The empty prefix" }, { id: "b", label: "The alphabetically first word" }, { id: "c", label: "The final character of every word" }, { id: "d", label: "A hash bucket" }], answer: "a", explanation: "The root corresponds to the empty prefix; edges below it add characters.", assumptions: ["The trie has one root and character-labelled edges."], provenance },
-  { id: "q-sort-complexity", topicId: "sorting", type: "multiple-choice", difficulty: "core", prompt: "Which sorting algorithm has a worst-case comparison count that grows quadratically for its usual in-place implementation?", options: [{ id: "a", label: "Insertion sort" }, { id: "b", label: "Merge sort" }, { id: "c", label: "Binary search" }, { id: "d", label: "Breadth-first search" }], answer: "a", explanation: "Insertion sort can shift a linear number of items for each of a linear number of positions, giving O(n²) worst-case work.", assumptions: ["The question concerns comparison-based insertion sort without a special bound on input order."], provenance },
-  { id: "q-sort-passes", topicId: "sorting", type: "ordered-sequence", difficulty: "core", prompt: "For insertion sort, order these actions for one non-empty pass: choose the next key, shift larger sorted items, place the key.", items: [{ id: "choose", label: "Choose the next key" }, { id: "shift", label: "Shift larger sorted items" }, { id: "place", label: "Place the key" }], answerOrder: ["choose", "shift", "place"], explanation: "Insertion sort saves the next key, opens a position by shifting larger items, and writes the key into that position.", assumptions: ["The sorted prefix is maintained before the pass."], provenance },
-  { id: "q-recursion-c-output", topicId: "recursion", type: "code-output", difficulty: "core", language: "c", code: `void countdown(int n) {
+  {
+    id: "q-array-offset",
+    topicId: "arrays-memory",
+    type: "numeric",
+    difficulty: "intro",
+    prompt: "A zero-based int array starts at index 0. Which index contains the fifth element?",
+    answer: 4,
+    tolerance: 0,
+    explanation: "Zero-based indexing assigns the first element index 0, so the fifth is at 5 − 1 = 4.",
+    assumptions: ["The array has at least five elements.", "Indexing is zero-based."],
+    provenance,
+  },
+  {
+    id: "q-array-c-output",
+    topicId: "arrays-memory",
+    type: "code-output",
+    difficulty: "core",
+    language: "c",
+    code: `int a[3] = {2, 4, 6};
+printf("%d", a[1] + a[2]);`,
+    prompt: 'What line does this C fragment print? int a[3] = {2, 4, 6}; printf("%d", a[1] + a[2]);',
+    output: ["10"],
+    explanation: "The expression reads 4 and 6, then adds them to produce 10.",
+    assumptions: ["The array is initialized as shown.", "Only the printed digits matter."],
+    provenance,
+  },
+  {
+    id: "q-list-empty-head",
+    topicId: "linked-lists",
+    type: "short-answer",
+    difficulty: "intro",
+    prompt: "What pointer value conventionally represents an empty singly linked list in C?",
+    answers: ["null", "null pointer", "nullptr", "nil"],
+    explanation: "An empty list has no first node, so its head is represented by a null pointer.",
+    assumptions: ["The list uses a head pointer.", "The question asks for the empty-list sentinel."],
+    provenance,
+  },
+  {
+    id: "q-list-delete-order",
+    topicId: "linked-lists",
+    type: "ordered-sequence",
+    difficulty: "core",
+    prompt:
+      "Order these steps to delete a known middle node from a singly linked list: bypass the node, save the successor, free the removed node.",
+    items: [
+      { id: "successor", label: "Save the successor" },
+      { id: "bypass", label: "Make the predecessor point to the successor" },
+      { id: "free", label: "Free the removed node" },
+    ],
+    answerOrder: ["successor", "bypass", "free"],
+    explanation:
+      "The successor must remain reachable before links change; after bypassing the node, its storage can be released.",
+    assumptions: ["The predecessor and target node are valid.", "The successor pointer is needed by the new link."],
+    provenance,
+  },
+  {
+    id: "q-stack-pop",
+    topicId: "stacks",
+    type: "ordered-sequence",
+    difficulty: "intro",
+    prompt: "A stack receives push(A), push(B), pop(), push(C), pop(). List the two values returned by pop, in order.",
+    items: [
+      { id: "b", label: "B" },
+      { id: "c", label: "C" },
+      { id: "a", label: "A" },
+    ],
+    answerOrder: ["b", "c"],
+    explanation: "A stack is LIFO: B is removed first, then C after it is pushed.",
+    assumptions: ["No operation fails.", "The sequence is evaluated from left to right."],
+    provenance,
+  },
+  {
+    id: "q-stack-depth",
+    topicId: "stacks",
+    type: "numeric",
+    difficulty: "intro",
+    prompt: "Starting empty, a stack performs push, push, pop, push, push. What is its final depth?",
+    answer: 3,
+    tolerance: 0,
+    explanation: "The depth changes 0 → 1 → 2 → 1 → 2 → 3.",
+    assumptions: ["Every pop is applied to a non-empty stack."],
+    provenance,
+  },
+  {
+    id: "q-queue-wrap",
+    topicId: "queues",
+    type: "numeric",
+    difficulty: "core",
+    prompt: "A circular queue has capacity 8 and uses zero-based positions. After position 7, which position is next?",
+    answer: 0,
+    tolerance: 0,
+    explanation: "Circular indexing wraps with (7 + 1) mod 8 = 0.",
+    assumptions: ["The queue uses modulo arithmetic for wraparound.", "Capacity is eight slots."],
+    provenance,
+  },
+  {
+    id: "q-queue-order",
+    topicId: "queues",
+    type: "ordered-sequence",
+    difficulty: "intro",
+    prompt:
+      "A queue performs enqueue(A), enqueue(B), dequeue(), enqueue(C), dequeue(). List the removed values in order.",
+    items: [
+      { id: "a", label: "A" },
+      { id: "b", label: "B" },
+      { id: "c", label: "C" },
+    ],
+    answerOrder: ["a", "b"],
+    explanation: "A queue is FIFO: A entered first and is removed first, followed by B.",
+    assumptions: ["No operation fails.", "The sequence is evaluated from left to right."],
+    provenance,
+  },
+  {
+    id: "q-tree-height",
+    topicId: "binary-trees",
+    type: "numeric",
+    difficulty: "intro",
+    prompt: "A perfect binary tree has 7 nodes. How many edges are on a path from its root to a leaf?",
+    answer: 2,
+    tolerance: 0,
+    explanation: "Seven nodes form three levels, so a root-to-leaf path has two edges.",
+    assumptions: ["The tree is perfect.", "Height counts edges, not vertices."],
+    provenance,
+  },
+  {
+    id: "q-bst-property",
+    topicId: "binary-trees",
+    type: "multiple-choice",
+    difficulty: "intro",
+    prompt: "For a binary search tree with unique keys, where are keys smaller than a node's key stored?",
+    options: [
+      { id: "a", label: "In its left subtree" },
+      { id: "b", label: "In its right subtree" },
+      { id: "c", label: "Only at the root" },
+      { id: "d", label: "In a separate queue" },
+    ],
+    answer: "a",
+    explanation: "The BST ordering rule places smaller keys in the left subtree and larger keys in the right subtree.",
+    assumptions: ["Keys are unique.", "The tree follows the standard BST ordering rule."],
+    provenance,
+  },
+  {
+    id: "q-avl-balance",
+    topicId: "avl-trees",
+    type: "short-answer",
+    difficulty: "core",
+    prompt: "What is the usual allowed balance-factor range for every node in an AVL tree?",
+    answers: ["-1 to 1", "-1, 0, or 1", "minus one to one"],
+    explanation:
+      "An AVL node's left and right subtree heights differ by at most one, giving a balance factor of −1, 0, or 1.",
+    assumptions: ["Balance factor is left height minus right height."],
+    provenance,
+  },
+  {
+    id: "q-avl-rotation",
+    topicId: "avl-trees",
+    type: "ordered-sequence",
+    difficulty: "core",
+    prompt:
+      "For a left-left imbalance, order the repair: rotate right at the unbalanced node, update heights, resume checking ancestors.",
+    items: [
+      { id: "rotate", label: "Rotate right" },
+      { id: "height", label: "Update heights" },
+      { id: "ancestors", label: "Check ancestors" },
+    ],
+    answerOrder: ["rotate", "height", "ancestors"],
+    explanation: "A right rotation restores the local shape; heights are recomputed before walking toward the root.",
+    assumptions: ["The imbalance is a single left-left case.", "No double rotation is needed."],
+    provenance,
+  },
+  {
+    id: "q-heap-child-index",
+    topicId: "heaps",
+    type: "numeric",
+    difficulty: "core",
+    prompt: "In a zero-based binary heap, what is the left-child index of the item at index 3?",
+    answer: 7,
+    tolerance: 0,
+    explanation: "The zero-based left-child formula is 2i + 1, so 2(3) + 1 = 7.",
+    assumptions: ["The heap uses zero-based indexing."],
+    provenance,
+  },
+  {
+    id: "q-heap-root",
+    topicId: "heaps",
+    type: "multiple-choice",
+    difficulty: "intro",
+    prompt: "In a min-heap, which value is guaranteed to be at the root?",
+    options: [
+      { id: "a", label: "The minimum value" },
+      { id: "b", label: "The maximum value" },
+      { id: "c", label: "The most recently inserted value" },
+      { id: "d", label: "The median value" },
+    ],
+    answer: "a",
+    explanation: "Every parent in a min-heap is no greater than its children, so the minimum is at the root.",
+    assumptions: ["The heap invariant is valid.", "Values are comparable."],
+    provenance,
+  },
+  {
+    id: "q-hash-modulo",
+    topicId: "hash-tables",
+    type: "numeric",
+    difficulty: "intro",
+    prompt: "With hash function h(k) = k mod 11, which bucket receives key 37?",
+    answer: 4,
+    tolerance: 0,
+    explanation: "37 divided by 11 leaves remainder 4, so h(37) = 4.",
+    assumptions: ["Buckets are numbered 0 through 10.", "The stated hash function is used directly."],
+    provenance,
+  },
+  {
+    id: "q-hash-probe",
+    topicId: "hash-tables",
+    type: "ordered-sequence",
+    difficulty: "core",
+    prompt:
+      "With linear probing, a collision occurs at slot 2. List the next slots inspected in order for a table of size 5.",
+    items: [
+      { id: "three", label: "3" },
+      { id: "four", label: "4" },
+      { id: "zero", label: "0" },
+    ],
+    answerOrder: ["three", "four", "zero"],
+    explanation: "Linear probing advances one slot at a time and wraps after slot 4.",
+    assumptions: ["The starting slot is 2.", "The table has five slots and uses modulo wraparound."],
+    provenance,
+  },
+  {
+    id: "q-trie-prefix",
+    topicId: "tries",
+    type: "short-answer",
+    difficulty: "intro",
+    prompt: "In a character trie containing 'cat' and 'car', what is their longest shared non-empty prefix?",
+    answers: ["ca"],
+    explanation: "Both words traverse c then a before branching at their third character.",
+    assumptions: ["Words are compared case-sensitively as shown.", "Prefix means the shared initial string."],
+    provenance,
+  },
+  {
+    id: "q-trie-root",
+    topicId: "tries",
+    type: "multiple-choice",
+    difficulty: "intro",
+    prompt: "In a trie for lowercase words, what does the root represent?",
+    options: [
+      { id: "a", label: "The empty prefix" },
+      { id: "b", label: "The alphabetically first word" },
+      { id: "c", label: "The final character of every word" },
+      { id: "d", label: "A hash bucket" },
+    ],
+    answer: "a",
+    explanation: "The root corresponds to the empty prefix; edges below it add characters.",
+    assumptions: ["The trie has one root and character-labelled edges."],
+    provenance,
+  },
+  {
+    id: "q-sort-complexity",
+    topicId: "sorting",
+    type: "multiple-choice",
+    difficulty: "core",
+    prompt:
+      "Which sorting algorithm has a worst-case comparison count that grows quadratically for its usual in-place implementation?",
+    options: [
+      { id: "a", label: "Insertion sort" },
+      { id: "b", label: "Merge sort" },
+      { id: "c", label: "Binary search" },
+      { id: "d", label: "Breadth-first search" },
+    ],
+    answer: "a",
+    explanation:
+      "Insertion sort can shift a linear number of items for each of a linear number of positions, giving O(n²) worst-case work.",
+    assumptions: ["The question concerns comparison-based insertion sort without a special bound on input order."],
+    provenance,
+  },
+  {
+    id: "q-sort-passes",
+    topicId: "sorting",
+    type: "ordered-sequence",
+    difficulty: "core",
+    prompt:
+      "For insertion sort, order these actions for one non-empty pass: choose the next key, shift larger sorted items, place the key.",
+    items: [
+      { id: "choose", label: "Choose the next key" },
+      { id: "shift", label: "Shift larger sorted items" },
+      { id: "place", label: "Place the key" },
+    ],
+    answerOrder: ["choose", "shift", "place"],
+    explanation:
+      "Insertion sort saves the next key, opens a position by shifting larger items, and writes the key into that position.",
+    assumptions: ["The sorted prefix is maintained before the pass."],
+    provenance,
+  },
+  {
+    id: "q-recursion-c-output",
+    topicId: "recursion",
+    type: "code-output",
+    difficulty: "core",
+    language: "c",
+    code: `void countdown(int n) {
   if (n == 0) return;
   printf("%d ", n);
   countdown(n - 1);
 }
 
-countdown(3);`, prompt: "What does this C function print for countdown(3), assuming printf prints each integer followed by a space? void countdown(int n) { if (n == 0) return; printf(\"%d \", n); countdown(n - 1); }", output: ["3 2 1 "], explanation: "Each call prints before making the smaller call, so the values appear in descending order.", assumptions: ["The base case returns without printing.", "The call starts with n = 3."], provenance },
-  { id: "q-recursion-calls", topicId: "recursion", type: "numeric", difficulty: "intro", prompt: "How many non-base calls occur when factorial recursively evaluates factorial(4) with base case factorial(1)?", answer: 3, tolerance: 0, explanation: "The calls are factorial(4), factorial(3), factorial(2), factorial(1); three calls make another recursive call.", assumptions: ["The base case is n = 1.", "Only calls that recurse are counted."], provenance },
-  { id: "q-analysis-log", topicId: "analysis-mathematics", type: "numeric", difficulty: "intro", prompt: "A sorted array has 32 elements. What is the smallest integer upper bound on midpoint checks for binary search?", answer: 6, tolerance: 0, explanation: "Binary search needs floor(log2(32)) + 1 = 6 checks in the worst case when the final singleton is inspected.", assumptions: ["The array length is exactly 32.", "A midpoint check inspects one candidate."], provenance },
-  { id: "q-analysis-bit", topicId: "analysis-mathematics", type: "short-answer", difficulty: "core", prompt: "What bitwise operation combines two bit masks while preserving a bit set in either mask?", answers: ["or", "bitwise or", "bitwise operator or"], explanation: "Bitwise OR sets each output bit when at least one corresponding input bit is set.", assumptions: ["The masks have equal width.", "The operation is bitwise rather than logical short-circuit OR."], provenance },
-  { id: "q-graph-bfs", topicId: "binary-trees", type: "graph", difficulty: "core", prompt: "Starting at A, give the BFS visit order for the displayed undirected graph.", graph: { directed: false, nodes: [{ id: "a", label: "A", x: 12, y: 50 }, { id: "b", label: "B", x: 36, y: 25 }, { id: "c", label: "C", x: 36, y: 75 }, { id: "d", label: "D", x: 66, y: 25 }, { id: "e", label: "E", x: 66, y: 75 }], edges: [{ from: "a", to: "b" }, { from: "a", to: "c" }, { from: "b", to: "d" }, { from: "c", to: "d" }, { from: "c", to: "e" }] }, operation: "bfs-order", startNode: "a", answerOrder: ["a", "b", "c", "d", "e"], explanation: "BFS visits A first, then its neighbors B and C in displayed node order, followed by D and E.", assumptions: ["Edges are unweighted.", "Undirected edges can be traversed in either direction.", "Neighbors are visited in displayed node order."], provenance },
-  { id: "q-graph-dfs", topicId: "sorting", type: "graph", difficulty: "core", prompt: "Starting at A, give the DFS preorder for the displayed directed graph.", graph: { directed: true, nodes: [{ id: "a", label: "A", x: 12, y: 50 }, { id: "b", label: "B", x: 35, y: 25 }, { id: "c", label: "C", x: 35, y: 75 }, { id: "d", label: "D", x: 62, y: 25 }, { id: "e", label: "E", x: 86, y: 50 }], edges: [{ from: "a", to: "b" }, { from: "a", to: "c" }, { from: "b", to: "d" }, { from: "d", to: "e" }, { from: "c", to: "e" }] }, operation: "dfs-order", startNode: "a", answerOrder: ["a", "b", "d", "e", "c"], explanation: "DFS follows A to B to D to E before backtracking to visit C.", assumptions: ["Only directed edges may be followed.", "Outgoing edges are considered in displayed node order."], provenance },
-  { id: "q-graph-adjacency", topicId: "heaps", type: "graph", difficulty: "intro", prompt: "List the neighbors of C in displayed node order.", graph: { directed: false, nodes: [{ id: "a", label: "A", x: 15, y: 50 }, { id: "b", label: "B", x: 38, y: 20 }, { id: "c", label: "C", x: 50, y: 75 }, { id: "d", label: "D", x: 80, y: 25 }, { id: "e", label: "E", x: 82, y: 80 }], edges: [{ from: "a", to: "c" }, { from: "b", to: "c" }, { from: "c", to: "d" }, { from: "c", to: "e" }] }, operation: "adjacency", nodeId: "c", adjacentNodes: ["a", "b", "d", "e"], explanation: "C shares an edge with A, B, D, and E; the answer follows the displayed node order.", assumptions: ["The graph is undirected.", "Adjacency means a direct edge, not reachability."], provenance },
-  { id: "q-graph-reachability", topicId: "analysis-mathematics", type: "graph", difficulty: "intro", prompt: "Can D be reached from A by following the directed edges?", graph: { directed: true, nodes: [{ id: "a", label: "A", x: 15, y: 30 }, { id: "b", label: "B", x: 40, y: 30 }, { id: "c", label: "C", x: 65, y: 30 }, { id: "d", label: "D", x: 40, y: 75 }, { id: "e", label: "E", x: 75, y: 75 }], edges: [{ from: "a", to: "b" }, { from: "b", to: "c" }, { from: "d", to: "e" }] }, operation: "reachability", startNode: "a", targetNode: "d", reachable: false, explanation: "A reaches B and C, but there is no directed path from that component to D.", assumptions: ["Only arrow direction shown may be followed.", "A node is reachable from itself, but A and D differ."], provenance },
-  { id: "q-graph-shortest", topicId: "arrays-memory", type: "graph", difficulty: "core", prompt: "What is the unweighted shortest-path length from A to E?", graph: { directed: false, nodes: [{ id: "a", label: "A", x: 12, y: 50 }, { id: "b", label: "B", x: 35, y: 25 }, { id: "c", label: "C", x: 35, y: 75 }, { id: "d", label: "D", x: 62, y: 50 }, { id: "e", label: "E", x: 88, y: 50 }], edges: [{ from: "a", to: "b" }, { from: "a", to: "c" }, { from: "b", to: "d" }, { from: "c", to: "d" }, { from: "d", to: "e" }] }, operation: "shortest-path", startNode: "a", targetNode: "e", distance: 3, explanation: "A reaches D in two edges through B or C, then E in one more edge.", assumptions: ["Every edge has unit weight.", "Path length counts edges, not nodes."], provenance },
+countdown(3);`,
+    prompt:
+      'What does this C function print for countdown(3), assuming printf prints each integer followed by a space? void countdown(int n) { if (n == 0) return; printf("%d ", n); countdown(n - 1); }',
+    output: ["3 2 1 "],
+    explanation: "Each call prints before making the smaller call, so the values appear in descending order.",
+    assumptions: ["The base case returns without printing.", "The call starts with n = 3."],
+    provenance,
+  },
+  {
+    id: "q-recursion-calls",
+    topicId: "recursion",
+    type: "numeric",
+    difficulty: "intro",
+    prompt:
+      "How many non-base calls occur when factorial recursively evaluates factorial(4) with base case factorial(1)?",
+    answer: 3,
+    tolerance: 0,
+    explanation:
+      "The calls are factorial(4), factorial(3), factorial(2), factorial(1); three calls make another recursive call.",
+    assumptions: ["The base case is n = 1.", "Only calls that recurse are counted."],
+    provenance,
+  },
+  {
+    id: "q-analysis-log",
+    topicId: "analysis-mathematics",
+    type: "numeric",
+    difficulty: "intro",
+    prompt:
+      "A sorted array has 32 elements. What is the smallest integer upper bound on midpoint checks for binary search?",
+    answer: 6,
+    tolerance: 0,
+    explanation:
+      "Binary search needs floor(log2(32)) + 1 = 6 checks in the worst case when the final singleton is inspected.",
+    assumptions: ["The array length is exactly 32.", "A midpoint check inspects one candidate."],
+    provenance,
+  },
+  {
+    id: "q-analysis-bit",
+    topicId: "analysis-mathematics",
+    type: "short-answer",
+    difficulty: "core",
+    prompt: "What bitwise operation combines two bit masks while preserving a bit set in either mask?",
+    answers: ["or", "bitwise or", "bitwise operator or"],
+    explanation: "Bitwise OR sets each output bit when at least one corresponding input bit is set.",
+    assumptions: ["The masks have equal width.", "The operation is bitwise rather than logical short-circuit OR."],
+    provenance,
+  },
+  {
+    id: "q-graph-bfs",
+    topicId: "binary-trees",
+    type: "graph",
+    difficulty: "core",
+    prompt: "Starting at A, give the BFS visit order for the displayed undirected graph.",
+    graph: {
+      directed: false,
+      nodes: [
+        { id: "a", label: "A", x: 12, y: 50 },
+        { id: "b", label: "B", x: 36, y: 25 },
+        { id: "c", label: "C", x: 36, y: 75 },
+        { id: "d", label: "D", x: 66, y: 25 },
+        { id: "e", label: "E", x: 66, y: 75 },
+      ],
+      edges: [
+        { from: "a", to: "b" },
+        { from: "a", to: "c" },
+        { from: "b", to: "d" },
+        { from: "c", to: "d" },
+        { from: "c", to: "e" },
+      ],
+    },
+    operation: "bfs-order",
+    startNode: "a",
+    answerOrder: ["a", "b", "c", "d", "e"],
+    explanation: "BFS visits A first, then its neighbors B and C in displayed node order, followed by D and E.",
+    assumptions: [
+      "Edges are unweighted.",
+      "Undirected edges can be traversed in either direction.",
+      "Neighbors are visited in displayed node order.",
+    ],
+    provenance,
+  },
+  {
+    id: "q-graph-dfs",
+    topicId: "sorting",
+    type: "graph",
+    difficulty: "core",
+    prompt: "Starting at A, give the DFS preorder for the displayed directed graph.",
+    graph: {
+      directed: true,
+      nodes: [
+        { id: "a", label: "A", x: 12, y: 50 },
+        { id: "b", label: "B", x: 35, y: 25 },
+        { id: "c", label: "C", x: 35, y: 75 },
+        { id: "d", label: "D", x: 62, y: 25 },
+        { id: "e", label: "E", x: 86, y: 50 },
+      ],
+      edges: [
+        { from: "a", to: "b" },
+        { from: "a", to: "c" },
+        { from: "b", to: "d" },
+        { from: "d", to: "e" },
+        { from: "c", to: "e" },
+      ],
+    },
+    operation: "dfs-order",
+    startNode: "a",
+    answerOrder: ["a", "b", "d", "e", "c"],
+    explanation: "DFS follows A to B to D to E before backtracking to visit C.",
+    assumptions: ["Only directed edges may be followed.", "Outgoing edges are considered in displayed node order."],
+    provenance,
+  },
+  {
+    id: "q-graph-adjacency",
+    topicId: "heaps",
+    type: "graph",
+    difficulty: "intro",
+    prompt: "List the neighbors of C in displayed node order.",
+    graph: {
+      directed: false,
+      nodes: [
+        { id: "a", label: "A", x: 15, y: 50 },
+        { id: "b", label: "B", x: 38, y: 20 },
+        { id: "c", label: "C", x: 50, y: 75 },
+        { id: "d", label: "D", x: 80, y: 25 },
+        { id: "e", label: "E", x: 82, y: 80 },
+      ],
+      edges: [
+        { from: "a", to: "c" },
+        { from: "b", to: "c" },
+        { from: "c", to: "d" },
+        { from: "c", to: "e" },
+      ],
+    },
+    operation: "adjacency",
+    nodeId: "c",
+    adjacentNodes: ["a", "b", "d", "e"],
+    explanation: "C shares an edge with A, B, D, and E; the answer follows the displayed node order.",
+    assumptions: ["The graph is undirected.", "Adjacency means a direct edge, not reachability."],
+    provenance,
+  },
+  {
+    id: "q-graph-reachability",
+    topicId: "analysis-mathematics",
+    type: "graph",
+    difficulty: "intro",
+    prompt: "Can D be reached from A by following the directed edges?",
+    graph: {
+      directed: true,
+      nodes: [
+        { id: "a", label: "A", x: 15, y: 30 },
+        { id: "b", label: "B", x: 40, y: 30 },
+        { id: "c", label: "C", x: 65, y: 30 },
+        { id: "d", label: "D", x: 40, y: 75 },
+        { id: "e", label: "E", x: 75, y: 75 },
+      ],
+      edges: [
+        { from: "a", to: "b" },
+        { from: "b", to: "c" },
+        { from: "d", to: "e" },
+      ],
+    },
+    operation: "reachability",
+    startNode: "a",
+    targetNode: "d",
+    reachable: false,
+    explanation: "A reaches B and C, but there is no directed path from that component to D.",
+    assumptions: [
+      "Only arrow direction shown may be followed.",
+      "A node is reachable from itself, but A and D differ.",
+    ],
+    provenance,
+  },
+  {
+    id: "q-graph-shortest",
+    topicId: "arrays-memory",
+    type: "graph",
+    difficulty: "core",
+    prompt: "What is the unweighted shortest-path length from A to E?",
+    graph: {
+      directed: false,
+      nodes: [
+        { id: "a", label: "A", x: 12, y: 50 },
+        { id: "b", label: "B", x: 35, y: 25 },
+        { id: "c", label: "C", x: 35, y: 75 },
+        { id: "d", label: "D", x: 62, y: 50 },
+        { id: "e", label: "E", x: 88, y: 50 },
+      ],
+      edges: [
+        { from: "a", to: "b" },
+        { from: "a", to: "c" },
+        { from: "b", to: "d" },
+        { from: "c", to: "d" },
+        { from: "d", to: "e" },
+      ],
+    },
+    operation: "shortest-path",
+    startNode: "a",
+    targetNode: "e",
+    distance: 3,
+    explanation: "A reaches D in two edges through B or C, then E in one more edge.",
+    assumptions: ["Every edge has unit weight.", "Path length counts edges, not nodes."],
+    provenance,
+  },
 ];
 
-type ContentBase = { id: string; topicId: Question["topicId"]; prompt: string; explanation: string; assumptions?: string[]; difficulty?: Question["difficulty"] };
+type ContentBase = {
+  id: string;
+  topicId: Question["topicId"];
+  prompt: string;
+  explanation: string;
+  assumptions?: string[];
+  difficulty?: Question["difficulty"];
+};
 const base = (draft: ContentBase) => ({
   id: draft.id,
   topicId: draft.topicId,
   prompt: draft.prompt,
   explanation: draft.explanation,
-  assumptions: draft.assumptions ?? ["The stated data structure invariant is valid.", "Only the operations described in the prompt are performed."],
+  assumptions: draft.assumptions ?? [
+    "The stated data structure invariant is valid.",
+    "Only the operations described in the prompt are performed.",
+  ],
   provenance,
-  difficulty: draft.difficulty ?? "core" as const,
+  difficulty: draft.difficulty ?? ("core" as const),
 });
-const multipleChoice = (draft: ContentBase & { options: Array<{ id: string; label: string }>; answer: string }): Question => ({ ...base(draft), type: "multiple-choice", options: draft.options, answer: draft.answer });
-const numeric = (draft: ContentBase & { answer: number; tolerance?: number; unit?: string }): Question => ({ ...base(draft), type: "numeric", answer: draft.answer, tolerance: draft.tolerance ?? 0, ...(draft.unit ? { unit: draft.unit } : {}) });
-const shortAnswer = (draft: ContentBase & { answers: string[] }): Question => ({ ...base(draft), type: "short-answer", answers: draft.answers });
+const multipleChoice = (
+  draft: ContentBase & { options: Array<{ id: string; label: string }>; answer: string },
+): Question => ({ ...base(draft), type: "multiple-choice", options: draft.options, answer: draft.answer });
+const numeric = (draft: ContentBase & { answer: number; tolerance?: number; unit?: string }): Question => ({
+  ...base(draft),
+  type: "numeric",
+  answer: draft.answer,
+  tolerance: draft.tolerance ?? 0,
+  ...(draft.unit ? { unit: draft.unit } : {}),
+});
+const shortAnswer = (draft: ContentBase & { answers: string[] }): Question => ({
+  ...base(draft),
+  type: "short-answer",
+  answers: draft.answers,
+});
 const curatedCCode: Record<string, string> = {
   "q-array-c-output-2": `int a[4] = {1, 3, 5, 7};
 printf("%d", a[0] + a[3]);`,
@@ -110,118 +607,1038 @@ const curatedCodeFor = (id: string) => {
   if (!code) throw new Error(`Missing curated C code for ${id}.`);
   return code;
 };
-const codeOutput = (draft: ContentBase & { output: string[] }): Question => ({ ...base(draft), type: "code-output", language: "c", code: curatedCodeFor(draft.id), output: draft.output });
-const ordered = (draft: ContentBase & { items: Array<{ id: string; label: string }>; answerOrder: string[] }): Question => ({ ...base(draft), type: "ordered-sequence", items: draft.items, answerOrder: draft.answerOrder });
+const codeOutput = (draft: ContentBase & { output: string[] }): Question => ({
+  ...base(draft),
+  type: "code-output",
+  language: "c",
+  code: curatedCodeFor(draft.id),
+  output: draft.output,
+});
+const ordered = (
+  draft: ContentBase & { items: Array<{ id: string; label: string }>; answerOrder: string[] },
+): Question => ({ ...base(draft), type: "ordered-sequence", items: draft.items, answerOrder: draft.answerOrder });
 
 /** Additional reviewed content: eight distinct prompts per family, authored for FE Arena. */
 const additionalQuestions: Question[] = [
-  multipleChoice({ id: "q-array-row-major", topicId: "arrays-memory", difficulty: "core", prompt: "In a row-major 3 by 4 int matrix, which element is adjacent in memory immediately after matrix[1][2]?", options: [{ id: "a", label: "matrix[1][3]" }, { id: "b", label: "matrix[2][0]" }, { id: "c", label: "matrix[2][1]" }, { id: "d", label: "matrix[0][3]" }], answer: "a", explanation: "Row-major layout stores each row contiguously. The next element after column 2 in row 1 is column 3 of that same row." }),
-  multipleChoice({ id: "q-array-pointer", topicId: "arrays-memory", prompt: "For int values[5], which expression is equivalent to values[3]?", options: [{ id: "a", label: "*(values + 3)" }, { id: "b", label: "&values + 3" }, { id: "c", label: "*values + 3" }, { id: "d", label: "values + *3" }], answer: "a", explanation: "The subscript operator is defined in terms of pointer arithmetic: values[3] means *(values + 3), which dereferences the fourth element." }),
-  numeric({ id: "q-array-bytes", topicId: "arrays-memory", difficulty: "core", prompt: "If an int occupies 4 bytes, how many bytes are required for an array of 12 int elements?", answer: 48, unit: "bytes", explanation: "An array stores its elements contiguously, so 12 elements multiplied by 4 bytes per element requires 48 bytes." }),
-  numeric({ id: "q-array-last-index", topicId: "arrays-memory", prompt: "A zero-based array has 18 elements. What is the largest valid index?", answer: 17, explanation: "With zero-based indexing, the valid range starts at zero and ends one less than the element count: 18 − 1 = 17." }),
-  shortAnswer({ id: "q-array-contiguous", topicId: "arrays-memory", prompt: "What memory-layout property makes constant-stride traversal natural for a C array?", answers: ["contiguous", "contiguous memory", "contiguous storage"], explanation: "C array elements occupy consecutive memory locations with a fixed element-size stride. That layout supports address calculation from a base pointer and index." }),
-  shortAnswer({ id: "q-array-decay", topicId: "arrays-memory", prompt: "When passed to a typical C function parameter, what does an array expression usually convert to?", answers: ["pointer", "pointer to first element", "address of first element"], explanation: "In most expression contexts an array is converted to a pointer to its first element. A function therefore receives an address rather than a copied array object." }),
-  codeOutput({ id: "q-array-c-output-2", topicId: "arrays-memory", prompt: "What does this C fragment print? int a[4] = {1, 3, 5, 7}; printf(\"%d\", a[0] + a[3]);", output: ["8"], explanation: "The first and last initialized values are 1 and 7. Their sum is 8, so the format call prints the single digit 8." }),
-  ordered({ id: "q-array-insert", topicId: "arrays-memory", prompt: "Order the core actions for inserting an item at index 2 in a full-length array segment: shift later items right, write the new item, increase the logical length.", items: [{ id: "shift", label: "Shift later items right" }, { id: "write", label: "Write the new item" }, { id: "length", label: "Increase logical length" }], answerOrder: ["shift", "write", "length"], explanation: "Moving the suffix first opens the target slot. The value can then be written safely, and the logical length is updated after the insertion." }),
+  multipleChoice({
+    id: "q-array-row-major",
+    topicId: "arrays-memory",
+    difficulty: "core",
+    prompt: "In a row-major 3 by 4 int matrix, which element is adjacent in memory immediately after matrix[1][2]?",
+    options: [
+      { id: "a", label: "matrix[1][3]" },
+      { id: "b", label: "matrix[2][0]" },
+      { id: "c", label: "matrix[2][1]" },
+      { id: "d", label: "matrix[0][3]" },
+    ],
+    answer: "a",
+    explanation:
+      "Row-major layout stores each row contiguously. The next element after column 2 in row 1 is column 3 of that same row.",
+  }),
+  multipleChoice({
+    id: "q-array-pointer",
+    topicId: "arrays-memory",
+    prompt: "For int values[5], which expression is equivalent to values[3]?",
+    options: [
+      { id: "a", label: "*(values + 3)" },
+      { id: "b", label: "&values + 3" },
+      { id: "c", label: "*values + 3" },
+      { id: "d", label: "values + *3" },
+    ],
+    answer: "a",
+    explanation:
+      "The subscript operator is defined in terms of pointer arithmetic: values[3] means *(values + 3), which dereferences the fourth element.",
+  }),
+  numeric({
+    id: "q-array-bytes",
+    topicId: "arrays-memory",
+    difficulty: "core",
+    prompt: "If an int occupies 4 bytes, how many bytes are required for an array of 12 int elements?",
+    answer: 48,
+    unit: "bytes",
+    explanation:
+      "An array stores its elements contiguously, so 12 elements multiplied by 4 bytes per element requires 48 bytes.",
+  }),
+  numeric({
+    id: "q-array-last-index",
+    topicId: "arrays-memory",
+    prompt: "A zero-based array has 18 elements. What is the largest valid index?",
+    answer: 17,
+    explanation:
+      "With zero-based indexing, the valid range starts at zero and ends one less than the element count: 18 − 1 = 17.",
+  }),
+  shortAnswer({
+    id: "q-array-contiguous",
+    topicId: "arrays-memory",
+    prompt: "What memory-layout property makes constant-stride traversal natural for a C array?",
+    answers: ["contiguous", "contiguous memory", "contiguous storage"],
+    explanation:
+      "C array elements occupy consecutive memory locations with a fixed element-size stride. That layout supports address calculation from a base pointer and index.",
+  }),
+  shortAnswer({
+    id: "q-array-decay",
+    topicId: "arrays-memory",
+    prompt: "When passed to a typical C function parameter, what does an array expression usually convert to?",
+    answers: ["pointer", "pointer to first element", "address of first element"],
+    explanation:
+      "In most expression contexts an array is converted to a pointer to its first element. A function therefore receives an address rather than a copied array object.",
+  }),
+  codeOutput({
+    id: "q-array-c-output-2",
+    topicId: "arrays-memory",
+    prompt: 'What does this C fragment print? int a[4] = {1, 3, 5, 7}; printf("%d", a[0] + a[3]);',
+    output: ["8"],
+    explanation:
+      "The first and last initialized values are 1 and 7. Their sum is 8, so the format call prints the single digit 8.",
+  }),
+  ordered({
+    id: "q-array-insert",
+    topicId: "arrays-memory",
+    prompt:
+      "Order the core actions for inserting an item at index 2 in a full-length array segment: shift later items right, write the new item, increase the logical length.",
+    items: [
+      { id: "shift", label: "Shift later items right" },
+      { id: "write", label: "Write the new item" },
+      { id: "length", label: "Increase logical length" },
+    ],
+    answerOrder: ["shift", "write", "length"],
+    explanation:
+      "Moving the suffix first opens the target slot. The value can then be written safely, and the logical length is updated after the insertion.",
+  }),
 
-  multipleChoice({ id: "q-list-tail", topicId: "linked-lists", prompt: "What is the usual time complexity of inserting a new node at the head of a singly linked list?", options: [{ id: "a", label: "O(1)" }, { id: "b", label: "O(log n)" }, { id: "c", label: "O(n)" }, { id: "d", label: "O(n log n)" }], answer: "a", explanation: "Head insertion only changes the new node's next pointer and the head pointer. It does not require traversing existing nodes." }),
-  multipleChoice({ id: "q-list-search", topicId: "linked-lists", difficulty: "core", prompt: "Why does searching an unsorted singly linked list generally take linear time?", options: [{ id: "a", label: "Nodes must be visited one by one" }, { id: "b", label: "Each node has two parents" }, { id: "c", label: "The list is always circular" }, { id: "d", label: "Pointers sort the keys" }], answer: "a", explanation: "A singly linked list exposes the successor of the current node, not random access by index. In the worst case a search follows every node before finding or rejecting the key." }),
-  numeric({ id: "q-list-nodes", topicId: "linked-lists", prompt: "A singly linked list contains 9 nodes. How many next links point to another node rather than to null?", answer: 8, explanation: "Every node except the tail points to its successor. Thus a non-empty linear list with 9 nodes has 9 − 1 = 8 non-null next links." }),
-  numeric({ id: "q-list-traverse", topicId: "linked-lists", difficulty: "core", prompt: "If visiting one node costs one step, how many steps does a full traversal of 14 nodes take?", answer: 14, unit: "steps", explanation: "A full traversal visits each node exactly once, so the number of visits and the number of steps are both 14." }),
-  shortAnswer({ id: "q-list-successor", topicId: "linked-lists", prompt: "What field in a conventional singly linked-list node stores the link to the next node?", answers: ["next", "next pointer", "link"], explanation: "The node's next field holds the address of its successor, or null for the tail. This single link is what makes the structure singly linked." }),
-  shortAnswer({ id: "q-list-tail-null", topicId: "linked-lists", prompt: "What sentinel value should the next pointer of a linear list's tail contain?", answers: ["null", "null pointer", "nil"], explanation: "The tail has no successor, so its next pointer is null. Traversal uses that sentinel to stop rather than reading beyond the list." }),
-  codeOutput({ id: "q-list-c-output", topicId: "linked-lists", prompt: "Assume n1.next points to n2, n2.next is null, and n1.value is 4 while n2.value is 9. What does printf(\"%d\", n1.next->value) print?", output: ["9"], explanation: "The arrow operator follows n1's next pointer to n2, then reads n2.value. The selected value is therefore 9." }),
-  ordered({ id: "q-list-head-insert", topicId: "linked-lists", prompt: "Order head insertion in a non-empty singly linked list: make new->next point to head, allocate the new node, move head to new.", items: [{ id: "allocate", label: "Allocate the new node" }, { id: "link", label: "Point new->next at head" }, { id: "move", label: "Move head to new" }], answerOrder: ["allocate", "link", "move"], explanation: "The node must exist before its fields are written. Linking it to the old head preserves the list, and assigning head last makes it the first node." }),
+  multipleChoice({
+    id: "q-list-tail",
+    topicId: "linked-lists",
+    prompt: "What is the usual time complexity of inserting a new node at the head of a singly linked list?",
+    options: [
+      { id: "a", label: "O(1)" },
+      { id: "b", label: "O(log n)" },
+      { id: "c", label: "O(n)" },
+      { id: "d", label: "O(n log n)" },
+    ],
+    answer: "a",
+    explanation:
+      "Head insertion only changes the new node's next pointer and the head pointer. It does not require traversing existing nodes.",
+  }),
+  multipleChoice({
+    id: "q-list-search",
+    topicId: "linked-lists",
+    difficulty: "core",
+    prompt: "Why does searching an unsorted singly linked list generally take linear time?",
+    options: [
+      { id: "a", label: "Nodes must be visited one by one" },
+      { id: "b", label: "Each node has two parents" },
+      { id: "c", label: "The list is always circular" },
+      { id: "d", label: "Pointers sort the keys" },
+    ],
+    answer: "a",
+    explanation:
+      "A singly linked list exposes the successor of the current node, not random access by index. In the worst case a search follows every node before finding or rejecting the key.",
+  }),
+  numeric({
+    id: "q-list-nodes",
+    topicId: "linked-lists",
+    prompt: "A singly linked list contains 9 nodes. How many next links point to another node rather than to null?",
+    answer: 8,
+    explanation:
+      "Every node except the tail points to its successor. Thus a non-empty linear list with 9 nodes has 9 − 1 = 8 non-null next links.",
+  }),
+  numeric({
+    id: "q-list-traverse",
+    topicId: "linked-lists",
+    difficulty: "core",
+    prompt: "If visiting one node costs one step, how many steps does a full traversal of 14 nodes take?",
+    answer: 14,
+    unit: "steps",
+    explanation:
+      "A full traversal visits each node exactly once, so the number of visits and the number of steps are both 14.",
+  }),
+  shortAnswer({
+    id: "q-list-successor",
+    topicId: "linked-lists",
+    prompt: "What field in a conventional singly linked-list node stores the link to the next node?",
+    answers: ["next", "next pointer", "link"],
+    explanation:
+      "The node's next field holds the address of its successor, or null for the tail. This single link is what makes the structure singly linked.",
+  }),
+  shortAnswer({
+    id: "q-list-tail-null",
+    topicId: "linked-lists",
+    prompt: "What sentinel value should the next pointer of a linear list's tail contain?",
+    answers: ["null", "null pointer", "nil"],
+    explanation:
+      "The tail has no successor, so its next pointer is null. Traversal uses that sentinel to stop rather than reading beyond the list.",
+  }),
+  codeOutput({
+    id: "q-list-c-output",
+    topicId: "linked-lists",
+    prompt:
+      'Assume n1.next points to n2, n2.next is null, and n1.value is 4 while n2.value is 9. What does printf("%d", n1.next->value) print?',
+    output: ["9"],
+    explanation:
+      "The arrow operator follows n1's next pointer to n2, then reads n2.value. The selected value is therefore 9.",
+  }),
+  ordered({
+    id: "q-list-head-insert",
+    topicId: "linked-lists",
+    prompt:
+      "Order head insertion in a non-empty singly linked list: make new->next point to head, allocate the new node, move head to new.",
+    items: [
+      { id: "allocate", label: "Allocate the new node" },
+      { id: "link", label: "Point new->next at head" },
+      { id: "move", label: "Move head to new" },
+    ],
+    answerOrder: ["allocate", "link", "move"],
+    explanation:
+      "The node must exist before its fields are written. Linking it to the old head preserves the list, and assigning head last makes it the first node.",
+  }),
 
-  multipleChoice({ id: "q-stack-underflow", topicId: "stacks", prompt: "What condition must be checked before popping from an array-backed stack?", options: [{ id: "a", label: "The stack is not empty" }, { id: "b", label: "The stack is sorted" }, { id: "c", label: "The capacity is prime" }, { id: "d", label: "The top is the minimum" }], answer: "a", explanation: "A pop requires an existing top element. Checking non-emptiness prevents an underflow and avoids reading an invalid slot." }),
-  multipleChoice({ id: "q-stack-lifo", topicId: "stacks", prompt: "Which access rule describes a stack?", options: [{ id: "a", label: "Last in, first out" }, { id: "b", label: "First in, first out" }, { id: "c", label: "Smallest in, first out" }, { id: "d", label: "Random in, random out" }], answer: "a", explanation: "A stack exposes one end for both insertion and removal. The most recently pushed item is consequently the first item popped." }),
-  numeric({ id: "q-stack-operations", topicId: "stacks", prompt: "Starting empty, perform 6 pushes and 2 pops. What is the final stack depth?", answer: 4, explanation: "Each push adds one item and each pop removes one. The net depth is 0 + 6 − 2 = 4." }),
-  numeric({ id: "q-stack-capacity", topicId: "stacks", prompt: "An array-backed stack has capacity 10 and currently contains 7 items. How many pushes fit before it is full?", answer: 3, explanation: "The unused capacity is the difference between capacity and current size: 10 − 7 = 3 additional items." }),
-  shortAnswer({ id: "q-stack-top", topicId: "stacks", prompt: "What name is commonly used for the index or pointer identifying the next stack item to remove?", answers: ["top", "top index", "stack top"], explanation: "The top marker identifies the active end of the stack. Push and pop update that marker while preserving LIFO order." }),
-  shortAnswer({ id: "q-stack-constant", topicId: "stacks", prompt: "What is the asymptotic time for push and pop when a stack's top is directly tracked?", answers: ["constant", "o 1", "o(1)", "constant time"], explanation: "With a direct top marker, each operation changes only a fixed number of fields. Its running time is therefore O(1), independent of stack size." }),
-  codeOutput({ id: "q-stack-c-output", topicId: "stacks", prompt: "Starting with top = 0, this C-like trace executes top++; top++; top--; printf(\"%d\", top);. What is printed?", output: ["1"], explanation: "The marker changes from 0 to 1, then 2, then back to 1. The final print therefore emits 1." }),
-  ordered({ id: "q-stack-push", topicId: "stacks", prompt: "Order a safe push onto a linked stack: set new->next to top, allocate new, assign top to new.", items: [{ id: "allocate", label: "Allocate new" }, { id: "next", label: "Set new->next to top" }, { id: "top", label: "Assign top to new" }], answerOrder: ["allocate", "next", "top"], explanation: "Allocation creates storage for the node, then its next link saves the old top. Updating top last exposes the complete new chain." }),
+  multipleChoice({
+    id: "q-stack-underflow",
+    topicId: "stacks",
+    prompt: "What condition must be checked before popping from an array-backed stack?",
+    options: [
+      { id: "a", label: "The stack is not empty" },
+      { id: "b", label: "The stack is sorted" },
+      { id: "c", label: "The capacity is prime" },
+      { id: "d", label: "The top is the minimum" },
+    ],
+    answer: "a",
+    explanation:
+      "A pop requires an existing top element. Checking non-emptiness prevents an underflow and avoids reading an invalid slot.",
+  }),
+  multipleChoice({
+    id: "q-stack-lifo",
+    topicId: "stacks",
+    prompt: "Which access rule describes a stack?",
+    options: [
+      { id: "a", label: "Last in, first out" },
+      { id: "b", label: "First in, first out" },
+      { id: "c", label: "Smallest in, first out" },
+      { id: "d", label: "Random in, random out" },
+    ],
+    answer: "a",
+    explanation:
+      "A stack exposes one end for both insertion and removal. The most recently pushed item is consequently the first item popped.",
+  }),
+  numeric({
+    id: "q-stack-operations",
+    topicId: "stacks",
+    prompt: "Starting empty, perform 6 pushes and 2 pops. What is the final stack depth?",
+    answer: 4,
+    explanation: "Each push adds one item and each pop removes one. The net depth is 0 + 6 − 2 = 4.",
+  }),
+  numeric({
+    id: "q-stack-capacity",
+    topicId: "stacks",
+    prompt:
+      "An array-backed stack has capacity 10 and currently contains 7 items. How many pushes fit before it is full?",
+    answer: 3,
+    explanation:
+      "The unused capacity is the difference between capacity and current size: 10 − 7 = 3 additional items.",
+  }),
+  shortAnswer({
+    id: "q-stack-top",
+    topicId: "stacks",
+    prompt: "What name is commonly used for the index or pointer identifying the next stack item to remove?",
+    answers: ["top", "top index", "stack top"],
+    explanation:
+      "The top marker identifies the active end of the stack. Push and pop update that marker while preserving LIFO order.",
+  }),
+  shortAnswer({
+    id: "q-stack-constant",
+    topicId: "stacks",
+    prompt: "What is the asymptotic time for push and pop when a stack's top is directly tracked?",
+    answers: ["constant", "o 1", "o(1)", "constant time"],
+    explanation:
+      "With a direct top marker, each operation changes only a fixed number of fields. Its running time is therefore O(1), independent of stack size.",
+  }),
+  codeOutput({
+    id: "q-stack-c-output",
+    topicId: "stacks",
+    prompt:
+      'Starting with top = 0, this C-like trace executes top++; top++; top--; printf("%d", top);. What is printed?',
+    output: ["1"],
+    explanation: "The marker changes from 0 to 1, then 2, then back to 1. The final print therefore emits 1.",
+  }),
+  ordered({
+    id: "q-stack-push",
+    topicId: "stacks",
+    prompt: "Order a safe push onto a linked stack: set new->next to top, allocate new, assign top to new.",
+    items: [
+      { id: "allocate", label: "Allocate new" },
+      { id: "next", label: "Set new->next to top" },
+      { id: "top", label: "Assign top to new" },
+    ],
+    answerOrder: ["allocate", "next", "top"],
+    explanation:
+      "Allocation creates storage for the node, then its next link saves the old top. Updating top last exposes the complete new chain.",
+  }),
 
-  multipleChoice({ id: "q-queue-fifo", topicId: "queues", prompt: "Which access rule describes a queue?", options: [{ id: "a", label: "First in, first out" }, { id: "b", label: "Last in, first out" }, { id: "c", label: "Largest in, first out" }, { id: "d", label: "Newest priority first" }], answer: "a", explanation: "A queue inserts at the rear and removes from the front. The earliest enqueued item therefore leaves first." }),
-  multipleChoice({ id: "q-queue-pointers", topicId: "queues", difficulty: "core", prompt: "Which pair of markers is sufficient for a linked queue with constant-time enqueue and dequeue?", options: [{ id: "a", label: "Front and rear" }, { id: "b", label: "Only a middle node" }, { id: "c", label: "A sorted index" }, { id: "d", label: "Two stack tops" }], answer: "a", explanation: "The front identifies the removal end and the rear identifies where a new node is attached. Maintaining both avoids a traversal during enqueue." }),
-  numeric({ id: "q-queue-length", topicId: "queues", prompt: "Starting empty, a queue receives 11 enqueues and 4 dequeues. What is its final size?", answer: 7, explanation: "Queue size changes by +1 for each enqueue and −1 for each dequeue. The final size is 11 − 4 = 7." }),
-  numeric({ id: "q-queue-wrap-2", topicId: "queues", difficulty: "core", prompt: "In a circular queue of capacity 6, what index follows index 4?", answer: 5, explanation: "The successor is computed modulo capacity: (4 + 1) mod 6 = 5. No wrap occurs until the index after 5." }),
-  shortAnswer({ id: "q-queue-front", topicId: "queues", prompt: "At which end of a queue does a normal dequeue occur?", answers: ["front", "the front", "front end"], explanation: "Dequeue removes the oldest waiting item, which is stored at the front end. Enqueue happens at the opposite rear end." }),
-  shortAnswer({ id: "q-queue-rear", topicId: "queues", prompt: "At which end of a queue is a new item normally inserted?", answers: ["rear", "back", "rear end"], explanation: "New arrivals join at the rear so that existing items retain their FIFO order. The front remains the removal end." }),
-  codeOutput({ id: "q-queue-c-output", topicId: "queues", prompt: "A queue contains front-to-back values 5, 8, 11. After one dequeue, what does printf(\"%d\", front->value) print?", output: ["8"], explanation: "The first dequeue removes 5 and advances the front pointer. The new front holds 8." }),
-  ordered({ id: "q-queue-enqueue", topicId: "queues", prompt: "Order linked-queue insertion into a non-empty queue: set rear->next to new, allocate new, move rear to new.", items: [{ id: "allocate", label: "Allocate new" }, { id: "link", label: "Set rear->next to new" }, { id: "rear", label: "Move rear to new" }], answerOrder: ["allocate", "link", "rear"], explanation: "The new node is allocated first, then attached after the old rear. Updating rear last ensures it points to the newly linked tail." }),
+  multipleChoice({
+    id: "q-queue-fifo",
+    topicId: "queues",
+    prompt: "Which access rule describes a queue?",
+    options: [
+      { id: "a", label: "First in, first out" },
+      { id: "b", label: "Last in, first out" },
+      { id: "c", label: "Largest in, first out" },
+      { id: "d", label: "Newest priority first" },
+    ],
+    answer: "a",
+    explanation:
+      "A queue inserts at the rear and removes from the front. The earliest enqueued item therefore leaves first.",
+  }),
+  multipleChoice({
+    id: "q-queue-pointers",
+    topicId: "queues",
+    difficulty: "core",
+    prompt: "Which pair of markers is sufficient for a linked queue with constant-time enqueue and dequeue?",
+    options: [
+      { id: "a", label: "Front and rear" },
+      { id: "b", label: "Only a middle node" },
+      { id: "c", label: "A sorted index" },
+      { id: "d", label: "Two stack tops" },
+    ],
+    answer: "a",
+    explanation:
+      "The front identifies the removal end and the rear identifies where a new node is attached. Maintaining both avoids a traversal during enqueue.",
+  }),
+  numeric({
+    id: "q-queue-length",
+    topicId: "queues",
+    prompt: "Starting empty, a queue receives 11 enqueues and 4 dequeues. What is its final size?",
+    answer: 7,
+    explanation: "Queue size changes by +1 for each enqueue and −1 for each dequeue. The final size is 11 − 4 = 7.",
+  }),
+  numeric({
+    id: "q-queue-wrap-2",
+    topicId: "queues",
+    difficulty: "core",
+    prompt: "In a circular queue of capacity 6, what index follows index 4?",
+    answer: 5,
+    explanation:
+      "The successor is computed modulo capacity: (4 + 1) mod 6 = 5. No wrap occurs until the index after 5.",
+  }),
+  shortAnswer({
+    id: "q-queue-front",
+    topicId: "queues",
+    prompt: "At which end of a queue does a normal dequeue occur?",
+    answers: ["front", "the front", "front end"],
+    explanation:
+      "Dequeue removes the oldest waiting item, which is stored at the front end. Enqueue happens at the opposite rear end.",
+  }),
+  shortAnswer({
+    id: "q-queue-rear",
+    topicId: "queues",
+    prompt: "At which end of a queue is a new item normally inserted?",
+    answers: ["rear", "back", "rear end"],
+    explanation:
+      "New arrivals join at the rear so that existing items retain their FIFO order. The front remains the removal end.",
+  }),
+  codeOutput({
+    id: "q-queue-c-output",
+    topicId: "queues",
+    prompt:
+      'A queue contains front-to-back values 5, 8, 11. After one dequeue, what does printf("%d", front->value) print?',
+    output: ["8"],
+    explanation: "The first dequeue removes 5 and advances the front pointer. The new front holds 8.",
+  }),
+  ordered({
+    id: "q-queue-enqueue",
+    topicId: "queues",
+    prompt:
+      "Order linked-queue insertion into a non-empty queue: set rear->next to new, allocate new, move rear to new.",
+    items: [
+      { id: "allocate", label: "Allocate new" },
+      { id: "link", label: "Set rear->next to new" },
+      { id: "rear", label: "Move rear to new" },
+    ],
+    answerOrder: ["allocate", "link", "rear"],
+    explanation:
+      "The new node is allocated first, then attached after the old rear. Updating rear last ensures it points to the newly linked tail.",
+  }),
 
-  multipleChoice({ id: "q-tree-inorder", topicId: "binary-trees", prompt: "For a binary search tree, which traversal visits keys in nondecreasing order?", options: [{ id: "a", label: "Inorder" }, { id: "b", label: "Preorder" }, { id: "c", label: "Postorder" }, { id: "d", label: "Level order only" }], answer: "a", explanation: "Inorder visits the left subtree, node, then right subtree. The BST ordering invariant makes that sequence sorted by key." }),
-  multipleChoice({ id: "q-tree-leaf", topicId: "binary-trees", prompt: "What defines a leaf in a binary tree?", options: [{ id: "a", label: "It has no children" }, { id: "b", label: "It is always the root" }, { id: "c", label: "It has two parents" }, { id: "d", label: "It has the largest key" }], answer: "a", explanation: "A leaf is a node whose left and right child references are both absent. Its location or key value does not determine whether it is a leaf." }),
-  numeric({ id: "q-tree-edges", topicId: "binary-trees", prompt: "A connected tree has 15 nodes. How many edges does it contain?", answer: 14, explanation: "Every tree with n nodes has exactly n − 1 edges because each node after the root contributes one connecting edge. For 15 nodes that is 14." }),
-  numeric({ id: "q-tree-level", topicId: "binary-trees", difficulty: "core", prompt: "How many nodes can a complete binary-tree level contain at depth 4, counting the root as depth 0?", answer: 16, explanation: "A binary level at depth d has at most 2^d positions. At depth 4, that capacity is 2^4 = 16 nodes." }),
-  shortAnswer({ id: "q-tree-root", topicId: "binary-trees", prompt: "What is the name of the unique node with no parent in a non-empty tree?", answers: ["root", "the root"], explanation: "The root is the tree's entry node and has no parent. Every other reachable node descends from it." }),
-  shortAnswer({ id: "q-tree-height-empty", topicId: "binary-trees", prompt: "Using edge-count height, what height is conventionally assigned to an empty tree?", answers: ["-1", "negative one", "minus one"], explanation: "With edge-count height, a leaf has height zero. Assigning the empty tree height −1 keeps the recursive height formula consistent." }),
-  codeOutput({ id: "q-tree-c-output", topicId: "binary-trees", prompt: "A node has left->key = 2, key = 5, and right->key = 9. An inorder visit prints each key followed by a space. What output results?", output: ["2 5 9 "], explanation: "Inorder visits the left child before the node and the right child after it. The stated keys therefore appear as 2, 5, and 9." }),
-  ordered({ id: "q-tree-search", topicId: "binary-trees", prompt: "Order a BST search for a key known to be in the tree: compare at the current node, choose the left or right child, repeat until equal.", items: [{ id: "compare", label: "Compare with current key" }, { id: "choose", label: "Choose a child" }, { id: "repeat", label: "Repeat at child" }], answerOrder: ["compare", "choose", "repeat"], explanation: "The comparison determines which ordered subtree can contain the target. The same process repeats at the selected child until the key matches." }),
+  multipleChoice({
+    id: "q-tree-inorder",
+    topicId: "binary-trees",
+    prompt: "For a binary search tree, which traversal visits keys in nondecreasing order?",
+    options: [
+      { id: "a", label: "Inorder" },
+      { id: "b", label: "Preorder" },
+      { id: "c", label: "Postorder" },
+      { id: "d", label: "Level order only" },
+    ],
+    answer: "a",
+    explanation:
+      "Inorder visits the left subtree, node, then right subtree. The BST ordering invariant makes that sequence sorted by key.",
+  }),
+  multipleChoice({
+    id: "q-tree-leaf",
+    topicId: "binary-trees",
+    prompt: "What defines a leaf in a binary tree?",
+    options: [
+      { id: "a", label: "It has no children" },
+      { id: "b", label: "It is always the root" },
+      { id: "c", label: "It has two parents" },
+      { id: "d", label: "It has the largest key" },
+    ],
+    answer: "a",
+    explanation:
+      "A leaf is a node whose left and right child references are both absent. Its location or key value does not determine whether it is a leaf.",
+  }),
+  numeric({
+    id: "q-tree-edges",
+    topicId: "binary-trees",
+    prompt: "A connected tree has 15 nodes. How many edges does it contain?",
+    answer: 14,
+    explanation:
+      "Every tree with n nodes has exactly n − 1 edges because each node after the root contributes one connecting edge. For 15 nodes that is 14.",
+  }),
+  numeric({
+    id: "q-tree-level",
+    topicId: "binary-trees",
+    difficulty: "core",
+    prompt: "How many nodes can a complete binary-tree level contain at depth 4, counting the root as depth 0?",
+    answer: 16,
+    explanation: "A binary level at depth d has at most 2^d positions. At depth 4, that capacity is 2^4 = 16 nodes.",
+  }),
+  shortAnswer({
+    id: "q-tree-root",
+    topicId: "binary-trees",
+    prompt: "What is the name of the unique node with no parent in a non-empty tree?",
+    answers: ["root", "the root"],
+    explanation: "The root is the tree's entry node and has no parent. Every other reachable node descends from it.",
+  }),
+  shortAnswer({
+    id: "q-tree-height-empty",
+    topicId: "binary-trees",
+    prompt: "Using edge-count height, what height is conventionally assigned to an empty tree?",
+    answers: ["-1", "negative one", "minus one"],
+    explanation:
+      "With edge-count height, a leaf has height zero. Assigning the empty tree height −1 keeps the recursive height formula consistent.",
+  }),
+  codeOutput({
+    id: "q-tree-c-output",
+    topicId: "binary-trees",
+    prompt:
+      "A node has left->key = 2, key = 5, and right->key = 9. An inorder visit prints each key followed by a space. What output results?",
+    output: ["2 5 9 "],
+    explanation:
+      "Inorder visits the left child before the node and the right child after it. The stated keys therefore appear as 2, 5, and 9.",
+  }),
+  ordered({
+    id: "q-tree-search",
+    topicId: "binary-trees",
+    prompt:
+      "Order a BST search for a key known to be in the tree: compare at the current node, choose the left or right child, repeat until equal.",
+    items: [
+      { id: "compare", label: "Compare with current key" },
+      { id: "choose", label: "Choose a child" },
+      { id: "repeat", label: "Repeat at child" },
+    ],
+    answerOrder: ["compare", "choose", "repeat"],
+    explanation:
+      "The comparison determines which ordered subtree can contain the target. The same process repeats at the selected child until the key matches.",
+  }),
 
-  multipleChoice({ id: "q-avl-single", topicId: "avl-trees", difficulty: "core", prompt: "Which rotation repairs a right-right AVL imbalance?", options: [{ id: "a", label: "Left rotation" }, { id: "b", label: "Right rotation" }, { id: "c", label: "Left-right double rotation" }, { id: "d", label: "No rotation" }], answer: "a", explanation: "A right-right case is heavy along the outer right path. A left rotation around the unbalanced node moves the middle subtree and restores balance." }),
-  multipleChoice({ id: "q-avl-invariant", topicId: "avl-trees", prompt: "What does AVL balancing guarantee after an insertion repair?", options: [{ id: "a", label: "Each node's height difference is at most one" }, { id: "b", label: "All leaves are at depth one" }, { id: "c", label: "Keys become consecutive" }, { id: "d", label: "Every node has two children" }], answer: "a", explanation: "The AVL invariant bounds the absolute difference between left and right subtree heights at every node by one. Rotations preserve ordering while enforcing that bound." }),
-  numeric({ id: "q-avl-balance-value", topicId: "avl-trees", difficulty: "core", prompt: "If a node's left subtree has height 3 and its right subtree has height 2, what is its left-minus-right balance factor?", answer: 1, explanation: "The balance factor is defined here as left height minus right height. Substituting 3 and 2 gives 1, which is allowed." }),
-  numeric({ id: "q-avl-leaf-height", topicId: "avl-trees", prompt: "Under edge-count height, what height does a leaf have?", answer: 0, explanation: "A leaf has no child edges below it. Therefore the longest downward path contains zero edges." }),
-  shortAnswer({ id: "q-avl-logarithmic", topicId: "avl-trees", prompt: "What asymptotic search time does AVL height support for n keys?", answers: ["log n", "o log n", "o(log n)", "logarithmic"], explanation: "AVL balancing keeps tree height logarithmic in the number of keys. Search follows one root-to-leaf path, so its time is O(log n)." }),
-  shortAnswer({ id: "q-avl-rebalance", topicId: "avl-trees", prompt: "What structural operation restores AVL balance while preserving in-order key order?", answers: ["rotation", "tree rotation", "rotations"], explanation: "A rotation changes local parent-child relationships without changing inorder order. Single or double rotations repair the relevant imbalance pattern." }),
-  codeOutput({ id: "q-avl-c-output", topicId: "avl-trees", prompt: "A balance function returns left_height - right_height. If left_height is 2 and right_height is 4, what does printf(\"%d\", balance) print?", output: ["-2"], explanation: "The function computes 2 − 4. The resulting negative balance factor is −2, which signals a right-heavy violation." }),
-  ordered({ id: "q-avl-update", topicId: "avl-trees", prompt: "After inserting into an AVL tree, order the upward repair work: update a node's height, compute its balance, rotate if needed.", items: [{ id: "height", label: "Update height" }, { id: "balance", label: "Compute balance" }, { id: "rotate", label: "Rotate if needed" }], answerOrder: ["height", "balance", "rotate"], explanation: "Balance depends on current child heights, so the node height is updated first. The computed factor then selects whether a rotation is necessary." }),
+  multipleChoice({
+    id: "q-avl-single",
+    topicId: "avl-trees",
+    difficulty: "core",
+    prompt: "Which rotation repairs a right-right AVL imbalance?",
+    options: [
+      { id: "a", label: "Left rotation" },
+      { id: "b", label: "Right rotation" },
+      { id: "c", label: "Left-right double rotation" },
+      { id: "d", label: "No rotation" },
+    ],
+    answer: "a",
+    explanation:
+      "A right-right case is heavy along the outer right path. A left rotation around the unbalanced node moves the middle subtree and restores balance.",
+  }),
+  multipleChoice({
+    id: "q-avl-invariant",
+    topicId: "avl-trees",
+    prompt: "What does AVL balancing guarantee after an insertion repair?",
+    options: [
+      { id: "a", label: "Each node's height difference is at most one" },
+      { id: "b", label: "All leaves are at depth one" },
+      { id: "c", label: "Keys become consecutive" },
+      { id: "d", label: "Every node has two children" },
+    ],
+    answer: "a",
+    explanation:
+      "The AVL invariant bounds the absolute difference between left and right subtree heights at every node by one. Rotations preserve ordering while enforcing that bound.",
+  }),
+  numeric({
+    id: "q-avl-balance-value",
+    topicId: "avl-trees",
+    difficulty: "core",
+    prompt:
+      "If a node's left subtree has height 3 and its right subtree has height 2, what is its left-minus-right balance factor?",
+    answer: 1,
+    explanation:
+      "The balance factor is defined here as left height minus right height. Substituting 3 and 2 gives 1, which is allowed.",
+  }),
+  numeric({
+    id: "q-avl-leaf-height",
+    topicId: "avl-trees",
+    prompt: "Under edge-count height, what height does a leaf have?",
+    answer: 0,
+    explanation: "A leaf has no child edges below it. Therefore the longest downward path contains zero edges.",
+  }),
+  shortAnswer({
+    id: "q-avl-logarithmic",
+    topicId: "avl-trees",
+    prompt: "What asymptotic search time does AVL height support for n keys?",
+    answers: ["log n", "o log n", "o(log n)", "logarithmic"],
+    explanation:
+      "AVL balancing keeps tree height logarithmic in the number of keys. Search follows one root-to-leaf path, so its time is O(log n).",
+  }),
+  shortAnswer({
+    id: "q-avl-rebalance",
+    topicId: "avl-trees",
+    prompt: "What structural operation restores AVL balance while preserving in-order key order?",
+    answers: ["rotation", "tree rotation", "rotations"],
+    explanation:
+      "A rotation changes local parent-child relationships without changing inorder order. Single or double rotations repair the relevant imbalance pattern.",
+  }),
+  codeOutput({
+    id: "q-avl-c-output",
+    topicId: "avl-trees",
+    prompt:
+      'A balance function returns left_height - right_height. If left_height is 2 and right_height is 4, what does printf("%d", balance) print?',
+    output: ["-2"],
+    explanation:
+      "The function computes 2 − 4. The resulting negative balance factor is −2, which signals a right-heavy violation.",
+  }),
+  ordered({
+    id: "q-avl-update",
+    topicId: "avl-trees",
+    prompt:
+      "After inserting into an AVL tree, order the upward repair work: update a node's height, compute its balance, rotate if needed.",
+    items: [
+      { id: "height", label: "Update height" },
+      { id: "balance", label: "Compute balance" },
+      { id: "rotate", label: "Rotate if needed" },
+    ],
+    answerOrder: ["height", "balance", "rotate"],
+    explanation:
+      "Balance depends on current child heights, so the node height is updated first. The computed factor then selects whether a rotation is necessary.",
+  }),
 
-  multipleChoice({ id: "q-heap-build", topicId: "heaps", prompt: "In a max-heap, which value is guaranteed at the root?", options: [{ id: "a", label: "The maximum value" }, { id: "b", label: "The minimum value" }, { id: "c", label: "The oldest value" }, { id: "d", label: "The median value" }], answer: "a", explanation: "A max-heap keeps every parent at least as large as its children. Repeatedly applying that invariant places the maximum key at the root." }),
-  multipleChoice({ id: "q-heap-last-parent", topicId: "heaps", difficulty: "core", prompt: "In a zero-based heap array with n elements, which index is the last possible parent index?", options: [{ id: "a", label: "floor(n / 2) − 1" }, { id: "b", label: "n − 1" }, { id: "c", label: "2n + 1" }, { id: "d", label: "floor(n / 2)" }], answer: "a", explanation: "An index i has a left child when 2i + 1 < n. Solving for the greatest such i gives floor(n / 2) − 1." }),
-  numeric({ id: "q-heap-right-child", topicId: "heaps", prompt: "In a zero-based binary heap, what is the right-child index of the item at index 4?", answer: 10, explanation: "The zero-based right-child formula is 2i + 2. Substituting i = 4 gives 10." }),
-  numeric({ id: "q-heap-height", topicId: "heaps", difficulty: "core", prompt: "What is the edge-count height of a complete heap containing 8 nodes?", answer: 3, explanation: "A complete 8-node heap occupies four levels: depths 0, 1, 2, and 3. The deepest possible edge distance from root is therefore 3." }),
-  shortAnswer({ id: "q-heap-up", topicId: "heaps", prompt: "What heap operation moves a newly inserted item toward the root when it violates the parent ordering?", answers: ["sift up", "bubble up", "heapify up", "percolate up"], explanation: "Sift-up repeatedly compares the new item with its parent and swaps while the heap invariant is violated. It stops at a valid parent or the root." }),
-  shortAnswer({ id: "q-heap-down", topicId: "heaps", prompt: "What heap operation restores order downward after removing the root?", answers: ["sift down", "bubble down", "heapify down", "percolate down"], explanation: "After the last item replaces the root, sift-down compares it with the appropriate child and moves it toward a valid position." }),
-  codeOutput({ id: "q-heap-c-output", topicId: "heaps", prompt: "An array stores a heap and value heap[0] is 12 while heap[1] is 7. What does printf(\"%d\", heap[0] >= heap[1]) print in C?", output: ["1"], explanation: "The comparison 12 >= 7 is true. In C, a true relational expression has integer value 1, which is what printf emits." }),
-  ordered({ id: "q-heap-remove", topicId: "heaps", prompt: "Order max-heap root removal: move the last item to the root, shrink the heap, sift the root down.", items: [{ id: "move", label: "Move last item to root" }, { id: "shrink", label: "Shrink heap" }, { id: "sift", label: "Sift root down" }], answerOrder: ["move", "shrink", "sift"], explanation: "The last item fills the root's vacant slot, and the logical size is reduced so the old final slot is excluded. Sift-down then restores parent ordering." }),
+  multipleChoice({
+    id: "q-heap-build",
+    topicId: "heaps",
+    prompt: "In a max-heap, which value is guaranteed at the root?",
+    options: [
+      { id: "a", label: "The maximum value" },
+      { id: "b", label: "The minimum value" },
+      { id: "c", label: "The oldest value" },
+      { id: "d", label: "The median value" },
+    ],
+    answer: "a",
+    explanation:
+      "A max-heap keeps every parent at least as large as its children. Repeatedly applying that invariant places the maximum key at the root.",
+  }),
+  multipleChoice({
+    id: "q-heap-last-parent",
+    topicId: "heaps",
+    difficulty: "core",
+    prompt: "In a zero-based heap array with n elements, which index is the last possible parent index?",
+    options: [
+      { id: "a", label: "floor(n / 2) − 1" },
+      { id: "b", label: "n − 1" },
+      { id: "c", label: "2n + 1" },
+      { id: "d", label: "floor(n / 2)" },
+    ],
+    answer: "a",
+    explanation: "An index i has a left child when 2i + 1 < n. Solving for the greatest such i gives floor(n / 2) − 1.",
+  }),
+  numeric({
+    id: "q-heap-right-child",
+    topicId: "heaps",
+    prompt: "In a zero-based binary heap, what is the right-child index of the item at index 4?",
+    answer: 10,
+    explanation: "The zero-based right-child formula is 2i + 2. Substituting i = 4 gives 10.",
+  }),
+  numeric({
+    id: "q-heap-height",
+    topicId: "heaps",
+    difficulty: "core",
+    prompt: "What is the edge-count height of a complete heap containing 8 nodes?",
+    answer: 3,
+    explanation:
+      "A complete 8-node heap occupies four levels: depths 0, 1, 2, and 3. The deepest possible edge distance from root is therefore 3.",
+  }),
+  shortAnswer({
+    id: "q-heap-up",
+    topicId: "heaps",
+    prompt: "What heap operation moves a newly inserted item toward the root when it violates the parent ordering?",
+    answers: ["sift up", "bubble up", "heapify up", "percolate up"],
+    explanation:
+      "Sift-up repeatedly compares the new item with its parent and swaps while the heap invariant is violated. It stops at a valid parent or the root.",
+  }),
+  shortAnswer({
+    id: "q-heap-down",
+    topicId: "heaps",
+    prompt: "What heap operation restores order downward after removing the root?",
+    answers: ["sift down", "bubble down", "heapify down", "percolate down"],
+    explanation:
+      "After the last item replaces the root, sift-down compares it with the appropriate child and moves it toward a valid position.",
+  }),
+  codeOutput({
+    id: "q-heap-c-output",
+    topicId: "heaps",
+    prompt:
+      'An array stores a heap and value heap[0] is 12 while heap[1] is 7. What does printf("%d", heap[0] >= heap[1]) print in C?',
+    output: ["1"],
+    explanation:
+      "The comparison 12 >= 7 is true. In C, a true relational expression has integer value 1, which is what printf emits.",
+  }),
+  ordered({
+    id: "q-heap-remove",
+    topicId: "heaps",
+    prompt: "Order max-heap root removal: move the last item to the root, shrink the heap, sift the root down.",
+    items: [
+      { id: "move", label: "Move last item to root" },
+      { id: "shrink", label: "Shrink heap" },
+      { id: "sift", label: "Sift root down" },
+    ],
+    answerOrder: ["move", "shrink", "sift"],
+    explanation:
+      "The last item fills the root's vacant slot, and the logical size is reduced so the old final slot is excluded. Sift-down then restores parent ordering.",
+  }),
 
-  multipleChoice({ id: "q-hash-collision", topicId: "hash-tables", prompt: "What is a collision in a hash table?", options: [{ id: "a", label: "Two keys map to the same slot" }, { id: "b", label: "A key has no characters" }, { id: "c", label: "The table is sorted" }, { id: "d", label: "A lookup uses binary search" }], answer: "a", explanation: "A collision occurs when distinct keys produce the same table index. The table needs chaining or probing to place both entries." }),
-  multipleChoice({ id: "q-hash-load", topicId: "hash-tables", difficulty: "core", prompt: "What quantity is commonly used to describe how full a hash table is?", options: [{ id: "a", label: "Load factor" }, { id: "b", label: "Tree height" }, { id: "c", label: "Stack depth" }, { id: "d", label: "Sort pass" }], answer: "a", explanation: "Load factor is the number of stored entries divided by the number of slots. It helps predict collision frequency and whether resizing is useful." }),
-  numeric({ id: "q-hash-remainder", topicId: "hash-tables", prompt: "With h(k) = k mod 13, which bucket receives key 52?", answer: 0, tolerance: 0, explanation: "Fifty-two is divisible by 13, so its remainder is zero. The direct modulo hash maps it to bucket 0." }),
-  numeric({ id: "q-hash-load-value", topicId: "hash-tables", difficulty: "core", prompt: "A table has 20 slots and stores 15 entries. Express its load factor as a decimal.", answer: 0.75, tolerance: 0.0001, explanation: "Load factor equals entries divided by slots: 15 / 20 = 0.75. This describes occupancy before considering how evenly keys distribute." }),
-  shortAnswer({ id: "q-hash-chain", topicId: "hash-tables", prompt: "What collision strategy stores multiple entries in a per-slot linked collection?", answers: ["chaining", "separate chaining", "bucket chaining"], explanation: "Separate chaining gives each table slot a collection, often a linked list, for all keys hashing there. A collision adds another entry to that collection." }),
-  shortAnswer({ id: "q-hash-open-addressing", topicId: "hash-tables", prompt: "What collision strategy searches for another empty slot within the table itself?", answers: ["open addressing", "probing", "open addressing with probing"], explanation: "Open addressing keeps entries in the table array and probes alternative slots after a collision. Linear probing is one example of this strategy." }),
-  codeOutput({ id: "q-hash-c-output", topicId: "hash-tables", prompt: "What does this C expression print? printf(\"%d\", 29 % 6);", output: ["5"], explanation: "Integer remainder asks for what remains after removing complete groups of six. Four groups consume 24 from 29, leaving 5." }),
-  ordered({ id: "q-hash-insert", topicId: "hash-tables", prompt: "Order a linear-probing insertion after a collision: compute the initial slot, inspect the slot, advance and wrap if occupied.", items: [{ id: "compute", label: "Compute initial slot" }, { id: "inspect", label: "Inspect slot" }, { id: "advance", label: "Advance and wrap if occupied" }], answerOrder: ["compute", "inspect", "advance"], explanation: "The hash determines where inspection begins. If that position is occupied, probing advances one position at a time with modulo wraparound." }),
+  multipleChoice({
+    id: "q-hash-collision",
+    topicId: "hash-tables",
+    prompt: "What is a collision in a hash table?",
+    options: [
+      { id: "a", label: "Two keys map to the same slot" },
+      { id: "b", label: "A key has no characters" },
+      { id: "c", label: "The table is sorted" },
+      { id: "d", label: "A lookup uses binary search" },
+    ],
+    answer: "a",
+    explanation:
+      "A collision occurs when distinct keys produce the same table index. The table needs chaining or probing to place both entries.",
+  }),
+  multipleChoice({
+    id: "q-hash-load",
+    topicId: "hash-tables",
+    difficulty: "core",
+    prompt: "What quantity is commonly used to describe how full a hash table is?",
+    options: [
+      { id: "a", label: "Load factor" },
+      { id: "b", label: "Tree height" },
+      { id: "c", label: "Stack depth" },
+      { id: "d", label: "Sort pass" },
+    ],
+    answer: "a",
+    explanation:
+      "Load factor is the number of stored entries divided by the number of slots. It helps predict collision frequency and whether resizing is useful.",
+  }),
+  numeric({
+    id: "q-hash-remainder",
+    topicId: "hash-tables",
+    prompt: "With h(k) = k mod 13, which bucket receives key 52?",
+    answer: 0,
+    tolerance: 0,
+    explanation: "Fifty-two is divisible by 13, so its remainder is zero. The direct modulo hash maps it to bucket 0.",
+  }),
+  numeric({
+    id: "q-hash-load-value",
+    topicId: "hash-tables",
+    difficulty: "core",
+    prompt: "A table has 20 slots and stores 15 entries. Express its load factor as a decimal.",
+    answer: 0.75,
+    tolerance: 0.0001,
+    explanation:
+      "Load factor equals entries divided by slots: 15 / 20 = 0.75. This describes occupancy before considering how evenly keys distribute.",
+  }),
+  shortAnswer({
+    id: "q-hash-chain",
+    topicId: "hash-tables",
+    prompt: "What collision strategy stores multiple entries in a per-slot linked collection?",
+    answers: ["chaining", "separate chaining", "bucket chaining"],
+    explanation:
+      "Separate chaining gives each table slot a collection, often a linked list, for all keys hashing there. A collision adds another entry to that collection.",
+  }),
+  shortAnswer({
+    id: "q-hash-open-addressing",
+    topicId: "hash-tables",
+    prompt: "What collision strategy searches for another empty slot within the table itself?",
+    answers: ["open addressing", "probing", "open addressing with probing"],
+    explanation:
+      "Open addressing keeps entries in the table array and probes alternative slots after a collision. Linear probing is one example of this strategy.",
+  }),
+  codeOutput({
+    id: "q-hash-c-output",
+    topicId: "hash-tables",
+    prompt: 'What does this C expression print? printf("%d", 29 % 6);',
+    output: ["5"],
+    explanation:
+      "Integer remainder asks for what remains after removing complete groups of six. Four groups consume 24 from 29, leaving 5.",
+  }),
+  ordered({
+    id: "q-hash-insert",
+    topicId: "hash-tables",
+    prompt:
+      "Order a linear-probing insertion after a collision: compute the initial slot, inspect the slot, advance and wrap if occupied.",
+    items: [
+      { id: "compute", label: "Compute initial slot" },
+      { id: "inspect", label: "Inspect slot" },
+      { id: "advance", label: "Advance and wrap if occupied" },
+    ],
+    answerOrder: ["compute", "inspect", "advance"],
+    explanation:
+      "The hash determines where inspection begins. If that position is occupied, probing advances one position at a time with modulo wraparound.",
+  }),
 
-  multipleChoice({ id: "q-trie-search", topicId: "tries", prompt: "What determines the path followed when searching for a word in a character trie?", options: [{ id: "a", label: "The word's characters in order" }, { id: "b", label: "The word's numeric hash only" }, { id: "c", label: "The insertion timestamp" }, { id: "d", label: "The tree's balance factor" }], answer: "a", explanation: "Each character selects the next edge from the current trie node. A search succeeds only when every character edge exists and the terminal marker is present." }),
-  multipleChoice({ id: "q-trie-terminal", topicId: "tries", prompt: "Why does a trie need a terminal marker in addition to character edges?", options: [{ id: "a", label: "To distinguish a word from only its prefix" }, { id: "b", label: "To sort numeric keys" }, { id: "c", label: "To store a hash collision" }, { id: "d", label: "To identify the root" }], answer: "a", explanation: "The word 'car' can be a prefix of 'cart'. A terminal marker records that the shorter path itself is a complete word, not merely an intermediate prefix." }),
-  numeric({ id: "q-trie-path", topicId: "tries", prompt: "How many character edges are traversed to search for the word 'stack'?", answer: 5, explanation: "The word has five characters: s, t, a, c, and k. A character trie follows one edge for each character." }),
-  numeric({ id: "q-trie-shared", topicId: "tries", difficulty: "core", prompt: "How many characters are in the longest shared prefix of 'plane' and 'plant'?", answer: 4, explanation: "The words agree on p, l, a, and n before branching at the fifth character. Their shared prefix length is therefore four." }),
-  shortAnswer({ id: "q-trie-prefix-name", topicId: "tries", prompt: "What term describes a string that appears at the beginning of another string in a trie?", answers: ["prefix", "a prefix"], explanation: "A prefix is an initial substring, possibly shorter than the complete word. Trie paths naturally represent prefixes from the root downward." }),
-  shortAnswer({ id: "q-trie-complexity", topicId: "tries", prompt: "For a fixed alphabet, what is the search time for a trie word of length L?", answers: ["o l", "o(l)", "linear in l", "linear"], explanation: "The search examines at most one node per character, so its time is O(L). It depends on word length rather than the number of stored words." }),
-  codeOutput({ id: "q-trie-c-output", topicId: "tries", prompt: "Suppose a trie lookup returns 1 for the word 'cat' and 0 for 'can'. What does printf(\"%d\", found_cat + found_can) print?", output: ["1"], explanation: "The two returned flags are 1 and 0. Adding them yields 1, indicating that exactly one lookup succeeded." }),
-  ordered({ id: "q-trie-insert", topicId: "tries", prompt: "Order inserting a word into a trie: start at root, follow or create each character edge, mark the final node terminal.", items: [{ id: "root", label: "Start at root" }, { id: "edges", label: "Follow or create character edges" }, { id: "terminal", label: "Mark final node terminal" }], answerOrder: ["root", "edges", "terminal"], explanation: "Insertion begins at the root and constructs the path character by character. Only the final node receives the terminal marker for the complete word." }),
+  multipleChoice({
+    id: "q-trie-search",
+    topicId: "tries",
+    prompt: "What determines the path followed when searching for a word in a character trie?",
+    options: [
+      { id: "a", label: "The word's characters in order" },
+      { id: "b", label: "The word's numeric hash only" },
+      { id: "c", label: "The insertion timestamp" },
+      { id: "d", label: "The tree's balance factor" },
+    ],
+    answer: "a",
+    explanation:
+      "Each character selects the next edge from the current trie node. A search succeeds only when every character edge exists and the terminal marker is present.",
+  }),
+  multipleChoice({
+    id: "q-trie-terminal",
+    topicId: "tries",
+    prompt: "Why does a trie need a terminal marker in addition to character edges?",
+    options: [
+      { id: "a", label: "To distinguish a word from only its prefix" },
+      { id: "b", label: "To sort numeric keys" },
+      { id: "c", label: "To store a hash collision" },
+      { id: "d", label: "To identify the root" },
+    ],
+    answer: "a",
+    explanation:
+      "The word 'car' can be a prefix of 'cart'. A terminal marker records that the shorter path itself is a complete word, not merely an intermediate prefix.",
+  }),
+  numeric({
+    id: "q-trie-path",
+    topicId: "tries",
+    prompt: "How many character edges are traversed to search for the word 'stack'?",
+    answer: 5,
+    explanation:
+      "The word has five characters: s, t, a, c, and k. A character trie follows one edge for each character.",
+  }),
+  numeric({
+    id: "q-trie-shared",
+    topicId: "tries",
+    difficulty: "core",
+    prompt: "How many characters are in the longest shared prefix of 'plane' and 'plant'?",
+    answer: 4,
+    explanation:
+      "The words agree on p, l, a, and n before branching at the fifth character. Their shared prefix length is therefore four.",
+  }),
+  shortAnswer({
+    id: "q-trie-prefix-name",
+    topicId: "tries",
+    prompt: "What term describes a string that appears at the beginning of another string in a trie?",
+    answers: ["prefix", "a prefix"],
+    explanation:
+      "A prefix is an initial substring, possibly shorter than the complete word. Trie paths naturally represent prefixes from the root downward.",
+  }),
+  shortAnswer({
+    id: "q-trie-complexity",
+    topicId: "tries",
+    prompt: "For a fixed alphabet, what is the search time for a trie word of length L?",
+    answers: ["o l", "o(l)", "linear in l", "linear"],
+    explanation:
+      "The search examines at most one node per character, so its time is O(L). It depends on word length rather than the number of stored words.",
+  }),
+  codeOutput({
+    id: "q-trie-c-output",
+    topicId: "tries",
+    prompt:
+      "Suppose a trie lookup returns 1 for the word 'cat' and 0 for 'can'. What does printf(\"%d\", found_cat + found_can) print?",
+    output: ["1"],
+    explanation:
+      "The two returned flags are 1 and 0. Adding them yields 1, indicating that exactly one lookup succeeded.",
+  }),
+  ordered({
+    id: "q-trie-insert",
+    topicId: "tries",
+    prompt:
+      "Order inserting a word into a trie: start at root, follow or create each character edge, mark the final node terminal.",
+    items: [
+      { id: "root", label: "Start at root" },
+      { id: "edges", label: "Follow or create character edges" },
+      { id: "terminal", label: "Mark final node terminal" },
+    ],
+    answerOrder: ["root", "edges", "terminal"],
+    explanation:
+      "Insertion begins at the root and constructs the path character by character. Only the final node receives the terminal marker for the complete word.",
+  }),
 
-  multipleChoice({ id: "q-sort-stable", topicId: "sorting", prompt: "What does it mean for a sorting algorithm to be stable?", options: [{ id: "a", label: "Equal-key records keep their original relative order" }, { id: "b", label: "It never uses comparisons" }, { id: "c", label: "It always runs in constant time" }, { id: "d", label: "It sorts only integers" }], answer: "a", explanation: "Stability preserves the order of records that compare equal. This matters when a previous ordering by another field should remain meaningful." }),
-  multipleChoice({ id: "q-sort-merge", topicId: "sorting", difficulty: "core", prompt: "Which strategy divides an input into halves, sorts them, and merges the sorted halves?", options: [{ id: "a", label: "Merge sort" }, { id: "b", label: "Linear probing" }, { id: "c", label: "Depth-first search" }, { id: "d", label: "Heap lookup" }], answer: "a", explanation: "Merge sort recursively divides the sequence and combines two sorted sub-sequences. The merge step chooses the smaller front item from either half." }),
-  numeric({ id: "q-sort-comparisons", topicId: "sorting", prompt: "How many adjacent comparisons occur in one complete bubble-sort pass over 10 items?", answer: 9, explanation: "A pass compares positions 0 through 8 with their immediate successors. That produces n − 1 = 9 adjacent comparisons." }),
-  numeric({ id: "q-sort-sorted", topicId: "sorting", difficulty: "core", prompt: "After insertion sort has processed the first 6 input items, how many items are guaranteed to be in the sorted prefix?", answer: 6, explanation: "Insertion sort maintains the invariant that its processed prefix is sorted. Processing six items therefore guarantees a sorted prefix of length six." }),
-  shortAnswer({ id: "q-sort-partition", topicId: "sorting", prompt: "What operation separates values around a pivot in quicksort?", answers: ["partition", "partitioning"], explanation: "Partitioning rearranges the current range so values on one side compare before the pivot and values on the other side compare after it." }),
-  shortAnswer({ id: "q-sort-nlogn", topicId: "sorting", prompt: "What asymptotic comparison bound is commonly associated with merge sort?", answers: ["o n log n", "o(n log n)", "n log n", "nlogn"], explanation: "Merge sort has logarithmically many levels and processes all n items during each level's merge work. Its comparison growth is O(n log n)." }),
-  codeOutput({ id: "q-sort-c-output", topicId: "sorting", prompt: "What does this C fragment print? int x = 3, y = 1; if (x > y) printf(\"sorted\"); else printf(\"swap\");", output: ["sorted"], explanation: "The condition 3 > 1 is true, so control enters the first branch. Only the word sorted is printed." }),
-  ordered({ id: "q-sort-merge-step", topicId: "sorting", prompt: "Order one merge step: compare the front items, copy the smaller item to output, advance that input.", items: [{ id: "compare", label: "Compare front items" }, { id: "copy", label: "Copy smaller to output" }, { id: "advance", label: "Advance that input" }], answerOrder: ["compare", "copy", "advance"], explanation: "The comparison chooses which sorted input contributes next. After copying that item, only its input position advances." }),
+  multipleChoice({
+    id: "q-sort-stable",
+    topicId: "sorting",
+    prompt: "What does it mean for a sorting algorithm to be stable?",
+    options: [
+      { id: "a", label: "Equal-key records keep their original relative order" },
+      { id: "b", label: "It never uses comparisons" },
+      { id: "c", label: "It always runs in constant time" },
+      { id: "d", label: "It sorts only integers" },
+    ],
+    answer: "a",
+    explanation:
+      "Stability preserves the order of records that compare equal. This matters when a previous ordering by another field should remain meaningful.",
+  }),
+  multipleChoice({
+    id: "q-sort-merge",
+    topicId: "sorting",
+    difficulty: "core",
+    prompt: "Which strategy divides an input into halves, sorts them, and merges the sorted halves?",
+    options: [
+      { id: "a", label: "Merge sort" },
+      { id: "b", label: "Linear probing" },
+      { id: "c", label: "Depth-first search" },
+      { id: "d", label: "Heap lookup" },
+    ],
+    answer: "a",
+    explanation:
+      "Merge sort recursively divides the sequence and combines two sorted sub-sequences. The merge step chooses the smaller front item from either half.",
+  }),
+  numeric({
+    id: "q-sort-comparisons",
+    topicId: "sorting",
+    prompt: "How many adjacent comparisons occur in one complete bubble-sort pass over 10 items?",
+    answer: 9,
+    explanation:
+      "A pass compares positions 0 through 8 with their immediate successors. That produces n − 1 = 9 adjacent comparisons.",
+  }),
+  numeric({
+    id: "q-sort-sorted",
+    topicId: "sorting",
+    difficulty: "core",
+    prompt:
+      "After insertion sort has processed the first 6 input items, how many items are guaranteed to be in the sorted prefix?",
+    answer: 6,
+    explanation:
+      "Insertion sort maintains the invariant that its processed prefix is sorted. Processing six items therefore guarantees a sorted prefix of length six.",
+  }),
+  shortAnswer({
+    id: "q-sort-partition",
+    topicId: "sorting",
+    prompt: "What operation separates values around a pivot in quicksort?",
+    answers: ["partition", "partitioning"],
+    explanation:
+      "Partitioning rearranges the current range so values on one side compare before the pivot and values on the other side compare after it.",
+  }),
+  shortAnswer({
+    id: "q-sort-nlogn",
+    topicId: "sorting",
+    prompt: "What asymptotic comparison bound is commonly associated with merge sort?",
+    answers: ["o n log n", "o(n log n)", "n log n", "nlogn"],
+    explanation:
+      "Merge sort has logarithmically many levels and processes all n items during each level's merge work. Its comparison growth is O(n log n).",
+  }),
+  codeOutput({
+    id: "q-sort-c-output",
+    topicId: "sorting",
+    prompt: 'What does this C fragment print? int x = 3, y = 1; if (x > y) printf("sorted"); else printf("swap");',
+    output: ["sorted"],
+    explanation: "The condition 3 > 1 is true, so control enters the first branch. Only the word sorted is printed.",
+  }),
+  ordered({
+    id: "q-sort-merge-step",
+    topicId: "sorting",
+    prompt: "Order one merge step: compare the front items, copy the smaller item to output, advance that input.",
+    items: [
+      { id: "compare", label: "Compare front items" },
+      { id: "copy", label: "Copy smaller to output" },
+      { id: "advance", label: "Advance that input" },
+    ],
+    answerOrder: ["compare", "copy", "advance"],
+    explanation:
+      "The comparison chooses which sorted input contributes next. After copying that item, only its input position advances.",
+  }),
 
-  multipleChoice({ id: "q-recursion-base", topicId: "recursion", prompt: "What is the purpose of a recursive function's base case?", options: [{ id: "a", label: "To stop further recursive calls" }, { id: "b", label: "To allocate every stack frame" }, { id: "c", label: "To sort all inputs" }, { id: "d", label: "To guarantee constant time" }], answer: "a", explanation: "The base case handles a smallest or terminal input without recursing. It guarantees that the chain of calls eventually stops." }),
-  multipleChoice({ id: "q-recursion-tail", topicId: "recursion", difficulty: "core", prompt: "A recursive call made as the final action of a function is called what?", options: [{ id: "a", label: "Tail recursion" }, { id: "b", label: "Binary probing" }, { id: "c", label: "Inorder recursion" }, { id: "d", label: "Deferred hashing" }], answer: "a", explanation: "In tail recursion, the caller has no work left after the recursive call returns. Some languages can optimize this shape, although standard C does not require that optimization." }),
-  numeric({ id: "q-recursion-factorial", topicId: "recursion", prompt: "How many multiplication operations does the usual recursive factorial compute for factorial(5) with factorial(1) as base?", answer: 4, explanation: "The multiplications occur for 5, 4, 3, and 2 before the base factorial(1) returns. That gives four multiplication operations." }),
-  numeric({ id: "q-recursion-binary-calls", topicId: "recursion", difficulty: "core", prompt: "A function makes two recursive calls at each non-base node and has 3 levels of non-base nodes. How many non-base call nodes are in the full recursion tree?", answer: 7, explanation: "The non-base levels contain 1, 2, and 4 calls. Summing those levels gives 1 + 2 + 4 = 7 non-base call nodes." }),
-  shortAnswer({ id: "q-recursion-stack", topicId: "recursion", prompt: "Where are active recursive function call frames typically stored in a conventional C process?", answers: ["call stack", "stack", "the call stack"], explanation: "Each active invocation has a frame containing return information and local state. Conventional C implementations place those frames on the call stack." }),
-  shortAnswer({ id: "q-recursion-induction", topicId: "recursion", prompt: "What reasoning technique proves a result for a base case and then for a smaller recursive case?", answers: ["induction", "mathematical induction", "proof by induction"], explanation: "Induction establishes a base case and an inductive step that transfers correctness from smaller inputs to the next input. Recursive correctness arguments often follow that structure." }),
-  codeOutput({ id: "q-recursion-c-output-2", topicId: "recursion", prompt: "What does this C function print for f(2)? void f(int n) { if (n == 0) return; f(n - 1); printf(\"%d \", n); }", output: ["1 2 "], explanation: "The recursive call runs before the print, so f(2) first reaches f(0), then prints 1 while unwinding, followed by 2." }),
-  ordered({ id: "q-recursion-unwind", topicId: "recursion", prompt: "Order a recursive computation's lifecycle: reach the base case, make recursive calls, return while combining results.", items: [{ id: "call", label: "Make recursive calls" }, { id: "base", label: "Reach base case" }, { id: "return", label: "Return and combine" }], answerOrder: ["call", "base", "return"], explanation: "The function descends through recursive calls until it reaches the base case. Results then flow back during unwinding, where pending work combines them." }),
+  multipleChoice({
+    id: "q-recursion-base",
+    topicId: "recursion",
+    prompt: "What is the purpose of a recursive function's base case?",
+    options: [
+      { id: "a", label: "To stop further recursive calls" },
+      { id: "b", label: "To allocate every stack frame" },
+      { id: "c", label: "To sort all inputs" },
+      { id: "d", label: "To guarantee constant time" },
+    ],
+    answer: "a",
+    explanation:
+      "The base case handles a smallest or terminal input without recursing. It guarantees that the chain of calls eventually stops.",
+  }),
+  multipleChoice({
+    id: "q-recursion-tail",
+    topicId: "recursion",
+    difficulty: "core",
+    prompt: "A recursive call made as the final action of a function is called what?",
+    options: [
+      { id: "a", label: "Tail recursion" },
+      { id: "b", label: "Binary probing" },
+      { id: "c", label: "Inorder recursion" },
+      { id: "d", label: "Deferred hashing" },
+    ],
+    answer: "a",
+    explanation:
+      "In tail recursion, the caller has no work left after the recursive call returns. Some languages can optimize this shape, although standard C does not require that optimization.",
+  }),
+  numeric({
+    id: "q-recursion-factorial",
+    topicId: "recursion",
+    prompt:
+      "How many multiplication operations does the usual recursive factorial compute for factorial(5) with factorial(1) as base?",
+    answer: 4,
+    explanation:
+      "The multiplications occur for 5, 4, 3, and 2 before the base factorial(1) returns. That gives four multiplication operations.",
+  }),
+  numeric({
+    id: "q-recursion-binary-calls",
+    topicId: "recursion",
+    difficulty: "core",
+    prompt:
+      "A function makes two recursive calls at each non-base node and has 3 levels of non-base nodes. How many non-base call nodes are in the full recursion tree?",
+    answer: 7,
+    explanation:
+      "The non-base levels contain 1, 2, and 4 calls. Summing those levels gives 1 + 2 + 4 = 7 non-base call nodes.",
+  }),
+  shortAnswer({
+    id: "q-recursion-stack",
+    topicId: "recursion",
+    prompt: "Where are active recursive function call frames typically stored in a conventional C process?",
+    answers: ["call stack", "stack", "the call stack"],
+    explanation:
+      "Each active invocation has a frame containing return information and local state. Conventional C implementations place those frames on the call stack.",
+  }),
+  shortAnswer({
+    id: "q-recursion-induction",
+    topicId: "recursion",
+    prompt: "What reasoning technique proves a result for a base case and then for a smaller recursive case?",
+    answers: ["induction", "mathematical induction", "proof by induction"],
+    explanation:
+      "Induction establishes a base case and an inductive step that transfers correctness from smaller inputs to the next input. Recursive correctness arguments often follow that structure.",
+  }),
+  codeOutput({
+    id: "q-recursion-c-output-2",
+    topicId: "recursion",
+    prompt:
+      'What does this C function print for f(2)? void f(int n) { if (n == 0) return; f(n - 1); printf("%d ", n); }',
+    output: ["1 2 "],
+    explanation:
+      "The recursive call runs before the print, so f(2) first reaches f(0), then prints 1 while unwinding, followed by 2.",
+  }),
+  ordered({
+    id: "q-recursion-unwind",
+    topicId: "recursion",
+    prompt:
+      "Order a recursive computation's lifecycle: reach the base case, make recursive calls, return while combining results.",
+    items: [
+      { id: "call", label: "Make recursive calls" },
+      { id: "base", label: "Reach base case" },
+      { id: "return", label: "Return and combine" },
+    ],
+    answerOrder: ["call", "base", "return"],
+    explanation:
+      "The function descends through recursive calls until it reaches the base case. Results then flow back during unwinding, where pending work combines them.",
+  }),
 
-  multipleChoice({ id: "q-analysis-big-o", topicId: "analysis-mathematics", prompt: "What does Big-O notation describe for an algorithm?", options: [{ id: "a", label: "An asymptotic upper growth bound" }, { id: "b", label: "An exact runtime on one machine" }, { id: "c", label: "The memory address of input" }, { id: "d", label: "Only the output type" }], answer: "a", explanation: "Big-O focuses on how resource use grows as input size increases, ignoring constant factors and lower-order terms. It is an asymptotic upper bound, not a stopwatch measurement." }),
-  multipleChoice({ id: "q-analysis-binary", topicId: "analysis-mathematics", difficulty: "core", prompt: "Which representation is most directly useful for describing a recurrence's recursive subproblem sizes?", options: [{ id: "a", label: "A recurrence equation" }, { id: "b", label: "A hash bucket" }, { id: "c", label: "A pointer sentinel" }, { id: "d", label: "A queue rear" }], answer: "a", explanation: "A recurrence expresses the cost or result for size n in terms of smaller sizes. That directly captures recursive subproblem structure for analysis." }),
-  numeric({ id: "q-analysis-power", topicId: "analysis-mathematics", prompt: "What is 2 raised to the fourth power?", answer: 16, explanation: "The fourth power multiplies four factors of two: 2 × 2 × 2 × 2 = 16." }),
-  numeric({ id: "q-analysis-growth", topicId: "analysis-mathematics", difficulty: "core", prompt: "A loop doubles i on each iteration, starting at 1 and stopping after i reaches 64. How many body iterations occur for i values 1 through 32?", answer: 6, explanation: "The body runs for i = 1, 2, 4, 8, 16, and 32. There are six powers-of-two iterations before the next value 64 stops the loop." }),
-  shortAnswer({ id: "q-analysis-little-o", topicId: "analysis-mathematics", prompt: "What asymptotic notation gives a tight bound when upper and lower growth match up to constants?", answers: ["theta", "big theta", "theta notation", "θ"], explanation: "Theta notation describes a tight asymptotic bound: the function is bounded above and below by constant multiples of the reference growth for sufficiently large inputs." }),
-  shortAnswer({ id: "q-analysis-space", topicId: "analysis-mathematics", prompt: "What resource measure counts auxiliary memory used by an algorithm?", answers: ["space complexity", "space", "memory complexity", "auxiliary space"], explanation: "Space complexity measures memory requirements as input grows. Auxiliary space focuses on storage beyond the input representation itself." }),
-  codeOutput({ id: "q-analysis-c-output", topicId: "analysis-mathematics", prompt: "What does this C fragment print? int x = 2 + 3 * 4; printf(\"%d\", x);", output: ["14"], explanation: "Multiplication has precedence over addition, so the expression is 2 + (3 × 4). The resulting value is 14." }),
-  ordered({ id: "q-analysis-proof", topicId: "analysis-mathematics", prompt: "Order a simple algorithm proof: state the invariant, show initialization, show preservation, conclude at termination.", items: [{ id: "state", label: "State the invariant" }, { id: "init", label: "Show initialization" }, { id: "preserve", label: "Show preservation" }, { id: "conclude", label: "Conclude at termination" }], answerOrder: ["state", "init", "preserve", "conclude"], explanation: "A loop proof first identifies the invariant, then verifies it before the loop and after each iteration. When termination supplies the final condition, the invariant yields the conclusion." }),
+  multipleChoice({
+    id: "q-analysis-big-o",
+    topicId: "analysis-mathematics",
+    prompt: "What does Big-O notation describe for an algorithm?",
+    options: [
+      { id: "a", label: "An asymptotic upper growth bound" },
+      { id: "b", label: "An exact runtime on one machine" },
+      { id: "c", label: "The memory address of input" },
+      { id: "d", label: "Only the output type" },
+    ],
+    answer: "a",
+    explanation:
+      "Big-O focuses on how resource use grows as input size increases, ignoring constant factors and lower-order terms. It is an asymptotic upper bound, not a stopwatch measurement.",
+  }),
+  multipleChoice({
+    id: "q-analysis-binary",
+    topicId: "analysis-mathematics",
+    difficulty: "core",
+    prompt: "Which representation is most directly useful for describing a recurrence's recursive subproblem sizes?",
+    options: [
+      { id: "a", label: "A recurrence equation" },
+      { id: "b", label: "A hash bucket" },
+      { id: "c", label: "A pointer sentinel" },
+      { id: "d", label: "A queue rear" },
+    ],
+    answer: "a",
+    explanation:
+      "A recurrence expresses the cost or result for size n in terms of smaller sizes. That directly captures recursive subproblem structure for analysis.",
+  }),
+  numeric({
+    id: "q-analysis-power",
+    topicId: "analysis-mathematics",
+    prompt: "What is 2 raised to the fourth power?",
+    answer: 16,
+    explanation: "The fourth power multiplies four factors of two: 2 × 2 × 2 × 2 = 16.",
+  }),
+  numeric({
+    id: "q-analysis-growth",
+    topicId: "analysis-mathematics",
+    difficulty: "core",
+    prompt:
+      "A loop doubles i on each iteration, starting at 1 and stopping after i reaches 64. How many body iterations occur for i values 1 through 32?",
+    answer: 6,
+    explanation:
+      "The body runs for i = 1, 2, 4, 8, 16, and 32. There are six powers-of-two iterations before the next value 64 stops the loop.",
+  }),
+  shortAnswer({
+    id: "q-analysis-little-o",
+    topicId: "analysis-mathematics",
+    prompt: "What asymptotic notation gives a tight bound when upper and lower growth match up to constants?",
+    answers: ["theta", "big theta", "theta notation", "θ"],
+    explanation:
+      "Theta notation describes a tight asymptotic bound: the function is bounded above and below by constant multiples of the reference growth for sufficiently large inputs.",
+  }),
+  shortAnswer({
+    id: "q-analysis-space",
+    topicId: "analysis-mathematics",
+    prompt: "What resource measure counts auxiliary memory used by an algorithm?",
+    answers: ["space complexity", "space", "memory complexity", "auxiliary space"],
+    explanation:
+      "Space complexity measures memory requirements as input grows. Auxiliary space focuses on storage beyond the input representation itself.",
+  }),
+  codeOutput({
+    id: "q-analysis-c-output",
+    topicId: "analysis-mathematics",
+    prompt: 'What does this C fragment print? int x = 2 + 3 * 4; printf("%d", x);',
+    output: ["14"],
+    explanation:
+      "Multiplication has precedence over addition, so the expression is 2 + (3 × 4). The resulting value is 14.",
+  }),
+  ordered({
+    id: "q-analysis-proof",
+    topicId: "analysis-mathematics",
+    prompt:
+      "Order a simple algorithm proof: state the invariant, show initialization, show preservation, conclude at termination.",
+    items: [
+      { id: "state", label: "State the invariant" },
+      { id: "init", label: "Show initialization" },
+      { id: "preserve", label: "Show preservation" },
+      { id: "conclude", label: "Conclude at termination" },
+    ],
+    answerOrder: ["state", "init", "preserve", "conclude"],
+    explanation:
+      "A loop proof first identifies the invariant, then verifies it before the loop and after each iteration. When termination supplies the final condition, the invariant yields the conclusion.",
+  }),
 ];
 
 QUESTION_BANK.push(...additionalQuestions);
@@ -232,10 +1649,12 @@ export const validateQuestionBank = (questions: readonly Question[] = QUESTION_B
   for (const question of parsed) {
     if (ids.has(question.id)) throw new Error(`Duplicate question id: ${question.id}`);
     ids.add(question.id);
-    if (question.type === "multiple-choice" && !question.options.some((option) => option.id === question.answer)) throw new Error(`Invalid answer option: ${question.id}`);
+    if (question.type === "multiple-choice" && !question.options.some((option) => option.id === question.answer))
+      throw new Error(`Invalid answer option: ${question.id}`);
     if (question.type === "ordered-sequence") {
       const itemIds = new Set(question.items.map((item) => item.id));
-      if (itemIds.size !== question.items.length || question.answerOrder.some((id) => !itemIds.has(id))) throw new Error(`Invalid sequence answer: ${question.id}`);
+      if (itemIds.size !== question.items.length || question.answerOrder.some((id) => !itemIds.has(id)))
+        throw new Error(`Invalid sequence answer: ${question.id}`);
     }
     if (question.type === "graph") {
       const edgeKeys = new Set<string>();
@@ -244,8 +1663,14 @@ export const validateQuestionBank = (questions: readonly Question[] = QUESTION_B
         if (edgeKeys.has(key)) throw new Error(`Duplicate graph edge: ${question.id}`);
         edgeKeys.add(key);
       }
-      const answer = question.operation === "bfs-order" || question.operation === "dfs-order" ? question.answerOrder! : question.operation === "adjacency" ? question.adjacentNodes! : undefined;
-      if (answer && new Set(answer).size !== answer.length) throw new Error(`Duplicate graph answer node: ${question.id}`);
+      const answer =
+        question.operation === "bfs-order" || question.operation === "dfs-order"
+          ? question.answerOrder!
+          : question.operation === "adjacency"
+            ? question.adjacentNodes!
+            : undefined;
+      if (answer && new Set(answer).size !== answer.length)
+        throw new Error(`Duplicate graph answer node: ${question.id}`);
     }
   }
   return parsed;

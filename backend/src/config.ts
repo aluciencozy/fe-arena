@@ -38,22 +38,36 @@ const parseOrigins = (environment: Environment, production: boolean, problems: s
     if (production) problems.push("FRONTEND_ORIGINS must contain at least one explicit https:// frontend origin.");
     return ["http://localhost:5173"];
   }
-  const origins = raw.split(",").map((origin) => origin.trim()).filter(Boolean);
+  const origins = raw
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
   const normalized: string[] = [];
   for (const origin of origins) {
     try {
       const parsed = new URL(origin);
-      if (!/^https?:$/.test(parsed.protocol) || parsed.pathname !== "/" || parsed.search || parsed.hash || parsed.username || parsed.password) {
+      if (
+        !/^https?:$/.test(parsed.protocol) ||
+        parsed.pathname !== "/" ||
+        parsed.search ||
+        parsed.hash ||
+        parsed.username ||
+        parsed.password
+      ) {
         throw new Error("not an origin");
       }
       const canonical = parsed.origin;
       if (!normalized.includes(canonical)) normalized.push(canonical);
     } catch {
-      problems.push(`FRONTEND_ORIGINS contains an invalid origin: ${origin || "(empty)"}. Use comma-separated http(s) origins without paths.`);
+      problems.push(
+        `FRONTEND_ORIGINS contains an invalid origin: ${origin || "(empty)"}. Use comma-separated http(s) origins without paths.`,
+      );
     }
   }
   if (production && (origins.includes("*") || normalized.some((origin) => origin.startsWith("http://")))) {
-    problems.push("Production frontend origins must be explicit HTTPS origins; wildcard or HTTP origins are not allowed.");
+    problems.push(
+      "Production frontend origins must be explicit HTTPS origins; wildcard or HTTP origins are not allowed.",
+    );
   }
   if (!normalized.length) normalized.push("http://localhost:5173");
   return normalized;
@@ -61,7 +75,8 @@ const parseOrigins = (environment: Environment, production: boolean, problems: s
 
 const parseTrustProxy = (value: string | undefined, production: boolean, problems: string[]): boolean | number => {
   if (!value?.trim()) {
-    if (production) problems.push("TRUST_PROXY must be set explicitly in production (for example true, false, or a hop count).");
+    if (production)
+      problems.push("TRUST_PROXY must be set explicitly in production (for example true, false, or a hop count).");
     return false;
   }
   const normalized = value.trim().toLowerCase();
@@ -81,7 +96,10 @@ const validateSupabase = (environment: Environment, production: boolean, problem
   const hasSecret = Boolean(secret);
   const hasPublishable = Boolean(publishable);
   if (hasSecret && !hasUrl) problems.push("SUPABASE_SECRET_KEY requires SUPABASE_URL.");
-  if (hasUrl && !hasSecret && !hasPublishable) problems.push("SUPABASE_URL requires SUPABASE_SECRET_KEY for persistence or SUPABASE_PUBLISHABLE_KEY for Auth-only verification.");
+  if (hasUrl && !hasSecret && !hasPublishable)
+    problems.push(
+      "SUPABASE_URL requires SUPABASE_SECRET_KEY for persistence or SUPABASE_PUBLISHABLE_KEY for Auth-only verification.",
+    );
   if (hasPublishable && !hasUrl) problems.push("SUPABASE_PUBLISHABLE_KEY requires SUPABASE_URL.");
   if (url) {
     try {

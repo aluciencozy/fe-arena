@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  type MatchRepository,
-  type TerminalMatchSnapshot,
-} from "../persistence/match.repository.js";
+import { type MatchRepository, type TerminalMatchSnapshot } from "../persistence/match.repository.js";
 import {
   clearMatch,
   clearMatchesForTests,
@@ -144,7 +141,10 @@ test("ignores client-supplied scoring fields and persists only server results", 
   });
   assert.deepEqual(Object.keys(forgedAttempt).sort(), ["answer", "questionId"]);
   assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, forgedAttempt, events()).ok, true);
-  assert.equal(submitAnswer(room.metadata.roomId, guest.seat.seatId, { questionId, answer: "not-the-answer" }, events()).ok, true);
+  assert.equal(
+    submitAnswer(room.metadata.roomId, guest.seat.seatId, { questionId, answer: "not-the-answer" }, events()).ok,
+    true,
+  );
   t.mock.timers.tick(30_000);
   await waitForMatchPersistenceForTests();
   const stored = repository.snapshots[0]!;

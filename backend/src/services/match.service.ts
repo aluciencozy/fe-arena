@@ -87,11 +87,14 @@ export const waitForMatchPersistenceForTests = async () => {
 const emptySubmission = (): SubmissionPublic => ({ submitted: false, correct: null, score: null, answer: null });
 const seatIds = (roomId: string) => getSeats(roomId).map((seat) => seat.seatId);
 const namesById = (roomId: string) => Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, seat.name]));
-const makeScores = (roomId: string) => Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, { total: 0, correct: 0, responseMs: 0 }]));
+const makeScores = (roomId: string) =>
+  Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, { total: 0, correct: 0, responseMs: 0 }]));
 const makeReady = (roomId: string) => Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, false]));
-const makeSubmissions = (roomId: string) => Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, emptySubmission()]));
+const makeSubmissions = (roomId: string) =>
+  Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, emptySubmission()]));
 const makeRevealSkips = (roomId: string) => Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, false]));
-const makeTopicSummary = (): Record<string, TopicPerformance> => Object.fromEntries(TOPICS.map((topic) => [topic.id, emptyTopicPerformance()]));
+const makeTopicSummary = (): Record<string, TopicPerformance> =>
+  Object.fromEntries(TOPICS.map((topic) => [topic.id, emptyTopicPerformance()]));
 
 const clearTimer = (record: MatchRecord) => {
   if (record.timer) clearTimeout(record.timer);
@@ -121,12 +124,14 @@ const publicSnapshot = (state: MatchPublicState): MatchPublicState => {
       submission.score = null;
       submission.answer = null;
     }
-    for (const playerId of Object.keys(safeState.scores)) safeState.scores[playerId] = { total: 0, correct: 0, responseMs: 0 };
+    for (const playerId of Object.keys(safeState.scores))
+      safeState.scores[playerId] = { total: 0, correct: 0, responseMs: 0 };
   }
   return safeState;
 };
 const emit = (record: MatchRecord, events: MatchEvents) => events.emit(publicSnapshot(record.state));
-const configFor = (metadata: RoomMetadata): MatchConfig => metadata.config ?? { topicIds: [], roundCount: DEFAULT_ROUND_COUNT, questionTimerSeconds: PUBLIC_QUESTION_SECONDS };
+const configFor = (metadata: RoomMetadata): MatchConfig =>
+  metadata.config ?? { topicIds: [], roundCount: DEFAULT_ROUND_COUNT, questionTimerSeconds: PUBLIC_QUESTION_SECONDS };
 const guestSessionOwner = (reconnectToken: string) => createHash("sha256").update(reconnectToken).digest("hex");
 const terminalSnapshot = (record: MatchRecord): TerminalMatchSnapshot | undefined => {
   const endReason = record.state.endReason;
@@ -152,9 +157,13 @@ const terminalSnapshot = (record: MatchRecord): TerminalMatchSnapshot | undefine
       questionId: round.question.id,
       topicId: round.question.topicId,
       questionBankVersion: QUESTION_BANK_VERSION,
-      correctness: Object.fromEntries(Object.entries(round.submissions).map(([seatId, submission]) => [seatId, submission.correct])),
+      correctness: Object.fromEntries(
+        Object.entries(round.submissions).map(([seatId, submission]) => [seatId, submission.correct]),
+      ),
       responseMs: Object.fromEntries(players.map((player) => [player.seatId, responseMs[player.seatId] ?? null])),
-      score: Object.fromEntries(players.map((player) => [player.seatId, round.submissions[player.seatId]?.score?.total ?? null])),
+      score: Object.fromEntries(
+        players.map((player) => [player.seatId, round.submissions[player.seatId]?.score?.total ?? null]),
+      ),
     };
   });
   return {
@@ -201,13 +210,35 @@ export const ensureMatch = (roomId: string, events?: MatchEvents) => {
   const metadata = getMetadata(roomId);
   if (!metadata) return undefined;
   const config = configFor(metadata);
-  const selectedQuestions = questionRepository.select(`${roomId}:${metadata.hostSeatId}`, config.roundCount, config.topicIds);
+  const selectedQuestions = questionRepository.select(
+    `${roomId}:${metadata.hostSeatId}`,
+    config.roundCount,
+    config.topicIds,
+  );
   const questions = selectedQuestions.length === config.roundCount ? selectedQuestions : [];
   const state: MatchPublicState = {
-    roomId, source: metadata.source, phase: "LOBBY", config, roundIndex: 0, totalRounds: config.roundCount,
-    question: null, revealedQuestion: null, questionStartedAt: null, questionEndsAt: null, countdownEndsAt: null,
-    revealStartedAt: null, revealEndsAt: null, revealSkips: makeRevealSkips(roomId), pause: null,
-    ready: makeReady(roomId), submissions: makeSubmissions(roomId), scores: makeScores(roomId), topicSummary: makeTopicSummary(), winnerSeatId: null, endReason: null, history: [],
+    roomId,
+    source: metadata.source,
+    phase: "LOBBY",
+    config,
+    roundIndex: 0,
+    totalRounds: config.roundCount,
+    question: null,
+    revealedQuestion: null,
+    questionStartedAt: null,
+    questionEndsAt: null,
+    countdownEndsAt: null,
+    revealStartedAt: null,
+    revealEndsAt: null,
+    revealSkips: makeRevealSkips(roomId),
+    pause: null,
+    ready: makeReady(roomId),
+    submissions: makeSubmissions(roomId),
+    scores: makeScores(roomId),
+    topicSummary: makeTopicSummary(),
+    winnerSeatId: null,
+    endReason: null,
+    history: [],
   };
   const matchId = randomUUID();
   const record: MatchRecord = {
@@ -277,10 +308,24 @@ const advanceOrFinish = (roomId: string, events: MatchEvents) => {
     record.state.revealStartedAt = null;
     record.state.revealEndsAt = null;
     record.state.revealSkips = makeRevealSkips(roomId);
-    const scores = Object.entries(record.state.scores).map(([playerId, score]) => ({ playerId, playerName: namesById(roomId)[playerId] ?? playerId, ...score }));
+    const scores = Object.entries(record.state.scores).map(([playerId, score]) => ({
+      playerId,
+      playerName: namesById(roomId)[playerId] ?? playerId,
+      ...score,
+    }));
     const [left, right] = scores;
-    const exactTie = Boolean(left && right && left.total === right.total && left.correct === right.correct && left.responseMs === right.responseMs);
-    record.state.winnerSeatId = exactTie ? null : left && right ? compareScores(left, right).playerId : left?.playerId ?? null;
+    const exactTie = Boolean(
+      left &&
+      right &&
+      left.total === right.total &&
+      left.correct === right.correct &&
+      left.responseMs === right.responseMs,
+    );
+    record.state.winnerSeatId = exactTie
+      ? null
+      : left && right
+        ? compareScores(left, right).playerId
+        : (left?.playerId ?? null);
     record.state.endReason = "completed";
     persistTerminal(record);
     emit(record, events);
@@ -291,7 +336,11 @@ const advanceOrFinish = (roomId: string, events: MatchEvents) => {
   startCountdown(roomId, events);
 };
 
-const finalizeRound = (record: MatchRecord, question: NonNullable<ReturnType<typeof questionFor>>, countUnanswered: boolean) => {
+const finalizeRound = (
+  record: MatchRecord,
+  question: NonNullable<ReturnType<typeof questionFor>>,
+  countUnanswered: boolean,
+) => {
   const round = record.state.roundIndex + 1;
   const existing = record.state.history.find((entry) => entry.round === round);
   if (existing) return existing.question;
@@ -302,9 +351,19 @@ const finalizeRound = (record: MatchRecord, question: NonNullable<ReturnType<typ
   const attempted = countUnanswered ? attempts.length : attempts.filter((submission) => submission.submitted).length;
   const correct = attempts.filter((submission) => submission.correct === true).length;
   const score = attempts.reduce((total, submission) => total + (submission.score?.total ?? 0), 0);
-  const responseMs = Object.values(record.roundResponseMs[record.state.roundIndex] ?? {}).reduce((total, value) => total + value, 0);
+  const responseMs = Object.values(record.roundResponseMs[record.state.roundIndex] ?? {}).reduce(
+    (total, value) => total + value,
+    0,
+  );
   const totalAttempted = summary.attempted + attempted;
-  record.state.topicSummary[question.topicId] = { attempted: totalAttempted, correct: summary.correct + correct, incorrect: summary.incorrect + attempted - correct, accuracy: totalAttempted ? (summary.correct + correct) / totalAttempted : 0, score: summary.score + score, responseMs: summary.responseMs + responseMs };
+  record.state.topicSummary[question.topicId] = {
+    attempted: totalAttempted,
+    correct: summary.correct + correct,
+    incorrect: summary.incorrect + attempted - correct,
+    accuracy: totalAttempted ? (summary.correct + correct) / totalAttempted : 0,
+    score: summary.score + score,
+    responseMs: summary.responseMs + responseMs,
+  };
   return revealed;
 };
 
@@ -329,7 +388,9 @@ const revealRound = (roomId: string, events: MatchEvents) => {
   record.timer = setTimeout(() => advanceOrFinish(roomId, events), REVEAL_SECONDS * 1000);
 };
 
-const allSubmitted = (record: MatchRecord) => seatIds(record.state.roomId).length === 2 && Object.values(record.state.submissions).every((submission) => submission.submitted);
+const allSubmitted = (record: MatchRecord) =>
+  seatIds(record.state.roomId).length === 2 &&
+  Object.values(record.state.submissions).every((submission) => submission.submitted);
 
 export const skipReveal = (roomId: string, seatId: string, events: MatchEvents) => {
   const record = matches.get(roomId);
@@ -341,7 +402,8 @@ export const skipReveal = (roomId: string, seatId: string, events: MatchEvents) 
   if (!seatIds(roomId).includes(seatId)) return { ok: false as const, error: "You are not seated in this match." };
   if (record.state.revealSkips[seatId]) return { ok: false as const, error: "You already skipped this reveal." };
   record.state.revealSkips[seatId] = true;
-  if (seatIds(roomId).length === 2 && seatIds(roomId).every((id) => record.state.revealSkips[id])) advanceOrFinish(roomId, events);
+  if (seatIds(roomId).length === 2 && seatIds(roomId).every((id) => record.state.revealSkips[id]))
+    advanceOrFinish(roomId, events);
   else emit(record, events);
   return { ok: true as const };
 };
@@ -349,11 +411,18 @@ export const skipReveal = (roomId: string, seatId: string, events: MatchEvents) 
 export const configureMatch = (roomId: string, seatId: string, config: MatchConfig, events: MatchEvents) => {
   const record = matches.get(roomId) ?? (ensureMatch(roomId) && matches.get(roomId));
   const metadata = getMetadata(roomId);
-  if (!record || !metadata || metadata.hostSeatId !== seatId) return { ok: false as const, error: "Only the host can change match settings." };
-  if (!(record.state.phase === "LOBBY" || record.state.phase === "SETUP" || record.state.phase === "REMATCH")) return { ok: false as const, error: "Settings can only change before a round begins." };
+  if (!record || !metadata || metadata.hostSeatId !== seatId)
+    return { ok: false as const, error: "Only the host can change match settings." };
+  if (!(record.state.phase === "LOBBY" || record.state.phase === "SETUP" || record.state.phase === "REMATCH"))
+    return { ok: false as const, error: "Settings can only change before a round begins." };
   if (!config.topicIds.length || !config.roundCount) return { ok: false as const, error: "Choose at least one topic." };
-  const questions = questionRepository.select(`${record.seed}:${JSON.stringify(config)}`, config.roundCount, config.topicIds);
-  if (questions.length !== config.roundCount) return { ok: false as const, error: "There are not enough reviewed questions for that topic selection." };
+  const questions = questionRepository.select(
+    `${record.seed}:${JSON.stringify(config)}`,
+    config.roundCount,
+    config.topicIds,
+  );
+  if (questions.length !== config.roundCount)
+    return { ok: false as const, error: "There are not enough reviewed questions for that topic selection." };
   record.state.config = config;
   record.state.phase = "SETUP";
   record.questionIds = questions.map((question) => question.id);
@@ -366,9 +435,16 @@ export const configureMatch = (roomId: string, seatId: string, config: MatchConf
 export const toggleReady = (roomId: string, seatId: string, events: MatchEvents) => {
   const record = matches.get(roomId) ?? (ensureMatch(roomId) && matches.get(roomId));
   if (!record) return { ok: false as const, error: "Match not found." };
-  if (!(record.state.phase === "LOBBY" || record.state.phase === "SETUP" || record.state.phase === "READY" || record.state.phase === "REMATCH")) return { ok: false as const, error: "Ready status is locked right now." };
+  if (!(
+    record.state.phase === "LOBBY" ||
+    record.state.phase === "SETUP" ||
+    record.state.phase === "READY" ||
+    record.state.phase === "REMATCH"
+  ))
+    return { ok: false as const, error: "Ready status is locked right now." };
   if (getSeats(roomId).length !== 2) return { ok: false as const, error: "Waiting for a second guest." };
-  if (record.questionIds.length !== record.state.config.roundCount) return { ok: false as const, error: "There are not enough reviewed questions for this match." };
+  if (record.questionIds.length !== record.state.config.roundCount)
+    return { ok: false as const, error: "There are not enough reviewed questions for this match." };
   record.state.ready[seatId] = !record.state.ready[seatId];
   record.state.phase = "READY";
   if (seatIds(roomId).every((id) => record.state.ready[id])) {
@@ -389,7 +465,8 @@ export const toggleReady = (roomId: string, seatId: string, events: MatchEvents)
 export const submitAnswer = (roomId: string, seatId: string, attempt: QuestionAttempt, events: MatchEvents) => {
   const record = matches.get(roomId);
   const question = record && questionFor(record);
-  if (!record || !question || record.state.phase !== "QUESTION") return { ok: false as const, error: "Answers are not being accepted right now." };
+  if (!record || !question || record.state.phase !== "QUESTION")
+    return { ok: false as const, error: "Answers are not being accepted right now." };
   const submission = record.state.submissions[seatId];
   if (!submission) return { ok: false as const, error: "You are not seated in this match." };
   if (record.state.questionEndsAt !== null && record.state.questionEndsAt <= Date.now()) {
@@ -407,7 +484,11 @@ export const submitAnswer = (roomId: string, seatId: string, attempt: QuestionAt
   submission.score = score;
   submission.answer = null;
   const current = record.state.scores[seatId] ?? { total: 0, correct: 0, responseMs: 0 };
-  record.state.scores[seatId] = { total: current.total + score.total, correct: current.correct + (correct ? 1 : 0), responseMs: current.responseMs + elapsedMs };
+  record.state.scores[seatId] = {
+    total: current.total + score.total,
+    correct: current.correct + (correct ? 1 : 0),
+    responseMs: current.responseMs + elapsedMs,
+  };
   const roundTiming = record.roundResponseMs[record.state.roundIndex] ?? {};
   roundTiming[seatId] = elapsedMs;
   record.roundResponseMs[record.state.roundIndex] = roundTiming;
@@ -418,8 +499,10 @@ export const submitAnswer = (roomId: string, seatId: string, attempt: QuestionAt
 
 export const requestRematch = (roomId: string, seatId: string, events: MatchEvents) => {
   const record = matches.get(roomId);
-  if (!record || !["RESULTS", "FORFEIT", "ABANDONED", "EXPIRED"].includes(record.state.phase)) return { ok: false as const, error: "Rematch is only available after a completed match." };
-  if (!seatIds(roomId).includes(seatId) || getSeats(roomId).length !== 2) return { ok: false as const, error: "Both guest seats are required for a rematch." };
+  if (!record || !["RESULTS", "FORFEIT", "ABANDONED", "EXPIRED"].includes(record.state.phase))
+    return { ok: false as const, error: "Rematch is only available after a completed match." };
+  if (!seatIds(roomId).includes(seatId) || getSeats(roomId).length !== 2)
+    return { ok: false as const, error: "Both guest seats are required for a rematch." };
   record.state.phase = "REMATCH";
   record.matchId = randomUUID();
   record.idempotencyKey = record.matchId;
@@ -439,14 +522,19 @@ export const requestRematch = (roomId: string, seatId: string, events: MatchEven
   return { ok: true as const };
 };
 
-export const leaveMatch = (roomId: string, leavingSeatId: string, reason: "forfeit" | "abandoned" | "expired", events: MatchEvents) => {
+export const leaveMatch = (
+  roomId: string,
+  leavingSeatId: string,
+  reason: "forfeit" | "abandoned" | "expired",
+  events: MatchEvents,
+) => {
   const record = matches.get(roomId);
   if (!record) return;
   clearTimer(record);
   const phase = record.state.phase === "PAUSED" ? record.pausedFrom : record.state.phase;
   const question = phase === "QUESTION" ? questionFor(record) : undefined;
   if (question) finalizeRound(record, question, false);
-  const winner = reason === "abandoned" ? null : seatIds(roomId).find((id) => id !== leavingSeatId) ?? null;
+  const winner = reason === "abandoned" ? null : (seatIds(roomId).find((id) => id !== leavingSeatId) ?? null);
   record.state.phase = reason === "forfeit" ? "FORFEIT" : reason === "expired" ? "EXPIRED" : "ABANDONED";
   record.state.winnerSeatId = winner;
   record.state.endReason = reason;
@@ -463,7 +551,11 @@ export const leaveMatch = (roomId: string, leavingSeatId: string, reason: "forfe
   record.pausedFrom = null;
   record.pausedAt = null;
   emit(record, events);
-  events.message(winner ? `${winner === leavingSeatId ? "A guest" : "Your opponent"} left; the match is over.` : "The match ended because the room was abandoned.");
+  events.message(
+    winner
+      ? `${winner === leavingSeatId ? "A guest" : "Your opponent"} left; the match is over.`
+      : "The match ended because the room was abandoned.",
+  );
 };
 
 export const pauseForDisconnect = (roomId: string, seatId: string, events: MatchEvents) => {
@@ -493,11 +585,21 @@ export const resumeAfterReconnect = (roomId: string, events: MatchEvents) => {
   if (record.state.revealEndsAt !== null) record.state.revealEndsAt += pausedMs;
   record.state.phase = record.pausedFrom;
   record.state.pause = null;
-  const deadline = record.state.phase === "COUNTDOWN" ? record.state.countdownEndsAt : record.state.phase === "QUESTION" ? record.state.questionEndsAt : record.state.revealEndsAt;
+  const deadline =
+    record.state.phase === "COUNTDOWN"
+      ? record.state.countdownEndsAt
+      : record.state.phase === "QUESTION"
+        ? record.state.questionEndsAt
+        : record.state.revealEndsAt;
   const remaining = (deadline ?? Date.now()) - Date.now();
   record.pausedFrom = null;
   record.pausedAt = null;
-  const action = record.state.phase === "COUNTDOWN" ? () => startQuestion(roomId, events) : record.state.phase === "QUESTION" ? () => revealRound(roomId, events) : () => advanceOrFinish(roomId, events);
+  const action =
+    record.state.phase === "COUNTDOWN"
+      ? () => startQuestion(roomId, events)
+      : record.state.phase === "QUESTION"
+        ? () => revealRound(roomId, events)
+        : () => advanceOrFinish(roomId, events);
   record.timer = setTimeout(action, Math.max(0, remaining));
   emit(record, events);
   events.message("Guest reconnected. The match is live again.");
@@ -508,5 +610,12 @@ export const getMatchState = (roomId: string) => {
   const record = matches.get(roomId);
   return record ? publicSnapshot(record.state) : undefined;
 };
-export const clearMatch = (roomId: string) => { const record = matches.get(roomId); if (record) clearTimer(record); matches.delete(roomId); };
-export const clearMatchesForTests = () => { for (const record of matches.values()) clearTimer(record); matches.clear(); };
+export const clearMatch = (roomId: string) => {
+  const record = matches.get(roomId);
+  if (record) clearTimer(record);
+  matches.delete(roomId);
+};
+export const clearMatchesForTests = () => {
+  for (const record of matches.values()) clearTimer(record);
+  matches.clear();
+};

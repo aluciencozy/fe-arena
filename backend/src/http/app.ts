@@ -26,7 +26,10 @@ export type AppOptions = {
 
 export const createApp = (options: AppOptions = {}): Express => {
   const runtime = options.runtimeConfig;
-  const allowedOrigins = options.frontendOrigins ?? runtime?.frontendOrigins ?? (options.frontendOrigin ? [options.frontendOrigin] : [process.env.FRONTEND_ORIGIN ?? "http://localhost:5173"]);
+  const allowedOrigins =
+    options.frontendOrigins ??
+    runtime?.frontendOrigins ??
+    (options.frontendOrigin ? [options.frontendOrigin] : [process.env.FRONTEND_ORIGIN ?? "http://localhost:5173"]);
   const production = runtime?.isProduction ?? process.env.NODE_ENV === "production";
   const persistence = options.persistence ?? { configured: false, mode: "in-memory-fallback" as const, ready: true };
   const authVerifier = options.authVerifier ?? createAuthVerifier();
@@ -35,12 +38,14 @@ export const createApp = (options: AppOptions = {}): Express => {
   if (runtime) app.set("trust proxy", runtime.trustProxy);
   app.disable("x-powered-by");
   app.use(securityHeaders(production));
-  app.use(cors({
-    origin: (origin, callback) => callback(null, isAllowedOrigin(origin, allowedOrigins, production)),
-    methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    maxAge: 600,
-  }));
+  app.use(
+    cors({
+      origin: (origin, callback) => callback(null, isAllowedOrigin(origin, allowedOrigins, production)),
+      methods: ["GET", "POST", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization"],
+      maxAge: 600,
+    }),
+  );
   app.use(express.json({ limit: "16kb" }));
   // Health checks are intentionally cheap and unauthenticated. Other public entry points are bounded by IP.
   app.get("/healthz", (_request, response) => response.status(200).json({ status: "ok" }));
@@ -53,27 +58,42 @@ export const createApp = (options: AppOptions = {}): Express => {
     });
   });
   app.use("/api", createIpRateLimit(120, 60_000));
-  app.get("/", (_request, response) => response.json({ name: "FE Arena", disclaimer: "Unofficial study tool; not affiliated with UCF." }));
+  app.get("/", (_request, response) =>
+    response.json({ name: "FE Arena", disclaimer: "Unofficial study tool; not affiliated with UCF." }),
+  );
   app.get("/api/topics", (_request, response) => response.json({ topics: TOPICS }));
-  app.get("/api/question-bank", (_request, response) => response.json({ ...questionBankStats(), provenance: "Original content informed by public reference materials; answers are never exposed by this endpoint." }));
+  app.get("/api/question-bank", (_request, response) =>
+    response.json({
+      ...questionBankStats(),
+      provenance:
+        "Original content informed by public reference materials; answers are never exposed by this endpoint.",
+    }),
+  );
   app.get("/api/account/history", async (request, response) => {
     response.set("Cache-Control", "no-store");
     const identity = await verifyBearerHeader(authVerifier, request.header("authorization"));
-    if (!identity) return response.status(401).json({ code: "AUTH_REQUIRED", message: "Sign in to view account history." });
+    if (!identity)
+      return response.status(401).json({ code: "AUTH_REQUIRED", message: "Sign in to view account history." });
     try {
       const history = historyRepository
         ? await historyRepository.getAccountHistory(identity.id)
         : await getAccountHistory(identity.id);
       return response.json(history);
     } catch {
-      return response.status(503).json({ code: "HISTORY_UNAVAILABLE", message: "Account history is temporarily unavailable." });
+      return response
+        .status(503)
+        .json({ code: "HISTORY_UNAVAILABLE", message: "Account history is temporarily unavailable." });
     }
   });
   const safeErrors: ErrorRequestHandler = (error, _request, response, next) => {
     if (response.headersSent) return next(error);
-    if (error && typeof error === "object" && "status" in error && error.status === 413) return response.status(413).json({ code: "REQUEST_TOO_LARGE", message: "Request body is too large." });
-    if (error instanceof SyntaxError && "body" in error) return response.status(400).json({ code: "INVALID_JSON", message: "Request JSON is invalid." });
-    return response.status(error?.message === "Not allowed by CORS" ? 403 : 500).json({ code: "REQUEST_FAILED", message: "The request could not be completed." });
+    if (error && typeof error === "object" && "status" in error && error.status === 413)
+      return response.status(413).json({ code: "REQUEST_TOO_LARGE", message: "Request body is too large." });
+    if (error instanceof SyntaxError && "body" in error)
+      return response.status(400).json({ code: "INVALID_JSON", message: "Request JSON is invalid." });
+    return response
+      .status(error?.message === "Not allowed by CORS" ? 403 : 500)
+      .json({ code: "REQUEST_FAILED", message: "The request could not be completed." });
   };
   app.use(safeErrors);
   return app;

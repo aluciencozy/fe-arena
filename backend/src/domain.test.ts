@@ -1,6 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateScore, ClientEventSchemas, compareScores, gradeQuestion, normalizeAnswer, QuestionSchema, selectSeededQuestions, ServerEventSchemas, toPublicQuestion, TOPICS, type Question } from "../../shared/domain.js";
+import {
+  calculateScore,
+  ClientEventSchemas,
+  compareScores,
+  gradeQuestion,
+  normalizeAnswer,
+  QuestionSchema,
+  selectSeededQuestions,
+  ServerEventSchemas,
+  toPublicQuestion,
+  TOPICS,
+  type Question,
+} from "../../shared/domain.js";
 import { QUESTION_BANK, validateQuestionBank } from "./data/questions.js";
 import { loadQuestionRepository, questionFromRow, questionToRow } from "./services/question-bank.service.js";
 
@@ -56,14 +68,20 @@ test("score correctness dominates speed and bonus has hard boundaries", () => {
 test("socket contracts validate payloadless requests and public outputs", () => {
   assert.equal(ClientEventSchemas["room:state-request"].safeParse(undefined).success, true);
   assert.equal(ClientEventSchemas["room:state-request"].safeParse({}).success, false);
-  assert.equal(ServerEventSchemas["server:error"].safeParse({ code: "BAD_REQUEST", message: "Invalid request" }).success, true);
+  assert.equal(
+    ServerEventSchemas["server:error"].safeParse({ code: "BAD_REQUEST", message: "Invalid request" }).success,
+    true,
+  );
   assert.equal(ServerEventSchemas["queue:state"].safeParse({ status: "waiting" }).success, false);
 });
 
 test("seeded selection is deterministic, topic-filtered, and has no repeated questions", () => {
   const first = selectSeededQuestions(QUESTION_BANK, "replay-seed", 10, ["stacks", "queues"]);
   const second = selectSeededQuestions(QUESTION_BANK, "replay-seed", 10, ["stacks", "queues"]);
-  assert.deepEqual(first.map((question) => question.id), second.map((question) => question.id));
+  assert.deepEqual(
+    first.map((question) => question.id),
+    second.map((question) => question.id),
+  );
   assert.equal(new Set(first.map((question) => question.id)).size, first.length);
   assert.ok(first.every((question) => question.topicId === "stacks" || question.topicId === "queues"));
   assert.equal(selectSeededQuestions(first, "replay-seed", first.length + 1).length, 0);
@@ -77,7 +95,10 @@ test("Supabase rows load private content through the repository without changing
     eq: () => query,
     order: async () => ({ data: [row], error: null }),
   };
-  const repository = await loadQuestionRepository({ SUPABASE_URL: "https://example.supabase.co", SUPABASE_SECRET_KEY: "service-key" }, { from: () => query } as never);
+  const repository = await loadQuestionRepository(
+    { SUPABASE_URL: "https://example.supabase.co", SUPABASE_SECRET_KEY: "service-key" },
+    { from: () => query } as never,
+  );
   const loaded = repository.get(source.id)!;
   assert.equal(loaded.explanation, source.explanation);
   assert.equal("answer" in toPublicQuestion(loaded), false);
@@ -88,7 +109,14 @@ test("Supabase private content cannot overwrite canonical row fields", () => {
   const row = questionToRow(source);
   const loaded = questionFromRow({
     ...row,
-    content: { ...(row.content as Record<string, unknown>), id: "q-forged", topicId: "queues", type: "multiple-choice", prompt: "Forged content prompt", difficulty: "stretch" },
+    content: {
+      ...(row.content as Record<string, unknown>),
+      id: "q-forged",
+      topicId: "queues",
+      type: "multiple-choice",
+      prompt: "Forged content prompt",
+      difficulty: "stretch",
+    },
     schema_version: 2,
     published: true,
   });
@@ -106,7 +134,13 @@ test("Supabase rows preserve legacy C content and load graph content", async () 
   const storedCode = questionToRow(code);
   const legacyContent = { ...(storedCode.content as Record<string, unknown>) };
   delete legacyContent.code;
-  const legacy = questionFromRow({ ...storedCode, prompt: "What line does this C fragment print? int a[3] = {2, 4, 6}; printf(\"%d\", a[1] + a[2]);", content: legacyContent, schema_version: 2, published: true });
+  const legacy = questionFromRow({
+    ...storedCode,
+    prompt: 'What line does this C fragment print? int a[3] = {2, 4, 6}; printf("%d", a[1] + a[2]);',
+    content: legacyContent,
+    schema_version: 2,
+    published: true,
+  });
   assert.equal(legacy.type, "code-output");
   assert.equal(legacy.code, code.code);
 
@@ -117,7 +151,10 @@ test("Supabase rows preserve legacy C content and load graph content", async () 
     eq: () => query,
     order: async () => ({ data: [row], error: null }),
   };
-  const repository = await loadQuestionRepository({ SUPABASE_URL: "https://example.supabase.co", SUPABASE_SECRET_KEY: "service-key" }, { from: () => query } as never);
+  const repository = await loadQuestionRepository(
+    { SUPABASE_URL: "https://example.supabase.co", SUPABASE_SECRET_KEY: "service-key" },
+    { from: () => query } as never,
+  );
   assert.deepEqual(repository.get(graph.id), graph);
 });
 

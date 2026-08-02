@@ -69,6 +69,15 @@ See [`DEPLOYMENT.md`](DEPLOYMENT.md) for platform-neutral static frontend/API bu
 
 ## Verification
 
+Run the repository-wide Prettier pass (dependency, build, and secret files are ignored) with:
+
+```bash
+prettier --write --ignore-unknown .
+prettier --check --ignore-unknown .
+```
+
+The SQL migrations are reviewed as SQL text because the repository's Prettier installation has no SQL parser.
+
 ```bash
 cd backend && npm run typecheck && npm test
 cd ../frontend && npm run lint && npm run build
