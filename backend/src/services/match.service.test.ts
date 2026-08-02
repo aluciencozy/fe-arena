@@ -7,6 +7,7 @@ import {
   disconnectSocket,
   joinRoom,
   reconnectRoom,
+  removeSeat,
 } from "./room.service.js";
 import {
   clearMatch,
@@ -626,6 +627,37 @@ test("leaving an active match records a forfeit", () => {
   leaveMatch(room.metadata.roomId, guest.seat.seatId, "forfeit", events());
   assert.equal(getMatchState(room.metadata.roomId)?.phase, "FORFEIT");
   assert.equal(getMatchState(room.metadata.roomId)?.winnerSeatId, room.seat.seatId);
+  clearMatchesForTests();
+  clearRoomsForTests();
+});
+
+test("terminal matches reject replacement guests", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
+  clearMatchesForTests();
+  clearRoomsForTests();
+  const oneRound = { ...config, roundCount: 1, questionTimerSeconds: 30 };
+  const room = createRoom("private", oneRound, "Host");
+  attachSeat(room.metadata.roomId, room.seat, "terminal-host");
+  const guest = joinRoom(room.metadata.roomId, "Guest", "terminal-guest");
+  assert.equal(guest.ok, true);
+  if (!guest.ok) return;
+  ensureMatch(room.metadata.roomId);
+  toggleReady(room.metadata.roomId, room.seat.seatId, events());
+  toggleReady(room.metadata.roomId, guest.seat.seatId, events());
+  t.mock.timers.tick(3_000);
+  const questionId = getMatchState(room.metadata.roomId)?.question?.id;
+  assert.ok(questionId);
+  assert.equal(
+    submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId: questionId!, answer: "private answer" }, events()).ok,
+    true,
+  );
+  leaveMatch(room.metadata.roomId, guest.seat.seatId, "forfeit", events());
+  assert.equal(removeSeat(room.metadata.roomId, guest.seat.seatId)?.remaining.length, 1);
+  const replacement = joinRoom(room.metadata.roomId, "Replacement", "replacement-guest");
+  assert.equal(replacement.ok, false);
+  if (!replacement.ok) assert.equal(replacement.error, "This match has ended and cannot accept replacement guests.");
+  assert.equal(getMatchState(room.metadata.roomId)?.phase, "FORFEIT");
+  assert.equal(getMatchState(room.metadata.roomId)?.submissions[room.seat.seatId]?.answer, "private answer");
   clearMatchesForTests();
   clearRoomsForTests();
 });

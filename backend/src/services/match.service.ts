@@ -25,7 +25,7 @@ import {
   selectSeededQuestions,
 } from "../../../shared/domain.js";
 import { questionRepository, publicQuestion, revealedQuestion } from "./question-bank.service.js";
-import { getMetadata, getSeats, type RoomMetadata } from "./room.service.js";
+import { closeRoomForNewGuests, getMetadata, getSeats, type RoomMetadata } from "./room.service.js";
 import { InMemoryMatchRepository } from "../persistence/in-memory-match.repository.js";
 import {
   PERSISTENCE_SCHEMA_VERSION,
@@ -401,6 +401,7 @@ const advanceOrFinish = (roomId: string, events: MatchEvents) => {
         ? compareScores(left, right).playerId
         : (left?.playerId ?? null);
     record.state.endReason = "completed";
+    closeRoomForNewGuests(roomId);
     persistTerminal(record);
     emit(record, events);
     return;
@@ -732,6 +733,7 @@ export const leaveMatch = (
   record.state.phase = reason === "forfeit" ? "FORFEIT" : reason === "expired" ? "EXPIRED" : "ABANDONED";
   record.state.winnerSeatId = winner;
   record.state.endReason = reason;
+  closeRoomForNewGuests(roomId);
   persistTerminal(record);
   record.state.pause = null;
   record.state.question = null;
