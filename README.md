@@ -25,7 +25,7 @@ Requirements: Node.js 20+ and npm.
 The frontend runs at `http://localhost:5173`; the backend runs at `http://localhost:3001`. Copy `.env.example` files when changing those defaults:
 
 - `frontend/.env.example`: `VITE_SOCKET_URL`, and optional `VITE_SUPABASE_URL` plus `VITE_SUPABASE_PUBLISHABLE_KEY` for Auth only
-- `backend/.env.example`: `PORT`, `FRONTEND_ORIGIN`, optional `SUPABASE_URL` plus `SUPABASE_SECRET_KEY` for server-side question-bank/loading and persistence, and optional `SUPABASE_PUBLISHABLE_KEY` for server-side Auth token verification
+- `backend/.env.example`: `NODE_ENV`, `PORT`, exact `FRONTEND_ORIGINS`, `TRUST_PROXY`, optional `SUPABASE_URL` plus `SUPABASE_SECRET_KEY` for server-side question-bank/loading and persistence, and optional `SUPABASE_PUBLISHABLE_KEY` for server-side Auth token verification
 
 ## Architecture
 
@@ -62,6 +62,10 @@ The bank covers:
 12. Algorithm analysis and representation
 
 Every item carries an answer, explanation, assumptions, and provenance. Content is validated at module load and in tests for schema shape, unique IDs, option/sequence/graph references, and complete type coverage. Apply the ordered migrations `supabase/migrations/202603080003_question_bank.sql` and `supabase/migrations/202603080004_question_bank_graph.sql` to create and extend the server-only table, then `cd backend && npm run seed:questions` idempotently upserts the reviewed bank when `SUPABASE_URL` and `SUPABASE_SECRET_KEY` are configured. The original 120-question reviewed bank remains intact, with five graph questions added to the current experience. Existing C rows without a stored code remain loadable through the compatibility mapper; new C rows always include curated code. Graph content is presentation-only: users cannot edit graphs or submit graph code. If either server-side question-bank variable is absent, local development and tests use the in-memory fallback. New content requires normal PR review plus validation. The public UCF index and supplied reference PDFs are provenance anchors for topic planning only: https://www.cs.ucf.edu/registration/exm/. They are not a license to copy, and FE Arena does not claim to match any future exam format.
+
+## Production preparation
+
+See [`DEPLOYMENT.md`](DEPLOYMENT.md) for platform-neutral static frontend/API build and start commands, production configuration validation, health/readiness checks, reverse-proxy/WebSocket requirements, and the explicit captain-owned hosting, TLS, Auth, secret, migration, and monitoring steps. No production deployment or credential configuration is performed by this repository workflow.
 
 ## Verification
 

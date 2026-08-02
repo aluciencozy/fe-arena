@@ -9,6 +9,7 @@ import { createRoom, attachSeat, bindSeatAuthIdentity, disconnectSocket, getMeta
 import { enqueue, dequeue, publicConfig, suspend } from "../services/queue.service.js";
 import { clearMatch, configureMatch, ensureMatch, getMatchState, leaveMatch, pauseForDisconnect, resumeAfterReconnect, skipReveal, submitAnswer, toggleReady, requestRematch } from "../services/match.service.js";
 import { soloNext, soloSubmit, startSolo } from "../services/solo.service.js";
+import { FixedWindowLimiter } from "../security.js";
 
 const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const chatTimes = new Map<string, number>();
@@ -75,6 +76,25 @@ const validateEmpty = (socket: Socket, schema: { safeParse: (value: unknown) => 
 };
 
 export const registerHandlers = (io: Server, socket: Socket, authVerifier: AuthVerifier) => {
+  const packetLimiter = new FixedWindowLimiter(120, 10_000);
+  const eventLimiters = new Map<string, FixedWindowLimiter>([
+    ["match:submit", new FixedWindowLimiter(12, 60_000)],
+    ["solo:submit", new FixedWindowLimiter(20, 60_000)],
+    ["chat:send", new FixedWindowLimiter(10, 10_000)],
+    ["room:create-private", new FixedWindowLimiter(10, 60_000)],
+    ["queue:join", new FixedWindowLimiter(10, 60_000)],
+  ]);
+  socket.use(([event], next) => {
+    const name = typeof event === "string" ? event : "unknown";
+    const decision = packetLimiter.check("packet");
+    const specific = eventLimiters.get(name)?.check("event");
+    if (!decision.allowed || specific && !specific.allowed) {
+      error(socket, "Too many requests. Please try again shortly.", "SOCKET_RATE_LIMIT");
+      next(new Error("SOCKET_RATE_LIMIT"));
+      return;
+    }
+    next();
+  });
   socket.on("auth:update", async (payload: unknown) => {
     const input = validate(socket, ClientEventSchemas["auth:update"], payload);
     if (!input) return;

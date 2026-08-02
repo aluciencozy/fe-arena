@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.ts",
   "scripts": {
+    "start": "tsx index.ts",
     "test": "tsx --test src/*.test.ts src/**/*.test.ts",
     "dev": "nodemon --exec tsx index.ts",
     "typecheck": "tsc --noEmit",
