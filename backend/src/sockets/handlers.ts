@@ -84,7 +84,7 @@ export const registerHandlers = (io: Server, socket: Socket, authVerifier: AuthV
     }
     socket.data.authUserId = authUserId;
     const current = session(socket);
-    if (current && authUserId) bindSeatAuthIdentity(current.roomId, current.seat.seatId, authUserId);
+    if (current) bindSeatAuthIdentity(current.roomId, current.seat.seatId, authUserId);
   });
 
   socket.on("room:create-private", (payload: unknown) => {

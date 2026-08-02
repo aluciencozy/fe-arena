@@ -46,10 +46,10 @@ export const getMetadata = (roomId: string) => getRoom(roomId)?.metadata;
 export const getSeats = (roomId: string) => getRoom(roomId)?.seats ?? [];
 export const getSeat = (roomId: string, seatId: string) => getRoom(roomId)?.seats.find((seat) => seat.seatId === seatId);
 export const bindSeatAuthIdentity = (roomId: string, seatId: string, authUserId: string | undefined) => {
-  if (!authUserId) return false;
   const seat = getSeat(roomId, seatId);
   if (!seat) return false;
-  seat.authUserId = authUserId;
+  if (authUserId) seat.authUserId = authUserId;
+  else delete seat.authUserId;
   return true;
 };
 export const getSeatForSocket = (socketId: string) => {
