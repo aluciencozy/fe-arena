@@ -107,12 +107,10 @@ begin
       insert into public.player_identities (guest_session_owner, chosen_username, auth_user_id, schema_version)
       values (v_player->>'guest_session_owner', v_player->>'chosen_username', nullif(v_player->>'auth_user_id', '')::uuid, (p_match->>'schema_version')::integer)
       returning id, auth_user_id into v_identity_id, v_auth_user_id;
-    elsif nullif(v_player->>'auth_user_id', '') is not null and v_auth_user_id is not null and v_auth_user_id <> (v_player->>'auth_user_id')::uuid then
-      raise exception 'A guest identity cannot be linked to a different account';
     else
       update public.player_identities
         set chosen_username = v_player->>'chosen_username',
-            auth_user_id = coalesce(v_auth_user_id, nullif(v_player->>'auth_user_id', '')::uuid),
+            auth_user_id = nullif(v_player->>'auth_user_id', '')::uuid,
             schema_version = (p_match->>'schema_version')::integer,
             updated_at = now()
         where id = v_identity_id;

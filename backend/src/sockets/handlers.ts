@@ -29,7 +29,7 @@ const makeEvents = (io: Server, roomId: string) => ({
 const error = (socket: Socket, message: string, code = "BAD_REQUEST") => socket.emit("server:error", output(ServerEventSchemas["server:error"], { code, message }));
 const bindVerifiedIdentity = (socket: Socket, roomId: string, seatId: string) => {
   const authUserId = (socket.data as { authUserId?: unknown }).authUserId;
-  if (typeof authUserId === "string") bindSeatAuthIdentity(roomId, seatId, authUserId);
+  bindSeatAuthIdentity(roomId, seatId, typeof authUserId === "string" ? authUserId : undefined);
 };
 const session = (socket: Socket) => {
   const seat = getSeatForSocket(socket.id);
