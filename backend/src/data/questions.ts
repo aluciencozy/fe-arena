@@ -1,3 +1,4 @@
+import { CODING_PROBLEMS } from "../../../shared/coding-problems.js";
 import { QuestionSchema, type Question } from "../../../shared/domain.js";
 
 /**
@@ -1641,7 +1642,23 @@ const additionalQuestions: Question[] = [
   }),
 ];
 
-QUESTION_BANK.push(...additionalQuestions);
+QUESTION_BANK.push(
+  ...additionalQuestions,
+  ...CODING_PROBLEMS.map((problem) => ({
+    id: `q-${problem.id}`,
+    topicId: "arrays-memory" as const,
+    type: "coding" as const,
+    difficulty: "core" as const,
+    prompt: problem.description,
+    explanation: "Run the complete function against the reviewed browser test harness.",
+    assumptions: [
+      "The locked signature and curated harness are unchanged.",
+      "Execution is local to the browser worker.",
+    ],
+    provenance,
+    problem,
+  })),
+);
 
 export const validateQuestionBank = (questions: readonly Question[] = QUESTION_BANK) => {
   const parsed = questions.map((question) => QuestionSchema.parse(question));
@@ -1651,6 +1668,8 @@ export const validateQuestionBank = (questions: readonly Question[] = QUESTION_B
     ids.add(question.id);
     if (question.type === "multiple-choice" && !question.options.some((option) => option.id === question.answer))
       throw new Error(`Invalid answer option: ${question.id}`);
+    if (question.type === "coding" && question.id !== `q-${question.problem.id}`)
+      throw new Error(`Coding question ID must match its problem ID: ${question.id}`);
     if (question.type === "ordered-sequence") {
       const itemIds = new Set(question.items.map((item) => item.id));
       if (itemIds.size !== question.items.length || question.answerOrder.some((id) => !itemIds.has(id)))

@@ -64,6 +64,7 @@ const answerFor = (question: Question): string | number | boolean | string[] => 
   if (question.type === "numeric") return question.answer;
   if (question.type === "short-answer") return question.answers[0]!;
   if (question.type === "code-output") return question.output;
+  if (question.type === "coding") return [];
   if (question.type === "ordered-sequence") return question.answerOrder;
   if (question.operation === "reachability") return question.reachable!;
   if (question.operation === "shortest-path") return question.distance!;
