@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { attachSeat, clearRoomsForTests, createRoom, joinRoom } from "./room.service.js";
-import { clearMatch, clearMatchesForTests, configureMatch, ensureMatch, getMatchState, leaveMatch, submitAnswer, toggleReady } from "./match.service.js";
+import { clearMatch, clearMatchesForTests, configureMatch, ensureMatch, getMatchState, leaveMatch, pauseForDisconnect, resumeAfterReconnect, skipReveal, submitAnswer, toggleReady } from "./match.service.js";
 import { QUESTION_BANK } from "../data/questions.js";
 import { inMemoryQuestionRepository, setQuestionRepository, type QuestionRepository } from "./question-bank.service.js";
 import { TOPICS, type MatchConfig, type Question } from "../../../shared/domain.js";
@@ -48,7 +48,7 @@ test("match transitions through question, reveal, and results with locked privat
   assert.equal(submittedState.submissions[room.seat.seatId]?.answer, null);
   assert.equal(submitAnswer(room.metadata.roomId, guest.seat.seatId, attempt, events()).ok, true);
   assert.equal(getMatchState(room.metadata.roomId)?.phase, "REVEAL");
-  t.mock.timers.tick(1_800);
+  t.mock.timers.tick(30_000);
   assert.equal(getMatchState(room.metadata.roomId)?.phase, "RESULTS");
   clearMatch(room.metadata.roomId); clearMatchesForTests(); clearRoomsForTests();
 });
@@ -81,8 +81,7 @@ test("graph and C submissions stay server-authoritative through the match lifecy
     assert.equal(submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId: graph.id, answer: graph.answerOrder! }, events()).ok, false);
     assert.equal(submitAnswer(room.metadata.roomId, guest.seat.seatId, { questionId: graph.id, answer: graph.answerOrder! }, events()).ok, true);
 
-    t.mock.timers.tick(1_800);
-    t.mock.timers.tick(1_800);
+    t.mock.timers.tick(30_000);
     t.mock.timers.tick(3_000);
     const second = getMatchState(room.metadata.roomId)?.question;
     assert.equal(second?.id, code.id);
@@ -97,6 +96,68 @@ test("graph and C submissions stay server-authoritative through the match lifecy
     setQuestionRepository(inMemoryQuestionRepository);
     clearMatchesForTests(); clearRoomsForTests();
   }
+});
+
+test("reveal lasts thirty seconds, supports one-sided review, and both skips advance", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
+  clearMatchesForTests(); clearRoomsForTests();
+  const oneRound = { ...config, roundCount: 1, questionTimerSeconds: 30 };
+  const room = createRoom("private", oneRound, "Host");
+  attachSeat(room.metadata.roomId, room.seat, "a");
+  const guest = joinRoom(room.metadata.roomId, "Guest", "b");
+  assert.equal(guest.ok, true);
+  if (!guest.ok) return;
+  ensureMatch(room.metadata.roomId);
+  toggleReady(room.metadata.roomId, room.seat.seatId, events());
+  toggleReady(room.metadata.roomId, guest.seat.seatId, events());
+  t.mock.timers.tick(3_000);
+  const questionId = getMatchState(room.metadata.roomId)?.question?.id;
+  assert.ok(questionId);
+  submitAnswer(room.metadata.roomId, room.metadata.hostSeatId, { questionId: questionId!, answer: "wrong" }, events());
+  submitAnswer(room.metadata.roomId, guest.seat.seatId, { questionId: questionId!, answer: "wrong" }, events());
+  const reveal = getMatchState(room.metadata.roomId)!;
+  assert.equal(reveal.phase, "REVEAL");
+  assert.equal(reveal.revealEndsAt, 34_000);
+  assert.equal(reveal.revealSkips[room.metadata.hostSeatId], false);
+  assert.equal(skipReveal(room.metadata.roomId, room.metadata.hostSeatId, events()).ok, true);
+  assert.equal(skipReveal(room.metadata.roomId, room.metadata.hostSeatId, events()).ok, false);
+  t.mock.timers.tick(29_999);
+  assert.equal(getMatchState(room.metadata.roomId)?.phase, "REVEAL");
+  assert.equal(skipReveal(room.metadata.roomId, guest.seat.seatId, events()).ok, true);
+  assert.equal(getMatchState(room.metadata.roomId)?.phase, "RESULTS");
+  clearMatchesForTests(); clearRoomsForTests();
+});
+
+test("reconnect pauses and resumes the reveal deadline without exposing answers early", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
+  clearMatchesForTests(); clearRoomsForTests();
+  const oneRound = { ...config, roundCount: 1, questionTimerSeconds: 30 };
+  const room = createRoom("private", oneRound, "Host");
+  attachSeat(room.metadata.roomId, room.seat, "a");
+  const guest = joinRoom(room.metadata.roomId, "Guest", "b");
+  assert.equal(guest.ok, true);
+  if (!guest.ok) return;
+  ensureMatch(room.metadata.roomId);
+  toggleReady(room.metadata.roomId, room.seat.seatId, events());
+  toggleReady(room.metadata.roomId, guest.seat.seatId, events());
+  t.mock.timers.tick(3_000);
+  const question = getMatchState(room.metadata.roomId)?.question;
+  assert.ok(question);
+  assert.equal("answer" in question!, false);
+  submitAnswer(room.metadata.roomId, room.seat.seatId, { questionId: question!.id, answer: "wrong" }, events());
+  submitAnswer(room.metadata.roomId, guest.seat.seatId, { questionId: question!.id, answer: "wrong" }, events());
+  const before = getMatchState(room.metadata.roomId)!;
+  t.mock.timers.tick(5_000);
+  assert.equal(pauseForDisconnect(room.metadata.roomId, guest.seat.seatId, events()), true);
+  assert.equal(getMatchState(room.metadata.roomId)?.phase, "PAUSED");
+  t.mock.timers.tick(5_000);
+  assert.equal(resumeAfterReconnect(room.metadata.roomId, events()), true);
+  assert.equal(getMatchState(room.metadata.roomId)?.revealEndsAt, before.revealEndsAt! + 5_000);
+  t.mock.timers.tick(24_999);
+  assert.equal(getMatchState(room.metadata.roomId)?.phase, "REVEAL");
+  t.mock.timers.tick(1);
+  assert.equal(getMatchState(room.metadata.roomId)?.phase, "RESULTS");
+  clearMatchesForTests(); clearRoomsForTests();
 });
 
 test("late submissions and cleared match timers cannot advance state", (t) => {

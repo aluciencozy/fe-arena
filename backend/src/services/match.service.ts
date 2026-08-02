@@ -6,6 +6,10 @@ import {
   DEFAULT_ROUND_COUNT,
   PAUSE_SECONDS,
   PUBLIC_QUESTION_SECONDS,
+  REVEAL_SECONDS,
+  TOPICS,
+  emptyTopicPerformance,
+  type TopicPerformance,
   type MatchConfig,
   type MatchPhase,
   type PublicQuestion,
@@ -42,10 +46,14 @@ export type MatchPublicState = {
   questionStartedAt: number | null;
   questionEndsAt: number | null;
   countdownEndsAt: number | null;
+  revealStartedAt: number | null;
+  revealEndsAt: number | null;
+  revealSkips: Record<string, boolean>;
   pause: { seatName: string; expiresAt: number } | null;
   ready: Record<string, boolean>;
   submissions: Record<string, SubmissionPublic>;
   scores: Record<string, { total: number; correct: number; responseMs: number }>;
+  topicSummary: Record<string, TopicPerformance>;
   winnerSeatId: string | null;
   endReason: "completed" | "forfeit" | "abandoned" | "expired" | null;
   history: RoundHistory[];
@@ -82,6 +90,8 @@ const namesById = (roomId: string) => Object.fromEntries(getSeats(roomId).map((s
 const makeScores = (roomId: string) => Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, { total: 0, correct: 0, responseMs: 0 }]));
 const makeReady = (roomId: string) => Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, false]));
 const makeSubmissions = (roomId: string) => Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, emptySubmission()]));
+const makeRevealSkips = (roomId: string) => Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, false]));
+const makeTopicSummary = (): Record<string, TopicPerformance> => Object.fromEntries(TOPICS.map((topic) => [topic.id, emptyTopicPerformance()]));
 
 const clearTimer = (record: MatchRecord) => {
   if (record.timer) clearTimeout(record.timer);
@@ -187,8 +197,9 @@ export const ensureMatch = (roomId: string, events?: MatchEvents) => {
   const questions = selectedQuestions.length === config.roundCount ? selectedQuestions : [];
   const state: MatchPublicState = {
     roomId, source: metadata.source, phase: "LOBBY", config, roundIndex: 0, totalRounds: config.roundCount,
-    question: null, revealedQuestion: null, questionStartedAt: null, questionEndsAt: null, countdownEndsAt: null, pause: null,
-    ready: makeReady(roomId), submissions: makeSubmissions(roomId), scores: makeScores(roomId), winnerSeatId: null, endReason: null, history: [],
+    question: null, revealedQuestion: null, questionStartedAt: null, questionEndsAt: null, countdownEndsAt: null,
+    revealStartedAt: null, revealEndsAt: null, revealSkips: makeRevealSkips(roomId), pause: null,
+    ready: makeReady(roomId), submissions: makeSubmissions(roomId), scores: makeScores(roomId), topicSummary: makeTopicSummary(), winnerSeatId: null, endReason: null, history: [],
   };
   const matchId = randomUUID();
   const record: MatchRecord = {
@@ -219,6 +230,9 @@ const startCountdown = (roomId: string, events: MatchEvents) => {
   record.state.countdownEndsAt = now + 3000;
   record.state.question = null;
   record.state.revealedQuestion = null;
+  record.state.revealStartedAt = null;
+  record.state.revealEndsAt = null;
+  record.state.revealSkips = makeRevealSkips(roomId);
   emit(record, events);
   record.timer = setTimeout(() => startQuestion(roomId, events), 3000);
 };
@@ -232,6 +246,9 @@ const startQuestion = (roomId: string, events: MatchEvents) => {
   record.state.countdownEndsAt = null;
   record.state.question = publicQuestion(question);
   record.state.revealedQuestion = null;
+  record.state.revealStartedAt = null;
+  record.state.revealEndsAt = null;
+  record.state.revealSkips = makeRevealSkips(roomId);
   record.state.questionStartedAt = now;
   record.state.questionEndsAt = now + record.state.config.questionTimerSeconds * 1000;
   record.state.submissions = makeSubmissions(roomId);
@@ -249,6 +266,9 @@ const advanceOrFinish = (roomId: string, events: MatchEvents) => {
     record.state.questionStartedAt = null;
     record.state.questionEndsAt = null;
     record.state.countdownEndsAt = null;
+    record.state.revealStartedAt = null;
+    record.state.revealEndsAt = null;
+    record.state.revealSkips = makeRevealSkips(roomId);
     const scores = Object.entries(record.state.scores).map(([playerId, score]) => ({ playerId, playerName: namesById(roomId)[playerId] ?? playerId, ...score }));
     const [left, right] = scores;
     const exactTie = Boolean(left && right && left.total === right.total && left.correct === right.correct && left.responseMs === right.responseMs);
@@ -259,14 +279,8 @@ const advanceOrFinish = (roomId: string, events: MatchEvents) => {
     return;
   }
   record.state.roundIndex += 1;
-  record.state.phase = "REVEAL";
-  record.state.question = null;
-  record.state.questionStartedAt = null;
-  record.state.questionEndsAt = null;
-  record.state.countdownEndsAt = null;
-  record.state.revealedQuestion = record.state.history.at(-1)?.question ?? null;
-  emit(record, events);
-  record.timer = setTimeout(() => startCountdown(roomId, events), 1800);
+  record.state.revealedQuestion = null;
+  startCountdown(roomId, events);
 };
 
 const revealRound = (roomId: string, events: MatchEvents) => {
@@ -281,12 +295,39 @@ const revealRound = (roomId: string, events: MatchEvents) => {
   record.state.questionStartedAt = null;
   record.state.questionEndsAt = null;
   record.state.countdownEndsAt = null;
+  const now = Date.now();
+  record.state.revealStartedAt = now;
+  record.state.revealEndsAt = now + REVEAL_SECONDS * 1000;
+  record.state.revealSkips = makeRevealSkips(roomId);
   record.state.history.push({ round: record.state.roundIndex + 1, question: revealed, submissions: structuredClone(record.state.submissions) });
+  const summary = record.state.topicSummary[question.topicId] ?? emptyTopicPerformance();
+  const attempts = Object.values(record.state.submissions);
+  const attempted = attempts.filter((submission) => submission.submitted).length;
+  const correct = attempts.filter((submission) => submission.correct === true).length;
+  const score = attempts.reduce((total, submission) => total + (submission.score?.total ?? 0), 0);
+  const responseMs = Object.values(record.roundResponseMs[record.state.roundIndex] ?? {}).reduce((total, value) => total + value, 0);
+  const totalAttempted = summary.attempted + attempted;
+  record.state.topicSummary[question.topicId] = { attempted: totalAttempted, correct: summary.correct + correct, incorrect: summary.incorrect + attempted - correct, accuracy: totalAttempted ? (summary.correct + correct) / totalAttempted : 0, score: summary.score + score, responseMs: summary.responseMs + responseMs };
   emit(record, events);
-  record.timer = setTimeout(() => advanceOrFinish(roomId, events), 1800);
+  record.timer = setTimeout(() => advanceOrFinish(roomId, events), REVEAL_SECONDS * 1000);
 };
 
 const allSubmitted = (record: MatchRecord) => seatIds(record.state.roomId).length === 2 && Object.values(record.state.submissions).every((submission) => submission.submitted);
+
+export const skipReveal = (roomId: string, seatId: string, events: MatchEvents) => {
+  const record = matches.get(roomId);
+  if (!record || record.state.phase !== "REVEAL") return { ok: false as const, error: "Reveal is not active." };
+  if ((record.state.revealEndsAt ?? 0) <= Date.now()) {
+    advanceOrFinish(roomId, events);
+    return { ok: false as const, error: "Reveal has ended." };
+  }
+  if (!seatIds(roomId).includes(seatId)) return { ok: false as const, error: "You are not seated in this match." };
+  if (record.state.revealSkips[seatId]) return { ok: false as const, error: "You already skipped this reveal." };
+  record.state.revealSkips[seatId] = true;
+  if (seatIds(roomId).length === 2 && seatIds(roomId).every((id) => record.state.revealSkips[id])) advanceOrFinish(roomId, events);
+  else emit(record, events);
+  return { ok: true as const };
+};
 
 export const configureMatch = (roomId: string, seatId: string, config: MatchConfig, events: MatchEvents) => {
   const record = matches.get(roomId) ?? (ensureMatch(roomId) && matches.get(roomId));
@@ -317,6 +358,8 @@ export const toggleReady = (roomId: string, seatId: string, events: MatchEvents)
     record.state.roundIndex = 0;
     record.state.history = [];
     record.state.scores = makeScores(roomId);
+    record.state.topicSummary = makeTopicSummary();
+    record.state.revealSkips = makeRevealSkips(roomId);
     record.roundResponseMs = {};
     record.terminalPersistence = "idle";
     record.state.winnerSeatId = null;
@@ -365,6 +408,10 @@ export const requestRematch = (roomId: string, seatId: string, events: MatchEven
   record.state.ready = makeReady(roomId);
   record.state.question = null;
   record.state.revealedQuestion = null;
+  record.state.revealStartedAt = null;
+  record.state.revealEndsAt = null;
+  record.state.revealSkips = makeRevealSkips(roomId);
+  record.state.topicSummary = makeTopicSummary();
   record.state.winnerSeatId = null;
   record.state.endReason = null;
   emit(record, events);
@@ -386,6 +433,9 @@ export const leaveMatch = (roomId: string, leavingSeatId: string, reason: "forfe
   record.state.questionStartedAt = null;
   record.state.questionEndsAt = null;
   record.state.countdownEndsAt = null;
+  record.state.revealStartedAt = null;
+  record.state.revealEndsAt = null;
+  record.state.revealSkips = makeRevealSkips(roomId);
   emit(record, events);
   events.message(winner ? `${winner === leavingSeatId ? "A guest" : "Your opponent"} left; the match is over.` : "The match ended because the room was abandoned.");
 };
@@ -412,9 +462,12 @@ export const resumeAfterReconnect = (roomId: string, events: MatchEvents) => {
   if (record.state.questionStartedAt !== null) record.state.questionStartedAt += pausedMs;
   if (record.state.questionEndsAt !== null) record.state.questionEndsAt += pausedMs;
   if (record.state.countdownEndsAt !== null) record.state.countdownEndsAt += pausedMs;
+  if (record.state.revealStartedAt !== null) record.state.revealStartedAt += pausedMs;
+  if (record.state.revealEndsAt !== null) record.state.revealEndsAt += pausedMs;
   record.state.phase = record.pausedFrom;
   record.state.pause = null;
-  const remaining = record.state.phase === "COUNTDOWN" ? (record.state.countdownEndsAt ?? Date.now()) - Date.now() : (record.state.questionEndsAt ?? Date.now()) - Date.now();
+  const deadline = record.state.phase === "COUNTDOWN" ? record.state.countdownEndsAt : record.state.phase === "QUESTION" ? record.state.questionEndsAt : record.state.revealEndsAt;
+  const remaining = (deadline ?? Date.now()) - Date.now();
   record.pausedFrom = null;
   record.pausedAt = null;
   const action = record.state.phase === "COUNTDOWN" ? () => startQuestion(roomId, events) : record.state.phase === "QUESTION" ? () => revealRound(roomId, events) : () => advanceOrFinish(roomId, events);

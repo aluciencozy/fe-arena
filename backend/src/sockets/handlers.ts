@@ -6,7 +6,7 @@ import {
 } from "../../../shared/domain.js";
 import { createRoom, attachSeat, disconnectSocket, getMetadata, getRoomForSocket, getSeatForSocket, getSeats, joinRoom, reconnectRoom, removeSeat } from "../services/room.service.js";
 import { enqueue, dequeue, publicConfig } from "../services/queue.service.js";
-import { clearMatch, configureMatch, ensureMatch, getMatchState, leaveMatch, pauseForDisconnect, resumeAfterReconnect, submitAnswer, toggleReady, requestRematch } from "../services/match.service.js";
+import { clearMatch, configureMatch, ensureMatch, getMatchState, leaveMatch, pauseForDisconnect, resumeAfterReconnect, skipReveal, submitAnswer, toggleReady, requestRematch } from "../services/match.service.js";
 import { soloNext, soloSubmit, startSolo } from "../services/solo.service.js";
 
 const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -155,6 +155,13 @@ export const registerHandlers = (io: Server, socket: Socket) => {
     const result = submitAnswer(current.roomId, current.seat.seatId, input, makeEvents(io, current.roomId));
     if (!result.ok) error(socket, result.error, "SUBMISSION_ERROR");
     else socket.emit("match:submission-ack", output(ServerEventSchemas["match:submission-ack"], { correct: result.correct, score: result.score }));
+  });
+  socket.on("match:reveal-skip", (payload?: unknown) => {
+    if (!validateEmpty(socket, ClientEventSchemas["match:reveal-skip"], payload)) return;
+    const current = session(socket);
+    if (!current) return error(socket, "Join a room first.", "NOT_SEATED");
+    const result = skipReveal(current.roomId, current.seat.seatId, makeEvents(io, current.roomId));
+    if (!result.ok) error(socket, result.error, "REVEAL_SKIP_ERROR");
   });
   socket.on("match:rematch", (payload?: unknown) => {
     if (!validateEmpty(socket, ClientEventSchemas["match:rematch"], payload)) return;

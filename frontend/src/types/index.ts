@@ -1,5 +1,5 @@
-import type { MatchConfig, MatchPhase, MatchSource, PublicQuestion, QuestionAttempt, QuestionType, RevealedQuestion, ScoreBreakdown, TopicId } from "../../../shared/domain";
-export type { MatchConfig, MatchPhase, MatchSource, PublicQuestion, QuestionAttempt, QuestionType, RevealedQuestion, ScoreBreakdown, TopicId };
+import type { MatchConfig, MatchPhase, MatchSource, PublicQuestion, QuestionAttempt, QuestionType, RevealedQuestion, ScoreBreakdown, TopicId, TopicPerformance } from "../../../shared/domain";
+export type { MatchConfig, MatchPhase, MatchSource, PublicQuestion, QuestionAttempt, QuestionType, RevealedQuestion, ScoreBreakdown, TopicId, TopicPerformance };
 export type { TOPICS } from "../../../shared/domain";
 
 export type RoomMetadata = { roomId: string; source: MatchSource; hostSeatId: string; config: MatchConfig };
@@ -10,8 +10,8 @@ export type RoundHistory = { round: number; question: RevealedQuestion; submissi
 export type MatchPublicState = {
   roomId: string; source: MatchSource; phase: MatchPhase; config: MatchConfig; roundIndex: number; totalRounds: number;
   question: PublicQuestion | null; revealedQuestion: RevealedQuestion | null; questionStartedAt: number | null; questionEndsAt: number | null;
-  countdownEndsAt: number | null; pause: { seatName: string; expiresAt: number } | null; ready: Record<string, boolean>;
+  countdownEndsAt: number | null; revealStartedAt: number | null; revealEndsAt: number | null; revealSkips: Record<string, boolean>; pause: { seatName: string; expiresAt: number } | null; ready: Record<string, boolean>;
   submissions: Record<string, SubmissionPublic>; scores: Record<string, { total: number; correct: number; responseMs: number }>;
-  winnerSeatId: string | null; endReason: "completed" | "forfeit" | "abandoned" | "expired" | null; history: RoundHistory[];
+  topicSummary: Record<string, TopicPerformance>; winnerSeatId: string | null; endReason: "completed" | "forfeit" | "abandoned" | "expired" | null; history: RoundHistory[];
 };
 export type ChatMessage = { type: "system" | "user"; sender: string; text: string; sentAt: number; id: string };
