@@ -149,6 +149,11 @@ const publicSnapshot = (state: MatchPublicState): MatchPublicState => {
       submission.score = null;
       submission.answer = null;
     }
+    for (const progress of Object.values(safeState.codingProgress)) {
+      progress.passed = null;
+      progress.tests = [];
+      progress.outcome = null;
+    }
     for (const playerId of Object.keys(safeState.scores))
       safeState.scores[playerId] = { total: 0, correct: 0, responseMs: 0 };
   }
@@ -173,10 +178,16 @@ const selectFreshQuestions = (seed: string, config: MatchConfig, previousIds: re
     );
   const fresh = eligible.filter((question) => !previousIds.includes(question.id));
   if (fresh.length >= config.roundCount) {
-    const selected = selectSeededQuestions(fresh, seed, config.roundCount, config.topicIds, includeCoding);
+    const selected = selectSeededQuestions(
+      fresh,
+      seed,
+      config.roundCount,
+      config.topicIds,
+      includeCoding && fresh.some((question) => question.type === "coding"),
+    );
     if (selected.length === config.roundCount) return selected;
   }
-  return questionRepository.select(seed, config.roundCount, config.topicIds, includeCoding);
+  return [];
 };
 const guestSessionOwner = (reconnectToken: string) => createHash("sha256").update(reconnectToken).digest("hex");
 const terminalSnapshot = (record: MatchRecord): TerminalMatchSnapshot | undefined => {
