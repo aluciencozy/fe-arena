@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   calculateScore,
   compareScores,
+  CODING_QUESTION_SECONDS,
   gradeQuestion,
   DEFAULT_ROUND_COUNT,
   PAUSE_SECONDS,
@@ -16,6 +17,8 @@ import {
   type QuestionAttempt,
   type RevealedQuestion,
   type ScoreBreakdown,
+  type CodingProgress,
+  type CodingRunResult,
 } from "../../../shared/domain.js";
 import { questionRepository, publicQuestion, revealedQuestion } from "./question-bank.service.js";
 import { getMetadata, getSeats, type RoomMetadata } from "./room.service.js";
@@ -51,6 +54,8 @@ export type MatchPublicState = {
   revealSkips: Record<string, boolean>;
   pause: { seatName: string; expiresAt: number } | null;
   ready: Record<string, boolean>;
+  codingReady: Record<string, boolean>;
+  codingProgress: Record<string, CodingProgress>;
   submissions: Record<string, SubmissionPublic>;
   scores: Record<string, { total: number; correct: number; responseMs: number }>;
   topicSummary: Record<string, TopicPerformance>;
@@ -90,6 +95,13 @@ const namesById = (roomId: string) => Object.fromEntries(getSeats(roomId).map((s
 const makeScores = (roomId: string) =>
   Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, { total: 0, correct: 0, responseMs: 0 }]));
 const makeReady = (roomId: string) => Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, false]));
+const makeCodingProgress = (roomId: string): Record<string, CodingProgress> =>
+  Object.fromEntries(
+    getSeats(roomId).map((seat) => [
+      seat.seatId,
+      { status: "idle", completedAt: null, passed: null, tests: [], outcome: null },
+    ]),
+  );
 const makeSubmissions = (roomId: string) =>
   Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, emptySubmission()]));
 const makeRevealSkips = (roomId: string) => Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, false]));
@@ -104,8 +116,12 @@ const syncSeats = (record: MatchRecord) => {
   const ids = new Set(seatIds(record.state.roomId));
   for (const id of Object.keys(record.state.ready)) if (!ids.has(id)) delete record.state.ready[id];
   for (const id of Object.keys(record.state.scores)) if (!ids.has(id)) delete record.state.scores[id];
+  for (const id of Object.keys(record.state.codingReady)) if (!ids.has(id)) delete record.state.codingReady[id];
+  for (const id of Object.keys(record.state.codingProgress)) if (!ids.has(id)) delete record.state.codingProgress[id];
   for (const id of Object.keys(record.state.submissions)) if (!ids.has(id)) delete record.state.submissions[id];
   for (const id of ids) {
+    record.state.codingReady[id] ??= false;
+    record.state.codingProgress[id] ??= { status: "idle", completedAt: null, passed: null, tests: [], outcome: null };
     record.state.ready[id] ??= false;
     record.state.scores[id] ??= { total: 0, correct: 0, responseMs: 0 };
     record.state.submissions[id] ??= emptySubmission();
@@ -214,6 +230,7 @@ export const ensureMatch = (roomId: string, events?: MatchEvents) => {
     `${roomId}:${metadata.hostSeatId}`,
     config.roundCount,
     config.topicIds,
+    config.includeCoding === true,
   );
   const questions = selectedQuestions.length === config.roundCount ? selectedQuestions : [];
   const state: MatchPublicState = {
@@ -233,6 +250,8 @@ export const ensureMatch = (roomId: string, events?: MatchEvents) => {
     revealSkips: makeRevealSkips(roomId),
     pause: null,
     ready: makeReady(roomId),
+    codingReady: makeReady(roomId),
+    codingProgress: makeCodingProgress(roomId),
     submissions: makeSubmissions(roomId),
     scores: makeScores(roomId),
     topicSummary: makeTopicSummary(),
@@ -260,6 +279,14 @@ export const ensureMatch = (roomId: string, events?: MatchEvents) => {
 };
 
 const questionFor = (record: MatchRecord) => questionRepository.get(record.questionIds[record.state.roundIndex] ?? "");
+const questionTimerSeconds = (record: MatchRecord, question: NonNullable<ReturnType<typeof questionFor>>) =>
+  question.type === "coding" ? CODING_QUESTION_SECONDS : record.state.config.questionTimerSeconds;
+const hasCodingRounds = (record: MatchRecord) =>
+  record.questionIds.some((id) => questionRepository.get(id)?.type === "coding");
+const allCodingReady = (record: MatchRecord) =>
+  !hasCodingRounds(record) ||
+  (seatIds(record.state.roomId).length === 2 &&
+    seatIds(record.state.roomId).every((id) => record.state.codingReady[id]));
 const startCountdown = (roomId: string, events: MatchEvents) => {
   const record = matches.get(roomId);
   if (!record) return;
@@ -279,6 +306,10 @@ const startQuestion = (roomId: string, events: MatchEvents) => {
   const record = matches.get(roomId);
   const question = record && questionFor(record);
   if (!record || !question || record.state.phase !== "COUNTDOWN") return;
+  if (question.type === "coding" && !allCodingReady(record)) {
+    emit(record, events);
+    return;
+  }
   clearTimer(record);
   const now = Date.now();
   record.state.phase = "QUESTION";
@@ -289,10 +320,11 @@ const startQuestion = (roomId: string, events: MatchEvents) => {
   record.state.revealEndsAt = null;
   record.state.revealSkips = makeRevealSkips(roomId);
   record.state.questionStartedAt = now;
-  record.state.questionEndsAt = now + record.state.config.questionTimerSeconds * 1000;
+  record.state.questionEndsAt = now + questionTimerSeconds(record, question) * 1000;
   record.state.submissions = makeSubmissions(roomId);
+  record.state.codingProgress = makeCodingProgress(roomId);
   emit(record, events);
-  record.timer = setTimeout(() => revealRound(roomId, events), record.state.config.questionTimerSeconds * 1000);
+  record.timer = setTimeout(() => revealRound(roomId, events), questionTimerSeconds(record, question) * 1000);
 };
 
 const advanceOrFinish = (roomId: string, events: MatchEvents) => {
@@ -420,6 +452,7 @@ export const configureMatch = (roomId: string, seatId: string, config: MatchConf
     `${record.seed}:${JSON.stringify(config)}`,
     config.roundCount,
     config.topicIds,
+    config.includeCoding === true,
   );
   if (questions.length !== config.roundCount)
     return { ok: false as const, error: "There are not enough reviewed questions for that topic selection." };
@@ -428,6 +461,8 @@ export const configureMatch = (roomId: string, seatId: string, config: MatchConf
   record.questionIds = questions.map((question) => question.id);
   record.state.totalRounds = config.roundCount;
   record.state.ready = makeReady(roomId);
+  record.state.codingReady = makeReady(roomId);
+  record.state.codingProgress = makeCodingProgress(roomId);
   emit(record, events);
   return { ok: true as const, state: record.state };
 };
@@ -445,9 +480,10 @@ export const toggleReady = (roomId: string, seatId: string, events: MatchEvents)
   if (getSeats(roomId).length !== 2) return { ok: false as const, error: "Waiting for a second guest." };
   if (record.questionIds.length !== record.state.config.roundCount)
     return { ok: false as const, error: "There are not enough reviewed questions for this match." };
+  if (!seatIds(roomId).includes(seatId)) return { ok: false as const, error: "You are not seated in this match." };
   record.state.ready[seatId] = !record.state.ready[seatId];
   record.state.phase = "READY";
-  if (seatIds(roomId).every((id) => record.state.ready[id])) {
+  if (seatIds(roomId).every((id) => record.state.ready[id]) && allCodingReady(record)) {
     record.state.roundIndex = 0;
     record.state.history = [];
     record.state.scores = makeScores(roomId);
@@ -457,9 +493,80 @@ export const toggleReady = (roomId: string, seatId: string, events: MatchEvents)
     record.terminalPersistence = "idle";
     record.state.winnerSeatId = null;
     record.state.endReason = null;
+    record.state.codingProgress = makeCodingProgress(roomId);
     startCountdown(roomId, events);
   } else emit(record, events);
   return { ok: true as const, state: record.state };
+};
+
+export const markCodingReady = (roomId: string, seatId: string, events: MatchEvents) => {
+  const record = matches.get(roomId) ?? (ensureMatch(roomId) && matches.get(roomId));
+  if (!record || !hasCodingRounds(record)) return { ok: false as const, error: "This match has no coding rounds." };
+  if (!seatIds(roomId).includes(seatId)) return { ok: false as const, error: "You are not seated in this match." };
+  if (!["LOBBY", "SETUP", "READY"].includes(record.state.phase))
+    return { ok: false as const, error: "Coding readiness must be reported before the match starts." };
+  record.state.codingReady[seatId] = true;
+  if (seatIds(roomId).every((id) => record.state.ready[id]) && allCodingReady(record)) startCountdown(roomId, events);
+  else emit(record, events);
+  return { ok: true as const, state: record.state };
+};
+
+export const submitCodingProgress = (
+  roomId: string,
+  seatId: string,
+  status: "compiling" | "running",
+  events: MatchEvents,
+) => {
+  const record = matches.get(roomId);
+  const question = record && questionFor(record);
+  if (!record || !question || question.type !== "coding" || record.state.phase !== "QUESTION")
+    return { ok: false as const, error: "Coding progress is not accepted right now." };
+  if (!seatIds(roomId).includes(seatId)) return { ok: false as const, error: "You are not seated in this match." };
+  const progress = record.state.codingProgress[seatId];
+  if (!progress || progress.status === "complete") return { ok: false as const, error: "Coding is already complete." };
+  progress.status = status;
+  emit(record, events);
+  return { ok: true as const };
+};
+
+export const submitCodingResult = (roomId: string, seatId: string, result: CodingRunResult, events: MatchEvents) => {
+  const record = matches.get(roomId);
+  const question = record && questionFor(record);
+  if (!record || !question || question.type !== "coding" || record.state.phase !== "QUESTION")
+    return { ok: false as const, error: "Coding results are not accepted right now." };
+  if (!seatIds(roomId).includes(seatId)) return { ok: false as const, error: "You are not seated in this match." };
+  if (record.state.questionEndsAt !== null && record.state.questionEndsAt <= Date.now()) {
+    revealRound(roomId, events);
+    return { ok: false as const, error: "Question time has expired." };
+  }
+  if (result.questionId !== question.id)
+    return { ok: false as const, error: "That coding question is no longer active." };
+  const progress = record.state.codingProgress[seatId];
+  const submission = record.state.submissions[seatId];
+  if (!progress || !submission || progress.status === "complete" || submission.submitted)
+    return { ok: false as const, error: "Your coding result is already locked." };
+  const elapsedMs = Math.max(0, Date.now() - (record.state.questionStartedAt ?? Date.now()));
+  const score = calculateScore(result.passed, elapsedMs, questionTimerSeconds(record, question) * 1000);
+  progress.status = "complete";
+  progress.completedAt = Date.now();
+  progress.passed = result.passed;
+  progress.tests = result.tests;
+  progress.outcome = result.outcome;
+  submission.submitted = true;
+  submission.correct = result.passed;
+  submission.score = score;
+  const current = record.state.scores[seatId] ?? { total: 0, correct: 0, responseMs: 0 };
+  record.state.scores[seatId] = {
+    total: current.total + score.total,
+    correct: current.correct + (result.passed ? 1 : 0),
+    responseMs: current.responseMs + elapsedMs,
+  };
+  const roundTiming = record.roundResponseMs[record.state.roundIndex] ?? {};
+  roundTiming[seatId] = elapsedMs;
+  record.roundResponseMs[record.state.roundIndex] = roundTiming;
+  emit(record, events);
+  if (result.passed || allSubmitted(record)) revealRound(roomId, events);
+  return { ok: true as const, score };
 };
 
 export const submitAnswer = (roomId: string, seatId: string, attempt: QuestionAttempt, events: MatchEvents) => {
@@ -510,6 +617,8 @@ export const requestRematch = (roomId: string, seatId: string, events: MatchEven
   record.roundResponseMs = {};
   record.terminalPersistence = "idle";
   record.state.ready = makeReady(roomId);
+  record.state.codingReady = makeReady(roomId);
+  record.state.codingProgress = makeCodingProgress(roomId);
   record.state.question = null;
   record.state.revealedQuestion = null;
   record.state.revealStartedAt = null;

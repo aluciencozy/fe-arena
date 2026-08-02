@@ -5,21 +5,31 @@ export type CExecutionOutcome =
   | { kind: "success"; stdout: string; stderr: string; tests: CTestResult[]; passed: boolean }
   | { kind: "compile-error"; stdout: string; stderr: string; tests: CTestResult[] }
   | { kind: "runtime-error"; stdout: string; stderr: string; tests: CTestResult[]; exitCode?: number }
-  | { kind: "timeout"; phase: "initialization" | "execution"; stdout: string; stderr: string; tests: CTestResult[] };
+  | {
+      kind: "timeout";
+      phase: "initialization" | "compilation" | "execution";
+      stdout: string;
+      stderr: string;
+      tests: CTestResult[];
+    };
 
 type WorkerMessage = {
-  kind: "ready" | "success" | "compile-error" | "runtime-error";
+  kind: "ready" | "compiled" | "success" | "compile-error" | "runtime-error";
   stdout?: string;
   stderr?: string;
   exitCode?: number;
 };
+type WorkerRequest = { kind?: "initialize"; source: string };
 type WorkerLike = {
-  postMessage: (message: { source: string }) => void;
+  postMessage: (message: WorkerRequest) => void;
   terminate: () => void;
   onmessage: ((event: MessageEvent<WorkerMessage>) => void) | null;
   onerror: ((event: ErrorEvent) => void) | null;
 };
 type WorkerFactory = () => WorkerLike;
+
+let prewarmedWorker: WorkerLike | undefined;
+let prewarmPromise: Promise<void> | undefined;
 
 export const generateCSource = (problem: CodingProblem, studentCode: string): string =>
   `${problem.prefix}\n${problem.functionSignature};\n${problem.testHarness}\n${problem.functionSignature} {\n${studentCode}\n}\n`;
@@ -44,109 +54,206 @@ export const parseExecutionOutput = (stdout: string, stderr: string, exitCode: n
 
 const defaultWorkerFactory: WorkerFactory = () =>
   new Worker(new URL("../workers/c-runner.worker.ts", import.meta.url), { type: "module" });
+const EXECUTION_TIMEOUT_MS = 30_000;
+
+const initializationFailure = (error: unknown): CExecutionOutcome => {
+  const stderr = error instanceof Error ? error.message : "The browser compiler worker could not initialize.";
+  if (stderr === "The browser compiler worker did not initialize within the startup limit.")
+    return { kind: "timeout", phase: "initialization", stdout: "", stderr, tests: [] };
+  return { kind: "runtime-error", stdout: "", stderr, tests: [] };
+};
+
+const initializeWorker = (worker: WorkerLike, timeoutMs: number) =>
+  new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const timer = globalThis.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      worker.terminate();
+      reject(new Error("The browser compiler worker did not initialize within the startup limit."));
+    }, timeoutMs);
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      globalThis.clearTimeout(timer);
+      if (error) {
+        worker.terminate();
+        reject(error);
+      } else resolve();
+    };
+    worker.onmessage = ({ data }) => {
+      if (data.kind === "ready") finish();
+      if (data.kind === "compile-error" || data.kind === "runtime-error")
+        finish(new Error(data.stderr || "The browser compiler worker failed during startup."));
+    };
+    worker.onerror = (event) => finish(new Error(event.message || "The browser compiler worker failed."));
+    try {
+      worker.postMessage({ kind: "initialize", source: "" });
+    } catch (error) {
+      finish(error instanceof Error ? error : new Error("The browser compiler worker could not start."));
+    }
+  });
+
+export const prewarmCWorker = (
+  options: { initializationTimeoutMs?: number; createWorker?: WorkerFactory } = {},
+): Promise<void> => {
+  if (prewarmedWorker) return Promise.resolve();
+  if (prewarmPromise) return prewarmPromise;
+  const workerFactory = options.createWorker ?? defaultWorkerFactory;
+  let worker: WorkerLike;
+  try {
+    worker = workerFactory();
+  } catch (error) {
+    return Promise.reject(error instanceof Error ? error : new Error("The browser compiler worker could not start."));
+  }
+  prewarmPromise = initializeWorker(worker, options.initializationTimeoutMs ?? 30_000).then(
+    () => {
+      prewarmedWorker = worker;
+    },
+    (error) => {
+      prewarmPromise = undefined;
+      throw error;
+    },
+  );
+  return prewarmPromise;
+};
 
 export const runCInWorker = (
   problem: CodingProblem,
   studentCode: string,
   options: { timeoutMs?: number; initializationTimeoutMs?: number; createWorker?: WorkerFactory } = {},
 ): Promise<CExecutionOutcome> => {
-  const executionTimeoutMs = options.timeoutMs ?? 2_500;
+  const executionTimeoutMs = options.timeoutMs ?? EXECUTION_TIMEOUT_MS;
   const initializationTimeoutMs = options.initializationTimeoutMs ?? 30_000;
   const source = generateCSource(problem, studentCode);
-  return new Promise((resolve) => {
-    let worker: WorkerLike;
-    try {
-      worker = (options.createWorker ?? defaultWorkerFactory)();
-    } catch (error) {
-      resolve({
-        kind: "runtime-error",
-        stdout: "",
-        stderr: error instanceof Error ? error.message : "The browser compiler worker could not start.",
-        tests: [],
-      });
-      return;
-    }
-    let settled = false;
-    let executionTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
-    const clearTimers = () => {
-      if (initializationTimer !== undefined) globalThis.clearTimeout(initializationTimer);
-      if (executionTimer !== undefined) globalThis.clearTimeout(executionTimer);
-    };
-    const finish = (outcome: CExecutionOutcome) => {
-      if (settled) return;
-      settled = true;
-      clearTimers();
-      try {
-        worker.terminate();
-      } catch (error) {
-        void error;
-      }
-      resolve(outcome);
-    };
-    const initializationTimer = globalThis.setTimeout(
-      () =>
-        finish({
-          kind: "timeout",
-          phase: "initialization",
-          stdout: "",
-          stderr: "The browser compiler worker did not initialize within the startup limit.",
-          tests: [],
-        }),
-      initializationTimeoutMs,
-    );
-    const complete = (outcome: CExecutionOutcome) => finish(outcome);
-    const startExecutionTimer = () => {
-      if (settled || executionTimer !== undefined) return;
-      executionTimer = globalThis.setTimeout(
+  const execute = (worker: WorkerLike) =>
+    new Promise<CExecutionOutcome>((resolve) => {
+      let settled = false;
+      let compilationTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
+      let executionTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
+      const clearTimers = () => {
+        if (initializationTimer !== undefined) globalThis.clearTimeout(initializationTimer);
+        if (compilationTimer !== undefined) globalThis.clearTimeout(compilationTimer);
+        if (executionTimer !== undefined) globalThis.clearTimeout(executionTimer);
+      };
+      const finish = (outcome: CExecutionOutcome) => {
+        if (settled) return;
+        settled = true;
+        clearTimers();
+        try {
+          worker.terminate();
+        } catch (error) {
+          void error;
+        }
+        if (!options.createWorker) void prewarmCWorker({ initializationTimeoutMs }).catch(() => undefined);
+        resolve(outcome);
+      };
+      const initializationTimer = globalThis.setTimeout(
         () =>
           finish({
             kind: "timeout",
-            phase: "execution",
+            phase: "initialization",
             stdout: "",
-            stderr: "Execution exceeded the 2.5 second safety limit.",
+            stderr: "The browser compiler worker did not initialize within the startup limit.",
             tests: [],
           }),
-        executionTimeoutMs,
+        initializationTimeoutMs,
       );
-    };
-    worker.onmessage = ({ data }) => {
-      if (data.kind === "ready") {
-        if (initializationTimer !== undefined) globalThis.clearTimeout(initializationTimer);
-        startExecutionTimer();
-        return;
-      }
-      if (data.kind === "compile-error") {
-        complete({ kind: "compile-error", stdout: data.stdout ?? "", stderr: data.stderr ?? "", tests: [] });
-        return;
-      }
-      if (data.kind === "runtime-error") {
+      const complete = (outcome: CExecutionOutcome) => finish(outcome);
+      const startCompilationTimer = () => {
+        if (settled || compilationTimer !== undefined) return;
+        compilationTimer = globalThis.setTimeout(
+          () =>
+            finish({
+              kind: "timeout",
+              phase: "compilation",
+              stdout: "",
+              stderr: "Compilation exceeded the startup safety limit.",
+              tests: [],
+            }),
+          initializationTimeoutMs,
+        );
+      };
+      const startExecutionTimer = () => {
+        if (settled || executionTimer !== undefined) return;
+        executionTimer = globalThis.setTimeout(
+          () =>
+            finish({
+              kind: "timeout",
+              phase: "execution",
+              stdout: "",
+              stderr: "Execution exceeded the 30 second safety limit.",
+              tests: [],
+            }),
+          executionTimeoutMs,
+        );
+      };
+      worker.onmessage = ({ data }) => {
+        if (data.kind === "ready") {
+          if (initializationTimer !== undefined) globalThis.clearTimeout(initializationTimer);
+          startCompilationTimer();
+          return;
+        }
+        if (data.kind === "compiled") {
+          if (compilationTimer !== undefined) globalThis.clearTimeout(compilationTimer);
+          startExecutionTimer();
+          return;
+        }
+        if (data.kind === "compile-error") {
+          complete({ kind: "compile-error", stdout: data.stdout ?? "", stderr: data.stderr ?? "", tests: [] });
+          return;
+        }
+        if (data.kind === "runtime-error") {
+          complete({
+            kind: "runtime-error",
+            stdout: data.stdout ?? "",
+            stderr: data.stderr ?? "",
+            tests: [],
+            ...(data.exitCode === undefined ? {} : { exitCode: data.exitCode }),
+          });
+          return;
+        }
+        complete(parseExecutionOutput(data.stdout ?? "", data.stderr ?? "", data.exitCode ?? 0));
+      };
+      worker.onerror = (event) =>
         complete({
           kind: "runtime-error",
-          stdout: data.stdout ?? "",
-          stderr: data.stderr ?? "",
+          stdout: "",
+          stderr: event.message || "The browser compiler worker failed.",
           tests: [],
-          ...(data.exitCode === undefined ? {} : { exitCode: data.exitCode }),
         });
-        return;
+      try {
+        worker.postMessage({ source });
+      } catch (error) {
+        complete({
+          kind: "runtime-error",
+          stdout: "",
+          stderr: error instanceof Error ? error.message : "The browser compiler worker could not receive the request.",
+          tests: [],
+        });
       }
-      complete(parseExecutionOutput(data.stdout ?? "", data.stderr ?? "", data.exitCode ?? 0));
-    };
-    worker.onerror = (event) =>
-      complete({
-        kind: "runtime-error",
-        stdout: "",
-        stderr: event.message || "The browser compiler worker failed.",
-        tests: [],
-      });
-    try {
-      worker.postMessage({ source });
-    } catch (error) {
-      complete({
-        kind: "runtime-error",
-        stdout: "",
-        stderr: error instanceof Error ? error.message : "The browser compiler worker could not receive the request.",
-        tests: [],
-      });
+    });
+  const takeWorker = () => {
+    if (!options.createWorker) {
+      const worker = prewarmedWorker;
+      if (!worker) throw new Error("The browser compiler worker was not prewarmed.");
+      prewarmedWorker = undefined;
+      prewarmPromise = undefined;
+      return worker;
     }
-  });
+    return options.createWorker();
+  };
+  const start = options.createWorker ? Promise.resolve() : prewarmCWorker({ initializationTimeoutMs });
+  return start.then(() => {
+    try {
+      return execute(takeWorker());
+    } catch (error) {
+      return {
+        kind: "runtime-error" as const,
+        stdout: "",
+        stderr: error instanceof Error ? error.message : "The browser compiler worker could not start.",
+        tests: [],
+      };
+    }
+  }, initializationFailure);
 };

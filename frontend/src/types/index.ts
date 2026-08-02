@@ -9,6 +9,7 @@ import type {
   ScoreBreakdown,
   TopicId,
   TopicPerformance,
+  CodingProgress,
 } from "../../../shared/domain";
 export type {
   MatchConfig,
@@ -21,6 +22,7 @@ export type {
   ScoreBreakdown,
   TopicId,
   TopicPerformance,
+  CodingProgress,
 };
 export type { TOPICS } from "../../../shared/domain";
 
@@ -51,6 +53,8 @@ export type MatchPublicState = {
   revealSkips: Record<string, boolean>;
   pause: { seatName: string; expiresAt: number } | null;
   ready: Record<string, boolean>;
+  codingReady: Record<string, boolean>;
+  codingProgress: Record<string, CodingProgress>;
   submissions: Record<string, SubmissionPublic>;
   scores: Record<string, { total: number; correct: number; responseMs: number }>;
   topicSummary: Record<string, TopicPerformance>;

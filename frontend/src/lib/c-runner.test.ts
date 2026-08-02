@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { CODING_PROBLEMS } from "../../../shared/coding-problems";
-import { generateCSource, parseExecutionOutput, runCInWorker, type CExecutionOutcome } from "./c-runner";
+import {
+  generateCSource,
+  parseExecutionOutput,
+  prewarmCWorker,
+  runCInWorker,
+  type CExecutionOutcome,
+} from "./c-runner";
 
 test("generates a complete C translation unit without allowing signature edits", () => {
   const problem = CODING_PROBLEMS[0]!;
@@ -35,6 +41,65 @@ test("parses machine-readable test results while preserving student stdout", () 
   });
 });
 
+test("shares an in-flight prewarm and permits one retry after initialization failure", async () => {
+  let workerCount = 0;
+  const createWorker = () => {
+    workerCount += 1;
+    const worker = {
+      onmessage: null as ((event: MessageEvent<{ kind: string }>) => void) | null,
+      onerror: null as ((event: ErrorEvent) => void) | null,
+      postMessage: () => {
+        if (workerCount === 1) {
+          setTimeout(() => worker.onerror?.({ message: "transient startup failure" } as ErrorEvent), 0);
+        } else {
+          setTimeout(() => worker.onmessage?.({ data: { kind: "ready" } }), 0);
+        }
+      },
+      terminate: () => undefined,
+    };
+    return worker;
+  };
+
+  await assert.rejects(prewarmCWorker({ createWorker }), /transient startup failure/);
+  const first = prewarmCWorker({ createWorker });
+  const second = prewarmCWorker({ createWorker });
+  assert.strictEqual(first, second);
+  await Promise.all([first, second]);
+  assert.equal(workerCount, 2);
+});
+
+test("runs the curated sum fixture after compilation completes", async () => {
+  let receivedSource = "";
+  const outcome = await runCInWorker(CODING_PROBLEMS[0]!, CODING_PROBLEMS[0]!.starterCode, {
+    createWorker: () => {
+      const worker = {
+        onmessage: null as ((event: MessageEvent) => void) | null,
+        onerror: null as ((event: ErrorEvent) => void) | null,
+        postMessage: (message: { source: string }) => {
+          receivedSource = message.source;
+          setTimeout(() => {
+            worker.onmessage?.({ data: { kind: "ready" } } as MessageEvent);
+            worker.onmessage?.({ data: { kind: "compiled" } } as MessageEvent);
+            worker.onmessage?.({
+              data: {
+                kind: "success",
+                stdout: "FEA_TEST|1|mixed values|PASS\nFEA_TEST|2|zero included|PASS\n",
+                stderr: "",
+                exitCode: 0,
+              },
+            } as MessageEvent);
+          }, 0);
+        },
+        terminate: () => undefined,
+      };
+      return worker;
+    },
+  });
+  assert.equal(outcome.kind, "success");
+  if (outcome.kind === "success") assert.equal(outcome.passed, true);
+  assert.match(receivedSource, /int sum_array\(const int values\[\], size_t length\)/);
+});
+
 test("classifies non-zero WASM exits as runtime errors", () => {
   const result = parseExecutionOutput("FEA_TEST|1|crash|FAIL", "trap", wasmExitCode());
   assert.equal(result.kind, "runtime-error");
@@ -49,7 +114,11 @@ test("terminates an unresponsive worker and returns a typed timeout", async () =
       const worker = {
         onmessage: null as ((event: MessageEvent) => void) | null,
         onerror: null as ((event: ErrorEvent) => void) | null,
-        postMessage: () => setTimeout(() => worker.onmessage?.({ data: { kind: "ready" } } as MessageEvent), 0),
+        postMessage: () =>
+          setTimeout(() => {
+            worker.onmessage?.({ data: { kind: "ready" } } as MessageEvent);
+            worker.onmessage?.({ data: { kind: "compiled" } } as MessageEvent);
+          }, 0),
         terminate: () => {
           terminated = true;
         },
@@ -70,7 +139,11 @@ test("starts the execution limit after compiler initialization", async () => {
       const worker = {
         onmessage: null as ((event: MessageEvent) => void) | null,
         onerror: null as ((event: ErrorEvent) => void) | null,
-        postMessage: () => setTimeout(() => worker.onmessage?.({ data: { kind: "ready" } } as MessageEvent), 10),
+        postMessage: () =>
+          setTimeout(() => {
+            worker.onmessage?.({ data: { kind: "ready" } } as MessageEvent);
+            worker.onmessage?.({ data: { kind: "compiled" } } as MessageEvent);
+          }, 10),
         terminate: () => undefined,
       };
       return worker;

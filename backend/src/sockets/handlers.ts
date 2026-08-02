@@ -26,6 +26,9 @@ import {
   skipReveal,
   submitAnswer,
   toggleReady,
+  markCodingReady,
+  submitCodingProgress,
+  submitCodingResult,
   requestRematch,
 } from "../services/match.service.js";
 import { soloNext, soloSubmit, startSolo } from "../services/solo.service.js";
@@ -128,6 +131,8 @@ export const registerHandlers = (io: Server, socket: Socket, authVerifier: AuthV
   const packetLimiter = new FixedWindowLimiter(120, 10_000);
   const eventLimiters = new Map<string, FixedWindowLimiter>([
     ["match:submit", new FixedWindowLimiter(12, 60_000)],
+    ["match:coding-progress", new FixedWindowLimiter(30, 60_000)],
+    ["match:coding-complete", new FixedWindowLimiter(12, 60_000)],
     ["solo:submit", new FixedWindowLimiter(20, 60_000)],
     ["chat:send", new FixedWindowLimiter(10, 10_000)],
     ["room:create-private", new FixedWindowLimiter(10, 60_000)],
@@ -314,6 +319,34 @@ export const registerHandlers = (io: Server, socket: Socket, authVerifier: AuthV
       return error(socket, "Public queue settings are fixed by the server.", "PUBLIC_SETTINGS");
     const result = configureMatch(current.roomId, current.seat.seatId, input, makeEvents(io, current.roomId));
     if (!result.ok) error(socket, result.error, "CONFIGURATION_ERROR");
+  });
+  socket.on("match:coding-ready", (payload?: unknown) => {
+    if (!validateEmpty(socket, ClientEventSchemas["match:coding-ready"], payload)) return;
+    const current = session(socket);
+    if (!current) return error(socket, "Join a room first.", "NOT_SEATED");
+    const result = markCodingReady(current.roomId, current.seat.seatId, makeEvents(io, current.roomId));
+    if (!result.ok) error(socket, result.error, "CODING_READY_ERROR");
+  });
+  socket.on("match:coding-progress", (payload: unknown) => {
+    const current = session(socket);
+    if (!current) return error(socket, "Join a room first.", "NOT_SEATED");
+    const input = validate(socket, ClientEventSchemas["match:coding-progress"], payload);
+    if (!input) return;
+    const result = submitCodingProgress(
+      current.roomId,
+      current.seat.seatId,
+      input.status,
+      makeEvents(io, current.roomId),
+    );
+    if (!result.ok) error(socket, result.error, "CODING_PROGRESS_ERROR");
+  });
+  socket.on("match:coding-complete", (payload: unknown) => {
+    const current = session(socket);
+    if (!current) return error(socket, "Join a room first.", "NOT_SEATED");
+    const input = validate(socket, ClientEventSchemas["match:coding-complete"], payload);
+    if (!input) return;
+    const result = submitCodingResult(current.roomId, current.seat.seatId, input, makeEvents(io, current.roomId));
+    if (!result.ok) error(socket, result.error, "CODING_RESULT_ERROR");
   });
   socket.on("match:ready", (payload?: unknown) => {
     if (!validateEmpty(socket, ClientEventSchemas["match:ready"], payload)) return;

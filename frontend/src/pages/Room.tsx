@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Editor from "@monaco-editor/react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -21,8 +22,11 @@ import {
 import { useArenaSocket } from "@/hooks/useSocket";
 import { useGameStore } from "@/store/gameStore";
 import { graphEdgePoints } from "@/lib/graph";
+import { prewarmCWorker, runCInWorker, type CExecutionOutcome, type CTestResult } from "@/lib/c-runner";
 import { canConfigureMatch, TOPICS, type PublicQuestion, type TopicId } from "../../../shared/domain";
 import type { MatchPublicState } from "@/types";
+
+const MAX_CODING_READY_ATTEMPTS = 2;
 
 const codeOf = (value: string) =>
   value
@@ -39,6 +43,7 @@ export default function Room() {
   const seatId = useGameStore((state) => state.seatId);
   const clearSession = useGameStore((state) => state.clearSession);
   const api = useArenaSocket(roomId, name);
+  const markCodingReady = api.codingReady;
   const questionId = match?.question?.id ?? null;
   const [chatOpen, setChatOpen] = useState(false);
   const [chatText, setChatText] = useState("");
@@ -62,12 +67,27 @@ export default function Room() {
     "analysis-mathematics",
   ]);
   const [timer, setTimer] = useState(90);
+  const [includeCoding, setIncludeCoding] = useState(false);
+  const [codingReadyError, setCodingReadyError] = useState("");
+  const [codingReadyRetry, setCodingReadyRetry] = useState(0);
+  const codingReadyAttempted = useRef(false);
+  const [codingReadyAttempts, setCodingReadyAttempts] = useState(0);
   const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const codingEnvironmentError = window.crossOriginIsolated
+    ? ""
+    : "Coding rounds require a cross-origin isolated Chromium tab.";
+  const codingReadyNotice = codingEnvironmentError || codingReadyError;
   const answer = answerState.questionId === questionId ? answerState.value : "";
   const ordered = orderedState.questionId === questionId ? orderedState.value : [];
   const setAnswer = (value: string | number | boolean | string[]) => setAnswerState({ questionId, value });
   const setOrdered = (value: string[]) => setOrderedState({ questionId, value });
+  const retryCodingReady = () => {
+    if (codingReadyAttempts >= MAX_CODING_READY_ATTEMPTS) return;
+    codingReadyAttempted.current = false;
+    setCodingReadyError("");
+    setCodingReadyRetry((attempt) => attempt + 1);
+  };
 
   useEffect(() => {
     if (!name || !roomId) navigate("/", { replace: true });
@@ -76,6 +96,48 @@ export default function Room() {
     const id = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(id);
   }, []);
+  useEffect(() => {
+    if (!match?.config.includeCoding) {
+      codingReadyAttempted.current = false;
+      queueMicrotask(() => setCodingReadyAttempts(0));
+      return;
+    }
+    if (match.phase === "REMATCH") {
+      codingReadyAttempted.current = false;
+      queueMicrotask(() => setCodingReadyAttempts(0));
+      return;
+    }
+    if (
+      !seatId ||
+      match.codingReady[seatId] ||
+      codingReadyAttempted.current ||
+      codingReadyAttempts >= MAX_CODING_READY_ATTEMPTS ||
+      !["LOBBY", "SETUP", "READY"].includes(match.phase)
+    )
+      return;
+    codingReadyAttempted.current = true;
+    queueMicrotask(() => setCodingReadyAttempts((attempts) => attempts + 1));
+    if (!window.crossOriginIsolated) return;
+    // Match updates must not cancel this browser-local initialization. The server
+    // accepts readiness only after the worker has initialized successfully.
+    void prewarmCWorker()
+      .then(() => {
+        setCodingReadyError("");
+        markCodingReady();
+      })
+      .catch((error) => {
+        codingReadyAttempted.current = false;
+        setCodingReadyError(error instanceof Error ? error.message : "The browser C compiler could not initialize.");
+      });
+  }, [
+    codingReadyAttempts,
+    codingReadyRetry,
+    markCodingReady,
+    match?.codingReady,
+    match?.config.includeCoding,
+    match?.phase,
+    seatId,
+  ]);
   const seats = room?.seats ?? [];
   const self = seats.find((seat) => seat.seatId === seatId);
   const opponent = seats.find((seat) => seat.seatId !== seatId);
@@ -90,7 +152,7 @@ export default function Room() {
   const configure = () => {
     if (selectedTopics.length) {
       api.clearSubmission();
-      api.configure({ topicIds: selectedTopics, roundCount: 5, questionTimerSeconds: timer });
+      api.configure({ topicIds: selectedTopics, roundCount: 5, questionTimerSeconds: timer, includeCoding });
     }
     setSettingsOpen(false);
   };
@@ -180,6 +242,18 @@ export default function Room() {
             {api.errorNotice}
           </div>
         )}
+        {codingReadyNotice && match?.config.includeCoding && match.phase !== "REMATCH" && (
+          <div className="notice-error mb-5 flex items-center justify-between gap-3">
+            <span>{codingReadyNotice}</span>
+            <button
+              className="button button-primary shrink-0"
+              onClick={retryCodingReady}
+              disabled={codingReadyAttempts >= MAX_CODING_READY_ATTEMPTS}
+            >
+              retry readiness
+            </button>
+          </div>
+        )}
         {!match ? (
           <Loading />
         ) : match.phase === "LOBBY" ||
@@ -198,25 +272,38 @@ export default function Room() {
             setTimer={setTimer}
             settingsOpen={settingsOpen}
             setSettingsOpen={setSettingsOpen}
+            includeCoding={includeCoding}
+            setIncludeCoding={setIncludeCoding}
             onConfigure={configure}
             onReady={api.ready}
           />
         ) : match.phase === "COUNTDOWN" ? (
           <Countdown seconds={seconds ?? 3} round={match.roundIndex + 1} />
         ) : match.phase === "QUESTION" ? (
-          <QuestionStage
-            match={match}
-            seatId={seatId}
-            opponent={opponent?.name}
-            seconds={seconds}
-            answer={answer}
-            setAnswer={setAnswer}
-            ordered={ordered}
-            setOrdered={setOrdered}
-            submitted={isSubmitted}
-            submit={submit}
-            lastSubmission={isSubmitted ? api.lastSubmission : null}
-          />
+          match.question?.type === "coding" ? (
+            <CodingQuestionStage
+              key={match.question.id}
+              match={match}
+              seatId={seatId}
+              now={now}
+              onProgress={api.codingProgress}
+              onComplete={api.codingComplete}
+            />
+          ) : (
+            <QuestionStage
+              match={match}
+              seatId={seatId}
+              opponent={opponent?.name}
+              seconds={seconds}
+              answer={answer}
+              setAnswer={setAnswer}
+              ordered={ordered}
+              setOrdered={setOrdered}
+              submitted={isSubmitted}
+              submit={submit}
+              lastSubmission={isSubmitted ? api.lastSubmission : null}
+            />
+          )
         ) : match.phase === "REVEAL" ? (
           <Reveal match={match} seatId={seatId} now={now} onSkip={api.skipReveal} />
         ) : match.phase === "PAUSED" ? (
@@ -250,6 +337,8 @@ const Lobby = ({
   setTimer,
   settingsOpen,
   setSettingsOpen,
+  includeCoding,
+  setIncludeCoding,
   onConfigure,
   onReady,
 }: {
@@ -264,6 +353,8 @@ const Lobby = ({
   setTimer: (timer: number) => void;
   settingsOpen: boolean;
   setSettingsOpen: (open: boolean) => void;
+  includeCoding: boolean;
+  setIncludeCoding: (include: boolean) => void;
   onConfigure: () => void;
   onReady: () => void;
 }) => (
@@ -296,7 +387,8 @@ const Lobby = ({
           <span>
             <span className="eyebrow text-gold">host controls</span>
             <span className="mt-1 block font-semibold">
-              {selectedTopics.length} topics · {timer}s per question
+              {selectedTopics.length} topics · {timer}s per non-coding question
+              {includeCoding ? " · 60s per coding round" : ""}
             </span>
           </span>
           <ChevronDown className={settingsOpen ? "rotate-180 text-gold" : "text-muted"} size={17} />
@@ -321,6 +413,14 @@ const Lobby = ({
                 </button>
               ))}
             </div>
+            <label className="mt-4 flex items-center gap-3 text-sm text-muted">
+              <input
+                type="checkbox"
+                checked={includeCoding}
+                onChange={(event) => setIncludeCoding(event.target.checked)}
+              />
+              include reviewed browser C rounds (results are client-reported; no anti-cheat guarantee)
+            </label>
             <div className="mt-4 flex items-center gap-3">
               <span className="text-sm text-muted">Timer</span>
               <select className="field w-auto" value={timer} onChange={(event) => setTimer(Number(event.target.value))}>
@@ -365,6 +465,132 @@ const Countdown = ({ seconds, round }: { seconds: number; round: number }) => (
     <p className="mt-5 text-muted">Get your scratch paper ready. The next prompt is coming.</p>
   </section>
 );
+
+const CodingQuestionStage = ({
+  match,
+  seatId,
+  now,
+  onProgress,
+  onComplete,
+}: {
+  match: MatchPublicState;
+  seatId: string | null;
+  now: number;
+  onProgress: (status: "compiling" | "running") => void;
+  onComplete: (result: {
+    questionId: string;
+    passed: boolean;
+    tests: CTestResult[];
+    outcome: "success" | "compile-error" | "runtime-error" | "timeout";
+  }) => void;
+}) => {
+  const question = match.question;
+  const problem = question?.type === "coding" ? question.problem : undefined;
+  const [code, setCode] = useState(problem?.starterCode ?? "");
+  const [outcome, setOutcome] = useState<CExecutionOutcome | null>(null);
+  const [runPending, setRunPending] = useState(false);
+  const runInFlight = useRef(false);
+  if (!question || question.type !== "coding" || !problem) return null;
+  const submitted = Boolean(seatId && match.submissions[seatId]?.submitted);
+  const complete = (result: CExecutionOutcome) => {
+    setOutcome(result);
+    onComplete({
+      questionId: question.id,
+      passed: result.kind === "success" && result.passed,
+      tests: result.tests,
+      outcome: result.kind === "success" ? "success" : result.kind,
+    });
+  };
+  const run = async () => {
+    if (runInFlight.current || submitted) return;
+    runInFlight.current = true;
+    setRunPending(true);
+    try {
+      onProgress("compiling");
+      complete(await runCInWorker(problem, code));
+    } catch (error) {
+      complete({
+        kind: "runtime-error",
+        stdout: "",
+        stderr: error instanceof Error ? error.message : "The browser C runner failed.",
+        tests: [],
+      });
+    } finally {
+      runInFlight.current = false;
+      setRunPending(false);
+    }
+  };
+  return (
+    <section className="mx-auto max-w-5xl py-6 sm:py-12">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="eyebrow text-gold">coding round · browser worker</p>
+          <h1 className="display mt-3 text-5xl">run the solution.</h1>
+        </div>
+        <div className="timer">
+          <Clock3 size={16} />
+          {match.questionEndsAt ? Math.max(0, Math.ceil((match.questionEndsAt - now) / 1000)) : 0}s
+        </div>
+      </div>
+      <p className="mt-4 max-w-2xl text-muted">
+        {problem.description} The server receives only typed progress and test results, never source code.
+      </p>
+      <div className="mt-7 panel overflow-hidden">
+        <div className="border-b border-line bg-ink px-4 py-3 font-mono text-xs text-gold">
+          locked · {problem.functionSignature} {"{"}
+        </div>
+        <Editor
+          height="min(52vh, 500px)"
+          language="c"
+          theme="vs-dark"
+          value={code}
+          onChange={(value) => setCode(value ?? "")}
+          options={{
+            minimap: { enabled: false },
+            readOnly: submitted || runPending,
+            wordWrap: "on",
+            scrollBeyondLastLine: false,
+          }}
+        />
+        <div className="flex items-center justify-between border-t border-line p-4">
+          <span className="text-xs text-muted">Local-only execution · no anti-cheat guarantee</span>
+          <button className="button button-primary" onClick={run} disabled={submitted || runPending || !code.trim()}>
+            <Zap size={15} /> {runPending ? "running…" : "run tests"}
+          </button>
+        </div>
+      </div>
+      {outcome && (
+        <div className="panel mt-5 p-5 text-sm">
+          <p className="eyebrow">runner result</p>
+          <p className="mt-2">
+            {outcome.kind === "success" && outcome.passed
+              ? "all tests passed"
+              : outcome.kind === "success"
+                ? "tests need attention"
+                : outcome.kind === "timeout"
+                  ? `${outcome.phase} timed out`
+                  : outcome.kind}
+          </p>
+          {outcome.tests.length > 0 && (
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {outcome.tests.map((test) => (
+                <div
+                  key={test.index}
+                  className="flex items-center justify-between rounded border border-line px-3 py-2"
+                >
+                  <span>{test.name}</span>
+                  <span className={test.passed ? "text-green-300" : "text-red-300"}>
+                    {test.passed ? "PASS" : "FAIL"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+};
 
 const QuestionStage = ({
   match,

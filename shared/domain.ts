@@ -21,6 +21,8 @@ export type QuestionType =
   "multiple-choice" | "numeric" | "short-answer" | "code-output" | "ordered-sequence" | "graph" | "coding";
 export type GraphOperation = "bfs-order" | "dfs-order" | "adjacency" | "reachability" | "shortest-path";
 export type MatchSource = "private" | "public";
+export type MatchMode = "quiz" | "mixed";
+export const MatchModeSchema = z.enum(["quiz", "mixed"]);
 export type MatchPhase =
   | "LOBBY"
   | "SETUP"
@@ -385,6 +387,8 @@ export const gradeQuestion = (question: Question, attempt: QuestionAttempt): boo
 export const QUESTION_TIMER_MIN_SECONDS = 30;
 export const QUESTION_TIMER_MAX_SECONDS = 300;
 export const PUBLIC_QUESTION_SECONDS = 300;
+/** Toolchain initialization is outside this deadline; coding gets a 60-second run window. */
+export const CODING_QUESTION_SECONDS = 60;
 export const PUBLIC_QUEUE_MAX_WAIT_SECONDS = 300;
 export const PAUSE_SECONDS = 30;
 export const REVEAL_SECONDS = 30;
@@ -429,16 +433,23 @@ export const selectSeededQuestions = (
   seed: string | number,
   count: number,
   topicIds?: readonly TopicId[],
+  includeCoding = false,
 ) => {
   const unique = new Map<string, Question>();
   for (const question of questions) unique.set(question.id, question);
-  // Coding practice is deliberately browser-only and never enters a server-authoritative run.
-  const allowed = topicIds?.length
-    ? [...unique.values()].filter((question) => question.type !== "coding" && topicIds.includes(question.topicId))
-    : [...unique.values()].filter((question) => question.type !== "coding");
+  const allowed = [...unique.values()].filter((question) =>
+    question.type === "coding" ? includeCoding : !topicIds?.length || topicIds.includes(question.topicId),
+  );
   if (!allowed.length || count <= 0 || allowed.length < count) return [];
   const shuffled = seededShuffle(allowed, seed);
-  return shuffled.slice(0, count);
+  const selected = shuffled.slice(0, count);
+  if (includeCoding && !selected.some((question) => question.type === "coding")) {
+    const codingQuestion = shuffled.find((question) => question.type === "coding");
+    if (!codingQuestion) return [];
+    const codingSlot = Math.floor(createSeededRandom(`${seed}:coding-slot`)() * count);
+    selected[codingSlot] = codingQuestion;
+  }
+  return selected;
 };
 
 export type MatchScore = { playerId: string; playerName: string; total: number; correct: number; responseMs: number };
@@ -469,6 +480,8 @@ export const MatchConfigSchema = z.object({
   topicIds: z.array(TopicIdSchema).min(1).max(TOPICS.length),
   roundCount: z.number().int().min(1).max(MAX_ROUND_COUNT),
   questionTimerSeconds: z.number().int().min(QUESTION_TIMER_MIN_SECONDS).max(QUESTION_TIMER_MAX_SECONDS),
+  /** Mixed playlists may contain curated browser-only coding rounds. */
+  includeCoding: z.boolean().optional(),
 });
 export type MatchConfig = z.infer<typeof MatchConfigSchema>;
 
@@ -500,6 +513,25 @@ export const SoloStartSchema = z.object({
 });
 export const AuthUpdateSchema = z.object({ accessToken: z.string().max(8192).nullable() });
 
+export const CodingTestResultSchema = z.object({
+  index: z.number().int().positive().max(100),
+  name: z.string().min(1).max(100),
+  passed: z.boolean(),
+});
+export const CodingRunResultSchema = z.object({
+  questionId: z.string().min(1),
+  passed: z.boolean(),
+  tests: z.array(CodingTestResultSchema).max(20),
+  outcome: z.enum(["success", "compile-error", "runtime-error", "timeout"]),
+});
+export type CodingRunResult = z.infer<typeof CodingRunResultSchema>;
+export type CodingProgress = {
+  status: "idle" | "compiling" | "running" | "complete";
+  completedAt: number | null;
+  passed: boolean | null;
+  tests: z.infer<typeof CodingTestResultSchema>[];
+  outcome: CodingRunResult["outcome"] | null;
+};
 export const PublicQuestionSchema = z.object({
   id: z.string().min(1),
   topicId: TopicIdSchema,
@@ -556,6 +588,13 @@ export const RoundHistorySchema = z.object({
   question: RevealedQuestionSchema,
   submissions: z.record(z.string(), SubmissionPublicSchema),
 });
+export const CodingProgressSchema = z.object({
+  status: z.enum(["idle", "compiling", "running", "complete"]),
+  completedAt: z.number().nullable(),
+  passed: z.boolean().nullable(),
+  tests: z.array(CodingTestResultSchema).max(20),
+  outcome: z.enum(["success", "compile-error", "runtime-error", "timeout"]).nullable(),
+});
 export const MatchPublicStateSchema = z.object({
   roomId: z.string().regex(/^[A-Z0-9]{6}$/),
   source: MatchSourceSchema,
@@ -573,6 +612,9 @@ export const MatchPublicStateSchema = z.object({
   revealSkips: z.record(z.string(), z.boolean()),
   pause: z.object({ seatName: z.string().min(1), expiresAt: z.number() }).nullable(),
   ready: z.record(z.string(), z.boolean()),
+  /** Browser capability readiness gates the first coding-round timer. */
+  codingReady: z.record(z.string(), z.boolean()),
+  codingProgress: z.record(z.string(), CodingProgressSchema),
   submissions: z.record(z.string(), SubmissionPublicSchema),
   scores: z.record(
     z.string(),
@@ -631,6 +673,9 @@ export const ClientEventSchemas = {
   "queue:leave": NoPayloadSchema,
   "match:configure": MatchConfigSchema,
   "match:ready": NoPayloadSchema,
+  "match:coding-ready": NoPayloadSchema,
+  "match:coding-progress": z.object({ status: z.enum(["compiling", "running"]) }),
+  "match:coding-complete": CodingRunResultSchema,
   "match:submit": SubmitSchema,
   "match:reveal-skip": NoPayloadSchema,
   "match:rematch": NoPayloadSchema,
