@@ -26,6 +26,8 @@ import { prewarmCWorker, runCInWorker, type CExecutionOutcome, type CTestResult 
 import { canConfigureMatch, TOPICS, type PublicQuestion, type TopicId } from "../../../shared/domain";
 import type { MatchPublicState } from "@/types";
 
+const MAX_CODING_READY_ATTEMPTS = 2;
+
 const codeOf = (value: string) =>
   value
     .toUpperCase()
@@ -69,6 +71,7 @@ export default function Room() {
   const [codingReadyError, setCodingReadyError] = useState("");
   const [codingReadyRetry, setCodingReadyRetry] = useState(0);
   const codingReadyAttempted = useRef(false);
+  const codingReadyAttempts = useRef(0);
   const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const codingEnvironmentError = window.crossOriginIsolated
@@ -80,6 +83,7 @@ export default function Room() {
   const setAnswer = (value: string | number | boolean | string[]) => setAnswerState({ questionId, value });
   const setOrdered = (value: string[]) => setOrderedState({ questionId, value });
   const retryCodingReady = () => {
+    if (codingReadyAttempts.current >= MAX_CODING_READY_ATTEMPTS) return;
     codingReadyAttempted.current = false;
     setCodingReadyError("");
     setCodingReadyRetry((attempt) => attempt + 1);
@@ -95,38 +99,36 @@ export default function Room() {
   useEffect(() => {
     if (!match?.config.includeCoding) {
       codingReadyAttempted.current = false;
+      codingReadyAttempts.current = 0;
       return;
     }
     if (match.phase === "REMATCH") {
       codingReadyAttempted.current = false;
+      codingReadyAttempts.current = 0;
       return;
     }
     if (
       !seatId ||
       match.codingReady[seatId] ||
       codingReadyAttempted.current ||
+      codingReadyAttempts.current >= MAX_CODING_READY_ATTEMPTS ||
       !["LOBBY", "SETUP", "READY"].includes(match.phase)
     )
       return;
     codingReadyAttempted.current = true;
+    codingReadyAttempts.current += 1;
     if (!window.crossOriginIsolated) return;
-    let active = true;
+    // Match updates must not cancel this browser-local initialization. The server
+    // accepts readiness only after the worker has initialized successfully.
     void prewarmCWorker()
       .then(() => {
-        if (active) {
-          setCodingReadyError("");
-          markCodingReady();
-        }
+        setCodingReadyError("");
+        markCodingReady();
       })
       .catch((error) => {
-        if (active) {
-          codingReadyAttempted.current = false;
-          setCodingReadyError(error instanceof Error ? error.message : "The browser C compiler could not initialize.");
-        }
+        codingReadyAttempted.current = false;
+        setCodingReadyError(error instanceof Error ? error.message : "The browser C compiler could not initialize.");
       });
-    return () => {
-      active = false;
-    };
   }, [codingReadyRetry, markCodingReady, match?.codingReady, match?.config.includeCoding, match?.phase, seatId]);
   const seats = room?.seats ?? [];
   const self = seats.find((seat) => seat.seatId === seatId);
@@ -235,7 +237,11 @@ export default function Room() {
         {codingReadyNotice && match?.config.includeCoding && match.phase !== "REMATCH" && (
           <div className="notice-error mb-5 flex items-center justify-between gap-3">
             <span>{codingReadyNotice}</span>
-            <button className="button button-primary shrink-0" onClick={retryCodingReady}>
+            <button
+              className="button button-primary shrink-0"
+              onClick={retryCodingReady}
+              disabled={codingReadyAttempts.current >= MAX_CODING_READY_ATTEMPTS}
+            >
               retry readiness
             </button>
           </div>

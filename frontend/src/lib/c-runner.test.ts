@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { CODING_PROBLEMS } from "../../../shared/coding-problems";
-import { generateCSource, parseExecutionOutput, runCInWorker, type CExecutionOutcome } from "./c-runner";
+import {
+  generateCSource,
+  parseExecutionOutput,
+  prewarmCWorker,
+  runCInWorker,
+  type CExecutionOutcome,
+} from "./c-runner";
 
 test("generates a complete C translation unit without allowing signature edits", () => {
   const problem = CODING_PROBLEMS[0]!;
@@ -33,6 +39,33 @@ test("parses machine-readable test results while preserving student stdout", () 
     ],
     passed: false,
   });
+});
+
+test("shares an in-flight prewarm and permits one retry after initialization failure", async () => {
+  let workerCount = 0;
+  const createWorker = () => {
+    workerCount += 1;
+    const worker = {
+      onmessage: null as ((event: MessageEvent<{ kind: string }>) => void) | null,
+      onerror: null as ((event: ErrorEvent) => void) | null,
+      postMessage: () => {
+        if (workerCount === 1) {
+          setTimeout(() => worker.onerror?.({ message: "transient startup failure" } as ErrorEvent), 0);
+        } else {
+          setTimeout(() => worker.onmessage?.({ data: { kind: "ready" } }), 0);
+        }
+      },
+      terminate: () => undefined,
+    };
+    return worker;
+  };
+
+  await assert.rejects(prewarmCWorker({ createWorker }), /transient startup failure/);
+  const first = prewarmCWorker({ createWorker });
+  const second = prewarmCWorker({ createWorker });
+  assert.strictEqual(first, second);
+  await Promise.all([first, second]);
+  assert.equal(workerCount, 2);
 });
 
 test("runs the curated sum fixture after compilation completes", async () => {
