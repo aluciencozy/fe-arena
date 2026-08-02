@@ -67,6 +67,7 @@ export default function Room() {
   const [timer, setTimer] = useState(90);
   const [includeCoding, setIncludeCoding] = useState(false);
   const [codingReadyError, setCodingReadyError] = useState("");
+  const [codingReadyRetry, setCodingReadyRetry] = useState(0);
   const codingReadyAttempted = useRef(false);
   const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -74,6 +75,11 @@ export default function Room() {
   const ordered = orderedState.questionId === questionId ? orderedState.value : [];
   const setAnswer = (value: string | number | boolean | string[]) => setAnswerState({ questionId, value });
   const setOrdered = (value: string[]) => setOrderedState({ questionId, value });
+  const retryCodingReady = () => {
+    codingReadyAttempted.current = false;
+    setCodingReadyError("");
+    setCodingReadyRetry((attempt) => attempt + 1);
+  };
 
   useEffect(() => {
     if (!name || !roomId) navigate("/", { replace: true });
@@ -111,13 +117,15 @@ export default function Room() {
         if (active) markCodingReady();
       })
       .catch((error) => {
-        if (active)
+        if (active) {
+          codingReadyAttempted.current = false;
           setCodingReadyError(error instanceof Error ? error.message : "The browser C compiler could not initialize.");
+        }
       });
     return () => {
       active = false;
     };
-  }, [markCodingReady, match?.codingReady, match?.config.includeCoding, match?.phase, seatId]);
+  }, [codingReadyRetry, markCodingReady, match?.codingReady, match?.config.includeCoding, match?.phase, seatId]);
   const seats = room?.seats ?? [];
   const self = seats.find((seat) => seat.seatId === seatId);
   const opponent = seats.find((seat) => seat.seatId !== seatId);
@@ -222,7 +230,14 @@ export default function Room() {
             {api.errorNotice}
           </div>
         )}
-        {codingReadyError && <div className="notice-error mb-5">{codingReadyError}</div>}
+        {codingReadyError && (
+          <div className="notice-error mb-5 flex items-center justify-between gap-3">
+            <span>{codingReadyError}</span>
+            <button className="button button-primary shrink-0" onClick={retryCodingReady}>
+              retry readiness
+            </button>
+          </div>
+        )}
         {!match ? (
           <Loading />
         ) : match.phase === "LOBBY" ||
@@ -456,11 +471,11 @@ const CodingQuestionStage = ({
   const problem = question?.type === "coding" ? question.problem : undefined;
   const [code, setCode] = useState(problem?.starterCode ?? "");
   const [outcome, setOutcome] = useState<CExecutionOutcome | null>(null);
+  const [runPending, setRunPending] = useState(false);
+  const runInFlight = useRef(false);
   if (!question || question.type !== "coding" || !problem) return null;
   const submitted = Boolean(seatId && match.submissions[seatId]?.submitted);
-  const run = async () => {
-    onProgress("compiling");
-    const result = await runCInWorker(problem, code);
+  const complete = (result: CExecutionOutcome) => {
     setOutcome(result);
     onComplete({
       questionId: question.id,
@@ -468,6 +483,25 @@ const CodingQuestionStage = ({
       tests: result.tests,
       outcome: result.kind === "success" ? "success" : result.kind,
     });
+  };
+  const run = async () => {
+    if (runInFlight.current || submitted) return;
+    runInFlight.current = true;
+    setRunPending(true);
+    try {
+      onProgress("compiling");
+      complete(await runCInWorker(problem, code));
+    } catch (error) {
+      complete({
+        kind: "runtime-error",
+        stdout: "",
+        stderr: error instanceof Error ? error.message : "The browser C runner failed.",
+        tests: [],
+      });
+    } finally {
+      runInFlight.current = false;
+      setRunPending(false);
+    }
   };
   return (
     <section className="mx-auto max-w-5xl py-6 sm:py-12">
@@ -494,12 +528,17 @@ const CodingQuestionStage = ({
           theme="vs-dark"
           value={code}
           onChange={(value) => setCode(value ?? "")}
-          options={{ minimap: { enabled: false }, readOnly: submitted, wordWrap: "on", scrollBeyondLastLine: false }}
+          options={{
+            minimap: { enabled: false },
+            readOnly: submitted || runPending,
+            wordWrap: "on",
+            scrollBeyondLastLine: false,
+          }}
         />
         <div className="flex items-center justify-between border-t border-line p-4">
           <span className="text-xs text-muted">Local-only execution · no anti-cheat guarantee</span>
-          <button className="button button-primary" onClick={run} disabled={submitted || !code.trim()}>
-            <Zap size={15} /> run tests
+          <button className="button button-primary" onClick={run} disabled={submitted || runPending || !code.trim()}>
+            <Zap size={15} /> {runPending ? "running…" : "run tests"}
           </button>
         </div>
       </div>

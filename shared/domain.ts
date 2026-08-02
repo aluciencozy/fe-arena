@@ -437,11 +437,9 @@ export const selectSeededQuestions = (
 ) => {
   const unique = new Map<string, Question>();
   for (const question of questions) unique.set(question.id, question);
-  const allowed = topicIds?.length
-    ? [...unique.values()].filter(
-        (question) => (includeCoding || question.type !== "coding") && topicIds.includes(question.topicId),
-      )
-    : [...unique.values()].filter((question) => includeCoding || question.type !== "coding");
+  const allowed = [...unique.values()].filter((question) =>
+    question.type === "coding" ? includeCoding : !topicIds?.length || topicIds.includes(question.topicId),
+  );
   if (!allowed.length || count <= 0 || allowed.length < count) return [];
   const shuffled = seededShuffle(allowed, seed);
   const selected = shuffled.slice(0, count);
