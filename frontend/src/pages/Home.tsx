@@ -57,6 +57,7 @@ export default function Home() {
   );
   const queuedName = useRef<string | null>(null);
   const queueToken = useRef<string | null>(null);
+  const pendingPrivateCreate = useRef(false);
   const validName = name.trim().length > 0;
   const config: MatchConfig = useMemo(
     () => ({ topicIds: topics, roundCount: 5, questionTimerSeconds: timer }),
@@ -66,6 +67,7 @@ export default function Home() {
   useEffect(() => {
     const created = (payload: { roomId: string; seatId: string; reconnectToken: string }) => {
       useGameStore.getState().setSession(payload.seatId, payload.reconnectToken, payload.roomId);
+      pendingPrivateCreate.current = false;
       setBusy(false);
       navigate(`/room/${payload.roomId}`);
     };
@@ -78,6 +80,7 @@ export default function Home() {
     const waiting = (payload: { status: string; expiresAt?: number; queueToken?: string }) => {
       if (payload.status === "waiting") {
         if (payload.queueToken) queueToken.current = payload.queueToken;
+        setNotice(null);
         setView("queue");
         setQueueExpiresAt(payload.expiresAt ?? Date.now() + 300_000);
       } else {
@@ -89,7 +92,6 @@ export default function Home() {
     };
     const onConnect = () => {
       setConnection("connected");
-      setNotice(null);
       if (queuedName.current)
         socket.emit(
           "queue:join",
@@ -100,14 +102,21 @@ export default function Home() {
     };
     const onDisconnect = () => {
       setConnection("disconnected");
+      if (pendingPrivateCreate.current) {
+        pendingPrivateCreate.current = false;
+        setBusy(false);
+        setNotice({ kind: "error", text: socketDisconnectedMessage(socketUrl) });
+      }
       if (queuedName.current) setNotice({ kind: "error", text: socketDisconnectedMessage(socketUrl) });
     };
     const onConnectError = (reason: unknown) => {
       setConnection("disconnected");
+      pendingPrivateCreate.current = false;
       setBusy(false);
       setNotice({ kind: "error", text: socketConnectionErrorMessage(reason, socketUrl) });
     };
     const failed = (payload: { message?: string } | string) => {
+      pendingPrivateCreate.current = false;
       setBusy(false);
       setNotice({
         kind: "error",
@@ -149,6 +158,7 @@ export default function Home() {
   };
   const createPrivate = () => {
     if (!begin()) return;
+    pendingPrivateCreate.current = true;
     setBusy(true);
     socket.emit("room:create-private", { username: name.trim(), config });
   };
@@ -169,7 +179,6 @@ export default function Home() {
   };
   const retryQueue = () => {
     if (!queuedName.current) return;
-    queueToken.current = null;
     setNotice(null);
     setConnection("connecting");
     connectSocket();

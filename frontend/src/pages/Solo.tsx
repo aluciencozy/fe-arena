@@ -47,6 +47,7 @@ export default function Solo() {
   const connectionRef = useRef(socket.connected);
   const stateRef = useRef<SoloState | null>(null);
   useEffect(() => {
+    let active = true;
     const onState = (next: SoloState) => {
       setNow(Date.now());
       stateRef.current = next;
@@ -85,8 +86,16 @@ export default function Solo() {
     socket.on("disconnect", onDisconnect);
     socket.on("connect_error", onConnectError);
     socket.on("server:error", onError);
-    connectSocket();
+    if (socket.connected) {
+      connectionRef.current = true;
+      queueMicrotask(() => {
+        if (active && socket.connected) setConnection("connected");
+      });
+    } else {
+      connectSocket();
+    }
     return () => {
+      active = false;
       socket.off("solo:state", onState);
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
@@ -245,6 +254,12 @@ export default function Solo() {
           <section className="mx-auto mt-20 max-w-2xl text-center">
             <p className="eyebrow text-gold">answer reveal</p>
             <h1 className="display mt-3 text-5xl">{state.result?.correct ? "correct" : "not quite"}</h1>
+            {error && (
+              <p className="mt-4 text-sm text-red-300" role="alert">
+                {error}
+              </p>
+            )}
+            {connection === "connecting" && <p className="mt-3 text-sm text-muted">Connecting to the study server…</p>}
             <p className="mt-8 rounded border border-gold/30 bg-gold/10 p-5 font-mono text-gold">
               {formatAnswer(state.revealedQuestion.answer)}
             </p>

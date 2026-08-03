@@ -29,6 +29,16 @@ The frontend runs at `http://localhost:5173`; the backend runs at `http://localh
 
 If the frontend reports that it cannot connect, verify the backend is reachable with `curl http://localhost:3001/healthz`. Check that `VITE_SOCKET_URL` points to that backend and that `FRONTEND_ORIGINS` exactly matches the browser origin (for example, `http://localhost:5173`).
 
+### Local connection diagnosis
+
+- Expected behavior: a guest who clicks Solo practice or Public queue connects to the backend, receives a Solo question or queue state, and can continue when the server is available.
+- Setup: run the frontend at `http://localhost:5173` and the backend at `http://localhost:3001` with the documented development commands; the backend uses the guest in-memory fallback when server-only persistence variables are absent.
+- Initiating trigger: click Solo practice or Public queue while the frontend attempts its first Socket.IO connection.
+- Observed behavior before the fix: with no backend process listening on `localhost:3001`, `curl http://localhost:3001/healthz` returned connection refused and the browser surfaced a WebSocket connection error instead of completing the action.
+- Visible symptom: the requested Solo or queue flow could not begin, and the unavailable backend was not actionable from the affected screen.
+- Repeatability: this reproduced consistently whenever the backend was stopped before the guest action.
+- Masking conditions: with the documented backend running, startup diagnostics showed port 3001 listening, `http://localhost:5173` allowlisted, and successful health and Socket.IO polling requests. A `127.0.0.1:5173` origin was correctly rejected, so the documented localhost path was not a CORS failure. A temporary proxy that blocked WebSocket upgrades but allowed polling reproduced the transport-specific failure; WebSocket-first connection now falls back to polling.
+
 ## Architecture
 
 - `shared/domain.ts` is the framework-free domain boundary. It defines discriminated question types, stable topic IDs, Zod schemas, normalization, grading, seeded selection, score calculation, and tie-breakers.
