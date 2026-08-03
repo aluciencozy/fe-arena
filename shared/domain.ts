@@ -228,10 +228,18 @@ export const QuestionSchema = z.discriminatedUnion("type", [
 export type Question = z.infer<typeof QuestionSchema>;
 
 export const QuestionAttemptSchema = z.object({
-  questionId: z.string().min(1),
-  answer: z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]),
+  questionId: z.string().min(1).max(128),
+  answer: z.union([z.string().max(4096), z.number(), z.boolean(), z.array(z.string().max(256)).max(100)]),
 });
 export type QuestionAttempt = z.infer<typeof QuestionAttemptSchema>;
+
+export type CodingAnswer = {
+  type: "coding";
+  passed: boolean;
+  outcome: "success" | "compile-error" | "runtime-error" | "timeout";
+  tests: CodingTestResult[];
+};
+export type PublicAnswer = string | number | boolean | string[] | CodingAnswer;
 
 export type PublicQuestion = {
   id: string;
@@ -258,7 +266,7 @@ export type RevealedQuestion = PublicQuestion & {
   explanation: string;
   assumptions: string[];
   provenance: { source: string; note: string };
-  answer: string | number | boolean | string[];
+  answer: PublicAnswer;
 };
 
 export const toPublicQuestion = (question: Question): PublicQuestion => {
@@ -304,7 +312,7 @@ export const toRevealedQuestion = (question: Question): RevealedQuestion => {
           : question.type === "code-output"
             ? question.output
             : question.type === "coding"
-              ? []
+              ? ({ type: "coding", passed: true, outcome: "success", tests: [] } satisfies CodingAnswer)
               : question.type === "ordered-sequence"
                 ? question.answerOrder
                 : question.operation === "bfs-order" || question.operation === "dfs-order"
@@ -531,6 +539,13 @@ export const CodingRunResultSchema = z.object({
   outcome: z.enum(["success", "compile-error", "runtime-error", "timeout"]),
 });
 export type CodingRunResult = z.infer<typeof CodingRunResultSchema>;
+export type CodingTestResult = z.infer<typeof CodingTestResultSchema>;
+export const CodingAnswerSchema: z.ZodType<CodingAnswer> = z.object({
+  type: z.literal("coding"),
+  passed: z.boolean(),
+  outcome: z.enum(["success", "compile-error", "runtime-error", "timeout"]),
+  tests: z.array(CodingTestResultSchema).max(20),
+});
 export type CodingProgress = {
   status: "idle" | "compiling" | "running" | "complete";
   completedAt: number | null;
@@ -563,7 +578,7 @@ export const RevealedQuestionSchema = PublicQuestionSchema.and(
     explanation: z.string().min(1),
     assumptions: z.array(z.string()).min(1),
     provenance: ProvenanceSchema,
-    answer: z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]),
+    answer: z.union([z.string(), z.number(), z.boolean(), z.array(z.string()), CodingAnswerSchema]),
   }),
 );
 export const ScoreBreakdownSchema: z.ZodType<ScoreBreakdown> = z.object({
@@ -587,7 +602,7 @@ export const SubmissionPublicSchema = z.object({
   submitted: z.boolean(),
   correct: z.boolean().nullable(),
   score: ScoreBreakdownSchema.nullable(),
-  answer: z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]).nullable(),
+  answer: z.union([z.string(), z.number(), z.boolean(), z.array(z.string()), CodingAnswerSchema]).nullable(),
 });
 export const RoundHistorySchema = z.object({
   round: z.number().int().positive(),
@@ -616,6 +631,7 @@ export const MatchPublicStateSchema = z.object({
   revealStartedAt: z.number().nullable(),
   revealEndsAt: z.number().nullable(),
   revealSkips: z.record(z.string(), z.boolean()),
+  rematchRequests: z.record(z.string(), z.boolean()),
   pause: z.object({ seatName: z.string().min(1), expiresAt: z.number() }).nullable(),
   ready: z.record(z.string(), z.boolean()),
   /** Browser capability readiness gates the first coding-round timer. */
@@ -716,7 +732,6 @@ export const ServerEventSchemas = {
     reconnectToken: z.string().uuid(),
   }),
   "match:state": MatchPublicStateSchema,
-  "match:submission-ack": z.object({ correct: z.boolean(), score: ScoreBreakdownSchema }),
   "chat:message": z.object({
     type: z.enum(["system", "user"]),
     sender: z.string().min(1),

@@ -18,7 +18,7 @@ export type RoomMetadata = {
   config: MatchConfig;
 };
 
-type RoomRecord = { metadata: RoomMetadata; seats: RoomSeat[] };
+type RoomRecord = { metadata: RoomMetadata; seats: RoomSeat[]; acceptingNewGuests: boolean };
 const rooms = new Map<string, RoomRecord>();
 const socketSeats = new Map<string, { roomId: string; seatId: string }>();
 const tokenSeats = new Map<string, { roomId: string; seatId: string }>();
@@ -42,7 +42,7 @@ export const createRoom = (source: MatchSource, config: MatchConfig, hostName: s
     connected: false,
   };
   const metadata: RoomMetadata = { roomId: generateRoomId(), source, hostSeatId: seat.seatId, config };
-  rooms.set(metadata.roomId, { metadata, seats: [seat] });
+  rooms.set(metadata.roomId, { metadata, seats: [seat], acceptingNewGuests: true });
   tokenSeats.set(seat.reconnectToken, { roomId: metadata.roomId, seatId: seat.seatId });
   return { metadata, seat };
 };
@@ -80,6 +80,8 @@ export const joinRoom = (roomIdInput: string, nameInput: string, socketId: strin
   const record = rooms.get(roomId);
   const name = nameInput.trim();
   if (!record) return { ok: false as const, error: "That room code was not found." };
+  if (!record.acceptingNewGuests)
+    return { ok: false as const, error: "This match has ended and cannot accept replacement guests." };
   const existingSocket = getRoomForSocket(socketId);
   if (existingSocket) return { ok: false as const, error: "This browser is already seated in a match." };
   const sameName = record.seats.find((seat) => seat.name.toLocaleLowerCase() === name.toLocaleLowerCase());
@@ -90,6 +92,10 @@ export const joinRoom = (roomIdInput: string, nameInput: string, socketId: strin
   socketSeats.set(socketId, { roomId, seatId: seat.seatId });
   tokenSeats.set(seat.reconnectToken, { roomId, seatId: seat.seatId });
   return { ok: true as const, seat, metadata: record.metadata };
+};
+export const closeRoomForNewGuests = (roomId: string) => {
+  const record = getRoom(roomId);
+  if (record) record.acceptingNewGuests = false;
 };
 
 export const reconnectRoom = (roomIdInput: string, token: string, socketId: string) => {

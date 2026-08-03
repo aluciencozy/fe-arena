@@ -28,7 +28,7 @@ Defaults are frontend `http://localhost:5173` and backend `http://localhost:3001
 
 ## Durable implementation notes
 
-- The server is the authority for question selection, grading, submission locks, timers, and scores. Public question payloads omit solutions until reveal/results.
+- The server is the authority for question selection, grading, submission locks, timers, and scores. Participant-visible answer and reveal behavior is documented in `README.md`.
 - Reconnect restores the same guest seat with the session token. Active matches pause both seats for 30 seconds and safely resolve to expiry if the seat does not return.
 - Private match configuration and mixed coding-round behavior: `README.md`, `shared/domain.ts`, and `backend/src/services/match.service.ts`. Public queue uses all reviewed topics, five rounds, and a five-minute question timer.
 - Add server-graded content only with answer, explanation, assumptions, provenance, schema validation, and tests. Graph fixtures are deterministic presentation-only diagrams with bounded BFS/DFS/adjacency/reachability/shortest-path semantics. Browser coding fixtures live in `shared/coding-problems.ts`, use locked signatures and deterministic harnesses, and execute only in a timed WebAssembly worker; no user code runs on the server. Reference materials inform topic planning only; never copy exam text or answer keys.

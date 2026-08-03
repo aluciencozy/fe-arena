@@ -19,9 +19,13 @@ import {
   type ScoreBreakdown,
   type CodingProgress,
   type CodingRunResult,
+  type CodingAnswer,
+  CodingRunResultSchema,
+  QuestionAttemptSchema,
+  selectSeededQuestions,
 } from "../../../shared/domain.js";
 import { questionRepository, publicQuestion, revealedQuestion } from "./question-bank.service.js";
-import { getMetadata, getSeats, type RoomMetadata } from "./room.service.js";
+import { closeRoomForNewGuests, getMetadata, getSeats, type RoomMetadata } from "./room.service.js";
 import { InMemoryMatchRepository } from "../persistence/in-memory-match.repository.js";
 import {
   PERSISTENCE_SCHEMA_VERSION,
@@ -34,7 +38,7 @@ export type SubmissionPublic = {
   submitted: boolean;
   correct: boolean | null;
   score: ScoreBreakdown | null;
-  answer: string | number | boolean | string[] | null;
+  answer: string | number | boolean | string[] | CodingAnswer | null;
 };
 export type RoundHistory = { round: number; question: RevealedQuestion; submissions: Record<string, SubmissionPublic> };
 export type MatchPublicState = {
@@ -52,6 +56,7 @@ export type MatchPublicState = {
   revealStartedAt: number | null;
   revealEndsAt: number | null;
   revealSkips: Record<string, boolean>;
+  rematchRequests: Record<string, boolean>;
   pause: { seatName: string; expiresAt: number } | null;
   ready: Record<string, boolean>;
   codingReady: Record<string, boolean>;
@@ -72,6 +77,7 @@ type MatchRecord = {
   startedAt: number;
   seed: string;
   questionIds: string[];
+  usedQuestionIds: string[];
   roundResponseMs: Record<number, Record<string, number>>;
   terminalPersistence: "idle" | "pending" | "persisted";
   timer: ReturnType<typeof setTimeout> | undefined;
@@ -105,6 +111,8 @@ const makeCodingProgress = (roomId: string): Record<string, CodingProgress> =>
 const makeSubmissions = (roomId: string) =>
   Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, emptySubmission()]));
 const makeRevealSkips = (roomId: string) => Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, false]));
+const makeRematchRequests = (roomId: string) =>
+  Object.fromEntries(getSeats(roomId).map((seat) => [seat.seatId, false]));
 const makeTopicSummary = (): Record<string, TopicPerformance> =>
   Object.fromEntries(TOPICS.map((topic) => [topic.id, emptyTopicPerformance()]));
 
@@ -115,6 +123,7 @@ const clearTimer = (record: MatchRecord) => {
 const syncSeats = (record: MatchRecord) => {
   const ids = new Set(seatIds(record.state.roomId));
   for (const id of Object.keys(record.state.ready)) if (!ids.has(id)) delete record.state.ready[id];
+  for (const id of Object.keys(record.state.rematchRequests)) if (!ids.has(id)) delete record.state.rematchRequests[id];
   for (const id of Object.keys(record.state.scores)) if (!ids.has(id)) delete record.state.scores[id];
   for (const id of Object.keys(record.state.codingReady)) if (!ids.has(id)) delete record.state.codingReady[id];
   for (const id of Object.keys(record.state.codingProgress)) if (!ids.has(id)) delete record.state.codingProgress[id];
@@ -123,6 +132,7 @@ const syncSeats = (record: MatchRecord) => {
     record.state.codingReady[id] ??= false;
     record.state.codingProgress[id] ??= { status: "idle", completedAt: null, passed: null, tests: [], outcome: null };
     record.state.ready[id] ??= false;
+    record.state.rematchRequests[id] ??= false;
     record.state.scores[id] ??= { total: 0, correct: 0, responseMs: 0 };
     record.state.submissions[id] ??= emptySubmission();
   }
@@ -140,6 +150,16 @@ const publicSnapshot = (state: MatchPublicState): MatchPublicState => {
       submission.score = null;
       submission.answer = null;
     }
+    for (const progress of Object.values(safeState.codingProgress)) {
+      progress.passed = null;
+      progress.tests = [];
+      progress.outcome = null;
+    }
+    for (const playerId of Object.keys(safeState.scores))
+      safeState.scores[playerId] = { total: 0, correct: 0, responseMs: 0 };
+  }
+  if (safeState.phase === "REVEAL") {
+    for (const submission of Object.values(safeState.submissions)) submission.score = null;
     for (const playerId of Object.keys(safeState.scores))
       safeState.scores[playerId] = { total: 0, correct: 0, responseMs: 0 };
   }
@@ -148,6 +168,26 @@ const publicSnapshot = (state: MatchPublicState): MatchPublicState => {
 const emit = (record: MatchRecord, events: MatchEvents) => events.emit(publicSnapshot(record.state));
 const configFor = (metadata: RoomMetadata): MatchConfig =>
   metadata.config ?? { topicIds: [], roundCount: DEFAULT_ROUND_COUNT, questionTimerSeconds: PUBLIC_QUESTION_SECONDS };
+const selectFreshQuestions = (seed: string, config: MatchConfig, previousIds: readonly string[]) => {
+  const includeCoding = config.includeCoding === true;
+  const eligible = questionRepository
+    .list()
+    .filter((question) =>
+      question.type === "coding"
+        ? includeCoding
+        : !config.topicIds.length || config.topicIds.includes(question.topicId),
+    );
+  const fresh = eligible.filter((question) => !previousIds.includes(question.id));
+  const pool = fresh.length >= config.roundCount ? fresh : eligible;
+  if (pool.length < config.roundCount) return [];
+  const selectionIncludesCoding =
+    includeCoding &&
+    (fresh.length < config.roundCount
+      ? pool.some((question) => question.type === "coding")
+      : fresh.some((question) => question.type === "coding"));
+  const selected = selectSeededQuestions(pool, seed, config.roundCount, config.topicIds, selectionIncludesCoding);
+  return selected.length === config.roundCount ? selected : [];
+};
 const guestSessionOwner = (reconnectToken: string) => createHash("sha256").update(reconnectToken).digest("hex");
 const terminalSnapshot = (record: MatchRecord): TerminalMatchSnapshot | undefined => {
   const endReason = record.state.endReason;
@@ -248,6 +288,7 @@ export const ensureMatch = (roomId: string, events?: MatchEvents) => {
     revealStartedAt: null,
     revealEndsAt: null,
     revealSkips: makeRevealSkips(roomId),
+    rematchRequests: makeRematchRequests(roomId),
     pause: null,
     ready: makeReady(roomId),
     codingReady: makeReady(roomId),
@@ -267,6 +308,7 @@ export const ensureMatch = (roomId: string, events?: MatchEvents) => {
     startedAt: Date.now(),
     seed: `${roomId}:${metadata.hostSeatId}`,
     questionIds: questions.map((question) => question.id),
+    usedQuestionIds: questions.map((question) => question.id),
     roundResponseMs: {},
     terminalPersistence: "idle",
     timer: undefined,
@@ -359,6 +401,7 @@ const advanceOrFinish = (roomId: string, events: MatchEvents) => {
         ? compareScores(left, right).playerId
         : (left?.playerId ?? null);
     record.state.endReason = "completed";
+    closeRoomForNewGuests(roomId);
     persistTerminal(record);
     emit(record, events);
     return;
@@ -376,6 +419,11 @@ const finalizeRound = (
   const round = record.state.roundIndex + 1;
   const existing = record.state.history.find((entry) => entry.round === round);
   if (existing) return existing.question;
+  if (countUnanswered) {
+    for (const submission of Object.values(record.state.submissions)) {
+      if (!submission.submitted) submission.correct = false;
+    }
+  }
   const revealed = revealedQuestion(question);
   record.state.history.push({ round, question: revealed, submissions: structuredClone(record.state.submissions) });
   const summary = record.state.topicSummary[question.topicId] ?? emptyTopicPerformance();
@@ -445,7 +493,9 @@ export const configureMatch = (roomId: string, seatId: string, config: MatchConf
   const metadata = getMetadata(roomId);
   if (!record || !metadata || metadata.hostSeatId !== seatId)
     return { ok: false as const, error: "Only the host can change match settings." };
-  if (!(record.state.phase === "LOBBY" || record.state.phase === "SETUP" || record.state.phase === "REMATCH"))
+  if (record.state.phase === "REMATCH")
+    return { ok: false as const, error: "Rematch settings are locked to the fresh question pool." };
+  if (!(record.state.phase === "LOBBY" || record.state.phase === "SETUP"))
     return { ok: false as const, error: "Settings can only change before a round begins." };
   if (!config.topicIds.length || !config.roundCount) return { ok: false as const, error: "Choose at least one topic." };
   const questions = questionRepository.select(
@@ -459,6 +509,7 @@ export const configureMatch = (roomId: string, seatId: string, config: MatchConf
   record.state.config = config;
   record.state.phase = "SETUP";
   record.questionIds = questions.map((question) => question.id);
+  record.usedQuestionIds = questions.map((question) => question.id);
   record.state.totalRounds = config.roundCount;
   record.state.ready = makeReady(roomId);
   record.state.codingReady = makeReady(roomId);
@@ -535,37 +586,45 @@ export const submitCodingResult = (roomId: string, seatId: string, result: Codin
   if (!record || !question || question.type !== "coding" || record.state.phase !== "QUESTION")
     return { ok: false as const, error: "Coding results are not accepted right now." };
   if (!seatIds(roomId).includes(seatId)) return { ok: false as const, error: "You are not seated in this match." };
+  const parsed = CodingRunResultSchema.safeParse(result);
+  if (!parsed.success) return { ok: false as const, error: "That coding result is invalid." };
   if (record.state.questionEndsAt !== null && record.state.questionEndsAt <= Date.now()) {
     revealRound(roomId, events);
     return { ok: false as const, error: "Question time has expired." };
   }
-  if (result.questionId !== question.id)
+  if (parsed.data.questionId !== question.id)
     return { ok: false as const, error: "That coding question is no longer active." };
   const progress = record.state.codingProgress[seatId];
   const submission = record.state.submissions[seatId];
   if (!progress || !submission || progress.status === "complete" || submission.submitted)
     return { ok: false as const, error: "Your coding result is already locked." };
   const elapsedMs = Math.max(0, Date.now() - (record.state.questionStartedAt ?? Date.now()));
-  const score = calculateScore(result.passed, elapsedMs, questionTimerSeconds(record, question) * 1000);
+  const score = calculateScore(parsed.data.passed, elapsedMs, questionTimerSeconds(record, question) * 1000);
   progress.status = "complete";
   progress.completedAt = Date.now();
-  progress.passed = result.passed;
-  progress.tests = result.tests;
-  progress.outcome = result.outcome;
+  progress.passed = parsed.data.passed;
+  progress.tests = parsed.data.tests;
+  progress.outcome = parsed.data.outcome;
   submission.submitted = true;
-  submission.correct = result.passed;
+  submission.correct = parsed.data.passed;
   submission.score = score;
+  submission.answer = {
+    type: "coding",
+    passed: parsed.data.passed,
+    outcome: parsed.data.outcome,
+    tests: structuredClone(parsed.data.tests),
+  };
   const current = record.state.scores[seatId] ?? { total: 0, correct: 0, responseMs: 0 };
   record.state.scores[seatId] = {
     total: current.total + score.total,
-    correct: current.correct + (result.passed ? 1 : 0),
+    correct: current.correct + (parsed.data.passed ? 1 : 0),
     responseMs: current.responseMs + elapsedMs,
   };
   const roundTiming = record.roundResponseMs[record.state.roundIndex] ?? {};
   roundTiming[seatId] = elapsedMs;
   record.roundResponseMs[record.state.roundIndex] = roundTiming;
   emit(record, events);
-  if (result.passed || allSubmitted(record)) revealRound(roomId, events);
+  if (parsed.data.passed || allSubmitted(record)) revealRound(roomId, events);
   return { ok: true as const, score };
 };
 
@@ -581,15 +640,17 @@ export const submitAnswer = (roomId: string, seatId: string, attempt: QuestionAt
     return { ok: false as const, error: "Question time has expired." };
   }
   if (submission.submitted) return { ok: false as const, error: "Your answer is already locked for this question." };
-  if (attempt.questionId !== question.id) return { ok: false as const, error: "That question is no longer active." };
+  const parsed = QuestionAttemptSchema.safeParse(attempt);
+  if (!parsed.success || parsed.data.questionId !== question.id)
+    return { ok: false as const, error: "That question is no longer active." };
   // Grading happens only here, on the server, against the private repository record.
-  const correct = gradeQuestion(question, attempt);
+  const correct = gradeQuestion(question, parsed.data);
   const elapsedMs = Math.max(0, Date.now() - (record.state.questionStartedAt ?? Date.now()));
   const score = calculateScore(correct, elapsedMs, record.state.config.questionTimerSeconds * 1000);
   submission.submitted = true;
   submission.correct = correct;
   submission.score = score;
-  submission.answer = null;
+  submission.answer = structuredClone(parsed.data.answer);
   const current = record.state.scores[seatId] ?? { total: 0, correct: 0, responseMs: 0 };
   record.state.scores[seatId] = {
     total: current.total + score.total,
@@ -610,15 +671,41 @@ export const requestRematch = (roomId: string, seatId: string, events: MatchEven
     return { ok: false as const, error: "Rematch is only available after a completed match." };
   if (!seatIds(roomId).includes(seatId) || getSeats(roomId).length !== 2)
     return { ok: false as const, error: "Both guest seats are required for a rematch." };
+  if (record.state.rematchRequests[seatId]) {
+    emit(record, events);
+    return { ok: true as const, state: record.state };
+  }
+  record.state.rematchRequests[seatId] = true;
+  const seats = seatIds(roomId);
+  if (!seats.every((id) => record.state.rematchRequests[id])) {
+    emit(record, events);
+    return { ok: true as const, state: record.state };
+  }
+
+  const previousQuestionIds = record.usedQuestionIds;
+  record.seed = randomUUID();
+  const questions = selectFreshQuestions(record.seed, record.state.config, previousQuestionIds);
+  if (questions.length !== record.state.config.roundCount) {
+    record.state.rematchRequests = makeRematchRequests(roomId);
+    emit(record, events);
+    return { ok: false as const, error: "There are not enough reviewed questions for a rematch." };
+  }
+  record.usedQuestionIds = [...new Set([...record.usedQuestionIds, ...questions.map((question) => question.id)])];
+  record.questionIds = questions.map((question) => question.id);
   record.state.phase = "REMATCH";
   record.matchId = randomUUID();
   record.idempotencyKey = record.matchId;
   record.startedAt = Date.now();
   record.roundResponseMs = {};
   record.terminalPersistence = "idle";
+  record.state.roundIndex = 0;
+  record.state.totalRounds = record.state.config.roundCount;
   record.state.ready = makeReady(roomId);
+  record.state.rematchRequests = makeRematchRequests(roomId);
   record.state.codingReady = makeReady(roomId);
   record.state.codingProgress = makeCodingProgress(roomId);
+  record.state.submissions = makeSubmissions(roomId);
+  record.state.scores = makeScores(roomId);
   record.state.question = null;
   record.state.revealedQuestion = null;
   record.state.revealStartedAt = null;
@@ -627,8 +714,9 @@ export const requestRematch = (roomId: string, seatId: string, events: MatchEven
   record.state.topicSummary = makeTopicSummary();
   record.state.winnerSeatId = null;
   record.state.endReason = null;
+  record.state.history = [];
   emit(record, events);
-  return { ok: true as const };
+  return { ok: true as const, state: record.state };
 };
 
 export const leaveMatch = (
@@ -647,6 +735,7 @@ export const leaveMatch = (
   record.state.phase = reason === "forfeit" ? "FORFEIT" : reason === "expired" ? "EXPIRED" : "ABANDONED";
   record.state.winnerSeatId = winner;
   record.state.endReason = reason;
+  closeRoomForNewGuests(roomId);
   persistTerminal(record);
   record.state.pause = null;
   record.state.question = null;

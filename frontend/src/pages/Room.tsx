@@ -23,7 +23,13 @@ import { useArenaSocket } from "@/hooks/useSocket";
 import { useGameStore } from "@/store/gameStore";
 import { graphEdgePoints } from "@/lib/graph";
 import { prewarmCWorker, runCInWorker, type CExecutionOutcome, type CTestResult } from "@/lib/c-runner";
-import { canConfigureMatch, TOPICS, type PublicQuestion, type TopicId } from "../../../shared/domain";
+import {
+  canConfigureMatch,
+  TOPICS,
+  type PublicAnswer,
+  type PublicQuestion,
+  type TopicId,
+} from "../../../shared/domain";
 import type { MatchPublicState } from "@/types";
 
 const MAX_CODING_READY_ATTEMPTS = 2;
@@ -141,7 +147,10 @@ export default function Room() {
   const seats = room?.seats ?? [];
   const self = seats.find((seat) => seat.seatId === seatId);
   const opponent = seats.find((seat) => seat.seatId !== seatId);
-  const host = room ? canConfigureMatch(room.metadata.source, room.metadata.hostSeatId, seatId) : false;
+  const host =
+    room && match?.phase !== "REMATCH"
+      ? canConfigureMatch(room.metadata.source, room.metadata.hostSeatId, seatId)
+      : false;
   const isSubmitted = seatId ? Boolean(match?.submissions[seatId]?.submitted) : false;
   const seconds =
     match?.phase === "COUNTDOWN"
@@ -151,7 +160,6 @@ export default function Room() {
         : null;
   const configure = () => {
     if (selectedTopics.length) {
-      api.clearSubmission();
       api.configure({ topicIds: selectedTopics, roundCount: 5, questionTimerSeconds: timer, includeCoding });
     }
     setSettingsOpen(false);
@@ -191,7 +199,6 @@ export default function Room() {
       (match.question.type === "graph" &&
         ["bfs-order", "dfs-order", "adjacency"].includes(match.question.operation ?? ""));
     const value = sequence ? ordered : answer;
-    api.clearSubmission();
     api.submit({ questionId: match.question.id, answer: value });
   };
 
@@ -301,15 +308,28 @@ export default function Room() {
               setOrdered={setOrdered}
               submitted={isSubmitted}
               submit={submit}
-              lastSubmission={isSubmitted ? api.lastSubmission : null}
             />
           )
         ) : match.phase === "REVEAL" ? (
-          <Reveal match={match} seatId={seatId} now={now} onSkip={api.skipReveal} />
+          <Reveal
+            match={match}
+            seatId={seatId}
+            now={now}
+            selfName={self?.name ?? name}
+            opponentName={opponent?.name ?? "opponent"}
+            onSkip={api.skipReveal}
+          />
         ) : match.phase === "PAUSED" ? (
           <Paused pause={match.pause} now={now} />
         ) : (
-          <Results match={match} selfSeatId={seatId} onRematch={api.rematch} onHome={leave} />
+          <Results
+            match={match}
+            selfSeatId={seatId}
+            selfName={self?.name ?? name}
+            opponentName={opponent?.name ?? "opponent"}
+            onRematch={api.rematch}
+            onHome={leave}
+          />
         )}
       </main>
       <Chat
@@ -603,7 +623,6 @@ const QuestionStage = ({
   setOrdered,
   submitted,
   submit,
-  lastSubmission,
 }: {
   match: MatchPublicState;
   seatId: string | null;
@@ -615,7 +634,6 @@ const QuestionStage = ({
   setOrdered: (items: string[]) => void;
   submitted: boolean;
   submit: () => void;
-  lastSubmission: { correct: boolean; total: number } | null;
 }) => {
   const question = match.question;
   if (!question) return null;
@@ -667,12 +685,6 @@ const QuestionStage = ({
               </>
             )}
           </button>
-          {lastSubmission && (
-            <p className="mt-4 text-center text-sm text-muted" role="status">
-              Server received your answer.{" "}
-              {lastSubmission.correct ? "Correctness confirmed." : "Keep going; reveal is after the round."}
-            </p>
-          )}
         </article>
         <aside className="space-y-3">
           <MiniScore
@@ -902,11 +914,15 @@ const Reveal = ({
   match,
   seatId,
   now,
+  selfName,
+  opponentName,
   onSkip,
 }: {
   match: MatchPublicState;
   seatId: string | null;
   now: number;
+  selfName: string;
+  opponentName: string;
   onSkip: () => void;
 }) => {
   const question = match.revealedQuestion;
@@ -925,10 +941,20 @@ const Reveal = ({
         </div>
       </div>
       <div className="panel mt-8 p-7 text-left">
-        <p className="eyebrow">answer</p>
+        <p className="eyebrow">correct answer</p>
         <p className="mt-2 text-2xl font-semibold text-gold">
           {question ? formatAnswer(question.answer, question) : "Answer unavailable"}
         </p>
+        <div className="mt-7 grid gap-3 sm:grid-cols-2">
+          {Object.entries(match.submissions).map(([id, submission]) => (
+            <AnswerReview
+              key={id}
+              label={id === seatId ? selfName : opponentName}
+              submission={submission}
+              question={question}
+            />
+          ))}
+        </div>
         <p className="eyebrow mt-7">explanation</p>
         <p className="mt-2 leading-7 text-muted">{question?.explanation}</p>
         {question?.type === "graph" && (
@@ -984,15 +1010,20 @@ const Paused = ({ pause, now }: { pause: MatchPublicState["pause"]; now: number 
 const Results = ({
   match,
   selfSeatId,
+  selfName,
+  opponentName,
   onRematch,
   onHome,
 }: {
   match: MatchPublicState;
   selfSeatId: string | null;
+  selfName: string;
+  opponentName: string;
   onRematch: () => void;
   onHome: () => void;
 }) => {
   const winner = match.winnerSeatId;
+  const rematchRequested = Boolean(selfSeatId && match.rematchRequests[selfSeatId]);
   const won = winner === selfSeatId;
   return (
     <section className="mx-auto max-w-4xl py-6 sm:py-12">
@@ -1017,9 +1048,13 @@ const Results = ({
         ))}
       </div>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
-        <button className="button button-primary" onClick={onRematch}>
-          <RotateCcw size={16} /> rematch
+        <button className="button button-primary" onClick={onRematch} disabled={rematchRequested}>
+          <RotateCcw size={16} /> {rematchRequested ? "rematch requested" : "rematch"}
         </button>
+        <p className="w-full text-center text-sm text-muted">
+          {Object.values(match.rematchRequests).filter(Boolean).length}/2 players requested a rematch.
+          {rematchRequested && " Waiting for your opponent to decide."}
+        </p>
         <button className="button button-ghost" onClick={onHome}>
           <LogOut size={16} /> leave room
         </button>
@@ -1036,8 +1071,18 @@ const Results = ({
               <ChevronDown className="group-open:rotate-180" size={16} />
             </summary>
             <div className="mt-4 border-t border-line pt-4 text-sm">
-              <p className="text-gold">Answer: {formatAnswer(round.question.answer, round.question)}</p>
-              <p className="mt-2 text-muted">{round.question.explanation}</p>
+              <p className="text-gold">Correct answer: {formatAnswer(round.question.answer, round.question)}</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {Object.entries(round.submissions).map(([id, submission]) => (
+                  <AnswerReview
+                    key={id}
+                    label={id === selfSeatId ? selfName : opponentName}
+                    submission={submission}
+                    question={round.question}
+                  />
+                ))}
+              </div>
+              <p className="mt-4 text-muted">{round.question.explanation}</p>
               <p className="mt-3 text-xs text-muted">Assumptions: {round.question.assumptions.join(" · ")}</p>
               <p className="mt-3 text-xs text-muted">
                 Provenance: {round.question.provenance.source} — {round.question.provenance.note}
@@ -1050,10 +1095,39 @@ const Results = ({
     </section>
   );
 };
+const AnswerReview = ({
+  label,
+  submission,
+  question,
+}: {
+  label: string;
+  submission: MatchPublicState["submissions"][string];
+  question: {
+    type: string;
+    graph?: { nodes: Array<{ id: string; label: string }> };
+  } | null;
+}) => (
+  <div className="rounded border border-line bg-ink/60 p-4">
+    <div className="flex items-center justify-between gap-3">
+      <span className="eyebrow">{label}</span>
+      <span
+        className={submission.correct === null ? "text-muted" : submission.correct ? "text-green-300" : "text-red-300"}
+      >
+        {submission.correct === null ? "not submitted" : submission.correct ? "correct" : "incorrect"}
+      </span>
+    </div>
+    <p className="mt-3 text-xs uppercase tracking-wider text-muted">submitted answer</p>
+    <p className="mt-1 break-words font-mono text-sm">
+      {submission.answer === null ? "No answer submitted" : formatAnswer(submission.answer, question ?? undefined)}
+    </p>
+  </div>
+);
 const formatAnswer = (
-  answer: string | number | boolean | string[],
+  answer: PublicAnswer,
   question?: { type: string; graph?: { nodes: Array<{ id: string; label: string }> } },
 ) => {
+  if (typeof answer === "object" && !Array.isArray(answer))
+    return answer.passed ? "Passed all tests" : `Did not pass (${answer.outcome.replace("-", " ")})`;
   if (!Array.isArray(answer)) return String(answer);
   if (question?.type === "graph")
     return answer.map((id) => question.graph?.nodes.find((node) => node.id === id)?.label ?? id).join(" → ");

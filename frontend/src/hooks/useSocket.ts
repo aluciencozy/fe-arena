@@ -12,8 +12,6 @@ export const useArenaSocket = (roomId: string, playerName: string) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [errorNotice, setErrorNotice] = useState("");
   const [connection, setConnection] = useState<"connecting" | "connected" | "disconnected">("connecting");
-  const [lastSubmission, setLastSubmission] = useState<{ correct: boolean; total: number } | null>(null);
-  const clearSubmission = useCallback(() => setLastSubmission(null), []);
   const markCodingReady = useCallback(() => socket.emit("match:coding-ready"), []);
 
   useEffect(() => {
@@ -51,8 +49,6 @@ export const useArenaSocket = (roomId: string, playerName: string) => {
       setErrorNotice(payload?.message ?? "The guest seat expired. The match ended safely.");
       setTimeout(() => navigate("/", { replace: true }), 1800);
     };
-    const onAck = (payload: { correct: boolean; score: { total: number } }) =>
-      setLastSubmission({ correct: payload.correct, total: payload.score.total });
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
     socket.on("room:session", onSession);
@@ -61,7 +57,6 @@ export const useArenaSocket = (roomId: string, playerName: string) => {
     socket.on("chat:message", onChat);
     socket.on("server:error", onError);
     socket.on("room:reconnect-failed", onReconnectFailed);
-    socket.on("match:submission-ack", onAck);
     connectSocket();
     if (socket.connected) join();
     return () => {
@@ -73,7 +68,6 @@ export const useArenaSocket = (roomId: string, playerName: string) => {
       socket.off("chat:message", onChat);
       socket.off("server:error", onError);
       socket.off("room:reconnect-failed", onReconnectFailed);
-      socket.off("match:submission-ack", onAck);
       scheduleSocketDisconnect();
     };
   }, [navigate, playerName, roomId, setMatch, setRoom, setSession]);
@@ -82,8 +76,6 @@ export const useArenaSocket = (roomId: string, playerName: string) => {
     messages,
     errorNotice,
     connection,
-    lastSubmission,
-    clearSubmission,
     sendChat: (message: string) => {
       if (message.trim()) socket.emit("chat:send", { message });
     },

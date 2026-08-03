@@ -182,6 +182,7 @@ test("an old terminal write cannot suppress persistence for a rematch", async ()
   const { room, guest } = setupRoom();
   leaveMatch(room.metadata.roomId, guest.seat.seatId, "forfeit", events());
   assert.equal(requestRematch(room.metadata.roomId, room.seat.seatId, events()).ok, true);
+  assert.equal(requestRematch(room.metadata.roomId, guest.seat.seatId, events()).ok, true);
   const firstMatchId = repository.snapshots[0]?.matchId;
   repository.completeNext();
   await waitForMatchPersistenceForTests();
