@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  CodingProblemSchema,
   calculateScore,
   ClientEventSchemas,
   compareScores,
@@ -13,8 +14,120 @@ import {
   TOPICS,
   type Question,
 } from "../../shared/domain.js";
+import { CODING_PROBLEMS } from "../../shared/coding-problems.js";
 import { QUESTION_BANK, validateQuestionBank } from "./data/questions.js";
-import { loadQuestionRepository, questionFromRow, questionToRow } from "./services/question-bank.service.js";
+import {
+  inMemoryQuestionRepository,
+  loadQuestionRepository,
+  questionFromRow,
+  questionToRow,
+} from "./services/question-bank.service.js";
+
+const CODE_OUTPUT_ORACLE: Record<string, string[]> = {
+  "q-array-c-output": ["10"],
+  "q-recursion-c-output": ["3 2 1 "],
+  "q-array-c-output-2": ["8"],
+  "q-list-c-output": ["9"],
+  "q-stack-c-output": ["1"],
+  "q-queue-c-output": ["8"],
+  "q-tree-c-output": ["2 5 9 "],
+  "q-avl-c-output": ["-2"],
+  "q-heap-c-output": ["1"],
+  "q-hash-c-output": ["5"],
+  "q-trie-c-output": ["1"],
+  "q-sort-c-output": ["sorted"],
+  "q-recursion-c-output-2": ["1 2 "],
+  "q-analysis-c-output": ["14"],
+  "q-hard-alias-increment": ["4 11 1"],
+  "q-hard-pointer-to-pointer": ["8 8"],
+  "q-hard-array-pointer-post": ["2 8 5"],
+  "q-hard-struct-alias": ["2 8"],
+  "q-hard-list-unlink": ["10 30 "],
+  "q-hard-stack-alias": ["2 13"],
+  "q-hard-stack-control": ["|3"],
+  "q-hard-queue-front-rear": ["4 9"],
+  "q-hard-queue-wrap": ["2 2 1"],
+  "q-hard-tree-unwind": ["1 2 3 "],
+  "q-hard-tree-height-trace": ["2 0"],
+  "q-hard-avl-balance-trace": ["-2 3"],
+  "q-hard-heap-sift": ["11 4 9"],
+  "q-hard-heap-index": ["5 1"],
+  "q-hard-hash-probe": ["2 27"],
+  "q-hard-hash-tombstone": ["3 2"],
+  "q-hard-trie-terminal": ["1 0"],
+  "q-hard-sort-invariant": ["2 3 6 5 "],
+  "q-hard-sort-compare": ["2 5"],
+  "q-hard-recursion-static": ["7 10"],
+  "q-hard-recursion-order": ["3 1 2 1 "],
+  "q-hard-analysis-short-circuit": ["10"],
+  "q-hard-analysis-bitmask": ["5"],
+  "q-hard-control-alias": ["9"],
+};
+
+type GraphQuestion = Extract<Question, { type: "graph" }>;
+
+const graphNeighbors = (question: GraphQuestion, nodeId: string): string[] =>
+  question.graph.nodes
+    .filter((node) =>
+      question.graph.edges.some((edge) =>
+        question.graph.directed
+          ? edge.from === nodeId && edge.to === node.id
+          : (edge.from === nodeId && edge.to === node.id) || (edge.from === node.id && edge.to === nodeId),
+      ),
+    )
+    .map((node) => node.id);
+
+const graphOracle = (question: GraphQuestion): string[] | boolean | number => {
+  if (question.operation === "adjacency") return graphNeighbors(question, question.nodeId!);
+  if (question.operation === "bfs-order") {
+    const visited = new Set([question.startNode!]);
+    const queue = [question.startNode!];
+    const order: string[] = [];
+    while (queue.length) {
+      const node = queue.shift()!;
+      order.push(node);
+      for (const neighbor of graphNeighbors(question, node)) {
+        if (visited.has(neighbor)) continue;
+        visited.add(neighbor);
+        queue.push(neighbor);
+      }
+    }
+    return order;
+  }
+  if (question.operation === "dfs-order") {
+    const visited = new Set<string>();
+    const order: string[] = [];
+    const visit = (node: string) => {
+      if (visited.has(node)) return;
+      visited.add(node);
+      order.push(node);
+      for (const neighbor of graphNeighbors(question, node)) visit(neighbor);
+    };
+    visit(question.startNode!);
+    return order;
+  }
+  const distances = new Map([[question.startNode!, 0]]);
+  const queue = [question.startNode!];
+  while (queue.length) {
+    const node = queue.shift()!;
+    for (const neighbor of graphNeighbors(question, node)) {
+      if (distances.has(neighbor)) continue;
+      distances.set(neighbor, distances.get(node)! + 1);
+      queue.push(neighbor);
+    }
+  }
+  if (question.operation === "reachability") return distances.has(question.targetNode!);
+  return distances.get(question.targetNode!) ?? -1;
+};
+
+const storedGraphAnswer = (question: GraphQuestion): string[] | boolean | number =>
+  question.operation === "bfs-order" || question.operation === "dfs-order"
+    ? question.answerOrder!
+    : question.operation === "adjacency"
+      ? question.adjacentNodes!
+      : question.operation === "reachability"
+        ? question.reachable!
+        : question.distance!;
 
 test("normalization is stable and explicit aliases grade short answers", () => {
   assert.equal(normalizeAnswer("  Little–Endian! "), "little endian");
@@ -25,10 +138,13 @@ test("normalization is stable and explicit aliases grade short answers", () => {
 
 test("reviewed bank has complete topic/type coverage, valid unique IDs, and hidden public solutions", () => {
   const questions = validateQuestionBank();
-  assert.equal(questions.length, 128);
+  assert.equal(questions.length, 201);
   assert.equal(new Set(questions.map((question) => question.id)).size, questions.length);
-  assert.equal(questions.filter((question) => question.type === "graph").length, 5);
-  assert.equal(questions.filter((question) => question.type === "coding").length, 3);
+  assert.equal(questions.filter((question) => question.type === "graph").length, 19);
+  assert.equal(questions.filter((question) => question.type === "coding").length, 38);
+  assert.ok(questions.filter((question) => question.difficulty === "stretch").length >= 70);
+  assert.ok(questions.some((question) => question.published === false));
+  assert.ok(questions.filter((question) => question.published !== false && question.type === "coding").length >= 30);
   assert.equal(new Set(questions.map((question) => question.type)).size, 7);
   assert.equal(new Set(questions.map((question) => question.topicId)).size, TOPICS.length);
   for (const topic of TOPICS) {
@@ -58,6 +174,68 @@ test("reviewed bank has complete topic/type coverage, valid unique IDs, and hidd
       assert.equal("reachable" in publicView, false);
       assert.equal("distance" in publicView, false);
     }
+  }
+});
+
+test("publication policy retains retired content but excludes it from play", () => {
+  const retired = QUESTION_BANK.find((question) => question.published === false)!;
+  assert.ok(retired);
+  assert.equal(inMemoryQuestionRepository.get(retired.id), undefined);
+  assert.equal(
+    inMemoryQuestionRepository.list().some((question) => question.id === retired.id),
+    false,
+  );
+  assert.ok(inMemoryQuestionRepository.list().every((question) => question.published !== false));
+});
+
+test("reviewed C traces match independent output oracles", () => {
+  const codeQuestions = QUESTION_BANK.filter(
+    (question): question is Extract<Question, { type: "code-output" }> => question.type === "code-output",
+  );
+  assert.deepEqual(codeQuestions.map((question) => question.id).sort(), Object.keys(CODE_OUTPUT_ORACLE).sort());
+  for (const question of codeQuestions) {
+    const expected = CODE_OUTPUT_ORACLE[question.id]!;
+    assert.deepEqual(question.output, expected, question.id);
+    assert.equal(gradeQuestion(question, { questionId: question.id, answer: expected }), true, question.id);
+    assert.equal(gradeQuestion(question, { questionId: question.id, answer: ["__incorrect__"] }), false, question.id);
+  }
+});
+
+test("reviewed graph answers match independent traversal oracles", () => {
+  for (const question of QUESTION_BANK.filter((item): item is GraphQuestion => item.type === "graph")) {
+    const expected = graphOracle(question);
+    assert.deepEqual(storedGraphAnswer(question), expected, question.id);
+    assert.equal(gradeQuestion(question, { questionId: question.id, answer: expected }), true, question.id);
+    const incorrect = Array.isArray(expected)
+      ? expected.length > 1
+        ? [expected[1]!, expected[0]!, ...expected.slice(2)]
+        : ["__incorrect__"]
+      : typeof expected === "boolean"
+        ? !expected
+        : expected === -1
+          ? 0
+          : expected + 1;
+    assert.equal(gradeQuestion(question, { questionId: question.id, answer: incorrect }), false, question.id);
+  }
+});
+
+test("browser coding fixtures are schema-valid and bounded", () => {
+  assert.equal(CODING_PROBLEMS.length, 38);
+  assert.equal(new Set(CODING_PROBLEMS.map((problem) => problem.id)).size, CODING_PROBLEMS.length);
+  for (const problem of CODING_PROBLEMS) {
+    assert.equal(CodingProblemSchema.safeParse(problem).success, true, problem.id);
+    assert.ok(problem.testHarness.length <= 8_192, problem.id);
+    const markers = [...problem.testHarness.matchAll(/FEA_TEST\|(\d+)\|/g)].map((match) => Number(match[1]));
+    assert.ok(markers.length > 0, problem.id);
+    assert.deepEqual(
+      markers,
+      markers.map((_, index) => index + 1),
+      problem.id,
+    );
+    assert.equal(
+      QUESTION_BANK.some((question) => question.id === `q-${problem.id}` && question.type === "coding"),
+      true,
+    );
   }
 });
 

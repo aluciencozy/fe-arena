@@ -96,6 +96,10 @@ const BaseQuestionSchema = z.object({
   assumptions: z.array(z.string()).min(1),
   provenance: ProvenanceSchema,
   difficulty: z.enum(["intro", "core", "stretch"]),
+  /** Publishing is a content-policy flag; retired questions remain in history. */
+  published: z.boolean().optional(),
+  /** Monotonic authored-bank version for forward content revisions. */
+  version: z.number().int().positive().optional(),
 });
 
 export const CodingProblemSchema = z.object({
@@ -437,8 +441,10 @@ export const selectSeededQuestions = (
 ) => {
   const unique = new Map<string, Question>();
   for (const question of questions) unique.set(question.id, question);
-  const allowed = [...unique.values()].filter((question) =>
-    question.type === "coding" ? includeCoding : !topicIds?.length || topicIds.includes(question.topicId),
+  const allowed = [...unique.values()].filter(
+    (question) =>
+      question.published !== false &&
+      (question.type === "coding" ? includeCoding : !topicIds?.length || topicIds.includes(question.topicId)),
   );
   if (!allowed.length || count <= 0 || allowed.length < count) return [];
   const shuffled = seededShuffle(allowed, seed);

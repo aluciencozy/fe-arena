@@ -10,7 +10,7 @@ if (!url || !secretKey) {
 }
 
 const questions = validateQuestionBank(QUESTION_BANK);
-const rows = questions.map((question) => ({ ...questionToRow(question), schema_version: 4, published: true }));
+const rows = questions.map((question) => ({ ...questionToRow(question), schema_version: 5 }));
 const client = createClient(url, secretKey, {
   auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
 });

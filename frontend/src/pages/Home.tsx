@@ -169,7 +169,8 @@ export default function Home() {
           <p className="eyebrow mt-8">public study queue</p>
           <h1 className="display mt-3 text-4xl">finding a study partner</h1>
           <p className="mt-4 max-w-md text-muted">
-            The public room uses the full reviewed bank, five rounds, and a five-minute question timer.
+            The public room uses the published reviewed bank; unpublished intro rows are excluded. It has five rounds
+            and a five-minute question timer.
           </p>
           <div className="mt-8 flex items-center gap-2 font-mono text-sm text-gold">
             <Clock3 size={16} /> max wait {Math.floor(queueSeconds / 60)}:{String(queueSeconds % 60).padStart(2, "0")}
@@ -314,7 +315,7 @@ export default function Home() {
           </article>
         </section>
         <section className="mt-16 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6 text-sm text-muted">
-          <span>12 topic families · original prompts · six answer types</span>
+          <span>12 topic families · original prompts · seven answer types</span>
           <span>Not affiliated with or endorsed by UCF.</span>
         </section>
         {view === "private" && <TopicDialog topics={topics} toggleTopic={toggleTopic} close={() => setView("home")} />}

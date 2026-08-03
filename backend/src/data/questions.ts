@@ -1,5 +1,6 @@
 import { CODING_PROBLEMS } from "../../../shared/coding-problems.js";
 import { QuestionSchema, type Question } from "../../../shared/domain.js";
+import { HARD_QUESTIONS } from "./hard-questions.js";
 
 /**
  * Reviewed, original study prompts. The provenance field records public topic
@@ -1644,11 +1645,12 @@ const additionalQuestions: Question[] = [
 
 QUESTION_BANK.push(
   ...additionalQuestions,
+  ...HARD_QUESTIONS,
   ...CODING_PROBLEMS.map((problem) => ({
     id: `q-${problem.id}`,
     topicId: "arrays-memory" as const,
     type: "coding" as const,
-    difficulty: "core" as const,
+    difficulty: "stretch" as const,
     prompt: problem.description,
     explanation: "Run the complete function against the reviewed browser test harness.",
     assumptions: [
@@ -1660,9 +1662,71 @@ QUESTION_BANK.push(
   })),
 );
 
+/**
+ * Published policy v2: retain introductory material for audit/history, but do
+ * not select it for new play. The reviewed stretch set is published by
+ * default; a question can be retired in-place without deleting terminal data.
+ */
+for (const question of QUESTION_BANK) {
+  question.published = question.difficulty !== "intro";
+  question.version = question.difficulty === "intro" ? 1 : 2;
+}
+
 export const validateQuestionBank = (questions: readonly Question[] = QUESTION_BANK) => {
   const parsed = questions.map((question) => QuestionSchema.parse(question));
   const ids = new Set<string>();
+  const graphNeighbors = (question: Extract<Question, { type: "graph" }>, nodeId: string) =>
+    question.graph.nodes
+      .filter((node) =>
+        question.graph.edges.some((edge) =>
+          question.graph.directed
+            ? edge.from === nodeId && edge.to === node.id
+            : (edge.from === nodeId && edge.to === node.id) || (edge.from === node.id && edge.to === nodeId),
+        ),
+      )
+      .map((node) => node.id);
+  const graphAnswer = (question: Extract<Question, { type: "graph" }>): string[] | boolean | number => {
+    if (question.operation === "adjacency") return graphNeighbors(question, question.nodeId!);
+    if (question.operation === "bfs-order") {
+      const visited = new Set([question.startNode!]);
+      const queue = [question.startNode!];
+      const order: string[] = [];
+      while (queue.length) {
+        const node = queue.shift()!;
+        order.push(node);
+        for (const neighbor of graphNeighbors(question, node)) {
+          if (visited.has(neighbor)) continue;
+          visited.add(neighbor);
+          queue.push(neighbor);
+        }
+      }
+      return order;
+    }
+    if (question.operation === "dfs-order") {
+      const visited = new Set<string>();
+      const order: string[] = [];
+      const visit = (node: string) => {
+        if (visited.has(node)) return;
+        visited.add(node);
+        order.push(node);
+        for (const neighbor of graphNeighbors(question, node)) visit(neighbor);
+      };
+      visit(question.startNode!);
+      return order;
+    }
+    const distances = new Map([[question.startNode!, 0]]);
+    const queue = [question.startNode!];
+    while (queue.length) {
+      const node = queue.shift()!;
+      for (const neighbor of graphNeighbors(question, node)) {
+        if (distances.has(neighbor)) continue;
+        distances.set(neighbor, distances.get(node)! + 1);
+        queue.push(neighbor);
+      }
+    }
+    if (question.operation === "reachability") return distances.has(question.targetNode!);
+    return distances.get(question.targetNode!) ?? -1;
+  };
   for (const question of parsed) {
     if (ids.has(question.id)) throw new Error(`Duplicate question id: ${question.id}`);
     ids.add(question.id);
@@ -1676,6 +1740,16 @@ export const validateQuestionBank = (questions: readonly Question[] = QUESTION_B
         throw new Error(`Invalid sequence answer: ${question.id}`);
     }
     if (question.type === "graph") {
+      const expected = graphAnswer(question);
+      const actual =
+        question.operation === "bfs-order" || question.operation === "dfs-order"
+          ? question.answerOrder!
+          : question.operation === "adjacency"
+            ? question.adjacentNodes!
+            : question.operation === "reachability"
+              ? question.reachable!
+              : question.distance!;
+      if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(`Invalid graph answer: ${question.id}`);
       const edgeKeys = new Set<string>();
       for (const edge of question.graph.edges) {
         const key = question.graph.directed ? `${edge.from}->${edge.to}` : [edge.from, edge.to].sort().join("--");
