@@ -3,6 +3,7 @@ import { ClientEventSchemas, ServerEventSchemas, type QuestionAttempt } from "..
 import type { AuthVerifier } from "../services/auth.service.js";
 import {
   createRoom,
+  createPrivateRoom,
   attachSeat,
   bindSeatAuthIdentity,
   disconnectSocket,
@@ -168,7 +169,12 @@ export const registerHandlers = (io: Server, socket: Socket, authVerifier: AuthV
   socket.on("room:create-private", (payload: unknown) => {
     const input = validate(socket, ClientEventSchemas["room:create-private"], payload);
     if (!input) return;
-    const created = createRoom("private", input.config, input.username);
+    const result = createPrivateRoom(input.requestId, input.config, input.username);
+    if (!result.ok) {
+      error(socket, result.error, "ROOM_CREATE_REPLAY");
+      return;
+    }
+    const created = result.created;
     attachSeat(created.metadata.roomId, created.seat, socket.id);
     bindVerifiedIdentity(socket, created.metadata.roomId, created.seat.seatId);
     enterRoom(io, socket, created.metadata.roomId, created.seat);

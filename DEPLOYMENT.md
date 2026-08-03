@@ -30,7 +30,7 @@ Copy `backend/.env.example` into the hosting platform's secret/environment confi
 
 Forward both HTTP and WebSocket upgrade traffic to the same backend process and preserve the `Origin` header. Use the frontend origin in `FRONTEND_ORIGINS`, not the proxy's internal address. Keep connection affinity/stickiness if the platform runs more than one backend: live state is in process memory and this MVP has no shared Socket.IO adapter. Forward `X-Forwarded-For` only through a trusted proxy and set `TRUST_PROXY` to match that topology; an incorrect value weakens IP-based rate controls.
 
-The existing Socket.IO transport and path are unchanged. A proxy must allow `GET`/`POST` requests and `Upgrade: websocket` for Socket.IO polling/websocket traffic. Do not cache `/healthz`, `/readyz`, API responses, or Socket.IO traffic.
+Socket.IO uses WebSocket first with polling fallback on its existing path. A proxy must allow `GET`/`POST` requests and `Upgrade: websocket` for Socket.IO polling/websocket traffic so the fallback remains available when upgrades fail. Do not cache `/healthz`, `/readyz`, API responses, or Socket.IO traffic.
 
 ## Captain-owned production steps (not performed by this PR)
 
