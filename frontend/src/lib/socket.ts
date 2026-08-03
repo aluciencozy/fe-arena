@@ -1,10 +1,8 @@
 import { io } from "socket.io-client";
+import { socketConnectionOptions } from "@/lib/socket-config";
 
-export const socket = io(import.meta.env.VITE_SOCKET_URL ?? "http://localhost:3001", {
-  autoConnect: false,
-  transports: ["websocket", "polling"],
-  auth: {},
-});
+export const socketUrl = import.meta.env.VITE_SOCKET_URL || "http://localhost:3001";
+export const socket = io(socketUrl, socketConnectionOptions);
 
 export const setSocketAccessToken = (accessToken: string | null) => {
   socket.auth = accessToken ? { accessToken } : {};

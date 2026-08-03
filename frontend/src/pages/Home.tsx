@@ -17,7 +17,8 @@ import {
 import AuthPanel from "@/components/AuthPanel";
 import { AppSettings } from "@/components/AppSettings";
 import { Select } from "@/components/ui/select";
-import { connectSocket, socket } from "@/lib/socket";
+import { connectSocket, socket, socketUrl } from "@/lib/socket";
+import { socketConnectionErrorMessage, socketDisconnectedMessage } from "@/lib/socket-errors";
 import { useGameStore } from "@/store/gameStore";
 import { TOPICS, type MatchConfig, type TopicId } from "../../../shared/domain";
 
@@ -38,6 +39,7 @@ const normalizeCode = (value: string) =>
     .slice(0, 6);
 
 type Notice = { kind: "error" | "info"; text: string } | null;
+type PrivateCreateRequest = { requestId: string; username: string; config: MatchConfig };
 export default function Home() {
   const navigate = useNavigate();
   const playerName = useGameStore((state) => state.playerName);
@@ -51,8 +53,12 @@ export default function Home() {
   const [queueExpiresAt, setQueueExpiresAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
+  const [connection, setConnection] = useState<"connecting" | "connected" | "disconnected">(
+    socket.connected ? "connected" : "disconnected",
+  );
   const queuedName = useRef<string | null>(null);
   const queueToken = useRef<string | null>(null);
+  const pendingPrivateCreate = useRef<PrivateCreateRequest | null>(null);
   const validName = name.trim().length > 0;
   const config: MatchConfig = useMemo(
     () => ({ topicIds: topics, roundCount: 5, questionTimerSeconds: timer }),
@@ -62,6 +68,7 @@ export default function Home() {
   useEffect(() => {
     const created = (payload: { roomId: string; seatId: string; reconnectToken: string }) => {
       useGameStore.getState().setSession(payload.seatId, payload.reconnectToken, payload.roomId);
+      pendingPrivateCreate.current = null;
       setBusy(false);
       navigate(`/room/${payload.roomId}`);
     };
@@ -74,6 +81,7 @@ export default function Home() {
     const waiting = (payload: { status: string; expiresAt?: number; queueToken?: string }) => {
       if (payload.status === "waiting") {
         if (payload.queueToken) queueToken.current = payload.queueToken;
+        setNotice(null);
         setView("queue");
         setQueueExpiresAt(payload.expiresAt ?? Date.now() + 300_000);
       } else {
@@ -84,6 +92,8 @@ export default function Home() {
       }
     };
     const onConnect = () => {
+      setConnection("connected");
+      if (pendingPrivateCreate.current) socket.emit("room:create-private", pendingPrivateCreate.current);
       if (queuedName.current)
         socket.emit(
           "queue:join",
@@ -92,7 +102,20 @@ export default function Home() {
             : { username: queuedName.current },
         );
     };
+    const onDisconnect = () => {
+      setConnection("disconnected");
+      if (pendingPrivateCreate.current) {
+        setNotice({ kind: "error", text: socketDisconnectedMessage(socketUrl) });
+      }
+      if (queuedName.current) setNotice({ kind: "error", text: socketDisconnectedMessage(socketUrl) });
+    };
+    const onConnectError = (reason: unknown) => {
+      setConnection("disconnected");
+      if (!pendingPrivateCreate.current) setBusy(false);
+      setNotice({ kind: "error", text: socketConnectionErrorMessage(reason, socketUrl) });
+    };
     const failed = (payload: { message?: string } | string) => {
+      pendingPrivateCreate.current = null;
       setBusy(false);
       setNotice({
         kind: "error",
@@ -103,12 +126,16 @@ export default function Home() {
     socket.on("queue:seat", queueSeat);
     socket.on("queue:state", waiting);
     socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("connect_error", onConnectError);
     socket.on("server:error", failed);
     return () => {
       socket.off("room:created", created);
       socket.off("queue:seat", queueSeat);
       socket.off("queue:state", waiting);
       socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("connect_error", onConnectError);
       socket.off("server:error", failed);
     };
   }, [navigate]);
@@ -130,8 +157,22 @@ export default function Home() {
   };
   const createPrivate = () => {
     if (!begin()) return;
+    const request = {
+      requestId: crypto.randomUUID(),
+      username: name.trim(),
+      config,
+    } satisfies PrivateCreateRequest;
+    pendingPrivateCreate.current = request;
     setBusy(true);
-    socket.emit("room:create-private", { username: name.trim(), config });
+    if (socket.connected) socket.emit("room:create-private", request);
+    else connectSocket();
+  };
+  const retryPrivateCreate = () => {
+    if (!pendingPrivateCreate.current) return;
+    setNotice(null);
+    setConnection("connecting");
+    connectSocket();
+    if (socket.connected) socket.emit("room:create-private", pendingPrivateCreate.current);
   };
   const joinPrivate = (event: React.FormEvent) => {
     event.preventDefault();
@@ -147,6 +188,13 @@ export default function Home() {
     queueToken.current = null;
     if (socket.connected) socket.emit("queue:join", { username: queuedName.current });
     setView("queue");
+  };
+  const retryQueue = () => {
+    if (!queuedName.current) return;
+    setNotice(null);
+    setConnection("connecting");
+    connectSocket();
+    if (socket.connected) socket.emit("queue:join", { username: queuedName.current });
   };
   const leaveQueue = () => {
     queuedName.current = null;
@@ -172,6 +220,17 @@ export default function Home() {
             The public room uses the published reviewed bank; unpublished intro rows are excluded. It has five rounds
             and a five-minute question timer.
           </p>
+          {notice && (
+            <p className="mt-5 max-w-xl text-sm text-red-300" role="alert">
+              {notice.text}
+            </p>
+          )}
+          {connection === "connecting" && <p className="mt-3 text-sm text-muted">Connecting to the study server…</p>}
+          {notice && (
+            <button className="button button-ghost mt-5" onClick={retryQueue}>
+              Retry connection
+            </button>
+          )}
           <div className="mt-8 flex items-center gap-2 font-mono text-sm text-gold">
             <Clock3 size={16} /> max wait {Math.floor(queueSeconds / 60)}:{String(queueSeconds % 60).padStart(2, "0")}
           </div>
@@ -251,6 +310,11 @@ export default function Home() {
               <p className={`mt-3 text-sm ${notice.kind === "error" ? "text-red-300" : "text-muted"}`} role="alert">
                 {notice.text}
               </p>
+            )}
+            {notice && busy && (
+              <button className="button button-ghost mt-4 w-full" onClick={retryPrivateCreate}>
+                Retry connection
+              </button>
             )}
             <div className="mt-7 flex items-center justify-between">
               <div>

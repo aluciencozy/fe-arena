@@ -22,10 +22,22 @@ Requirements: Node.js 20+ and npm.
 (cd frontend && npm install && npm run dev)
 ```
 
-The frontend runs at `http://localhost:5173`; the backend runs at `http://localhost:3001`. Copy `.env.example` files when changing those defaults:
+The frontend runs at `http://localhost:5173`; the backend runs at `http://localhost:3001` and must be running to start Solo practice or Public queue. If it is unavailable, the affected screen shows an actionable error and retry path. Copy `.env.example` files when changing those defaults:
 
 - `frontend/.env.example`: `VITE_SOCKET_URL`, and optional `VITE_SUPABASE_URL` plus `VITE_SUPABASE_PUBLISHABLE_KEY` for Auth only
 - `backend/.env.example`: `NODE_ENV`, `PORT`, exact `FRONTEND_ORIGINS`, `TRUST_PROXY`, optional `SUPABASE_URL` plus `SUPABASE_SECRET_KEY` for server-side question-bank/loading and persistence, and optional `SUPABASE_PUBLISHABLE_KEY` for server-side Auth token verification
+
+If the frontend reports that it cannot connect, verify the backend is reachable with `curl http://localhost:3001/healthz`. Check that `VITE_SOCKET_URL` points to that backend and that `FRONTEND_ORIGINS` exactly matches the browser origin (for example, `http://localhost:5173`).
+
+### Local connection diagnosis
+
+- Expected behavior: a guest who clicks Solo practice or Public queue connects to the backend, receives a Solo question or queue state, and can continue when the server is available.
+- Setup: run the frontend at `http://localhost:5173` and the backend at `http://localhost:3001` with the documented development commands; the backend uses the guest in-memory fallback when server-only persistence variables are absent.
+- Initiating trigger: click Solo practice or Public queue while the frontend attempts its first Socket.IO connection.
+- Observed behavior before the fix: with no backend process listening on `localhost:3001`, `curl http://localhost:3001/healthz` returned connection refused and the browser surfaced a WebSocket connection error instead of completing the action.
+- Visible symptom: the requested Solo or queue flow could not begin, and the unavailable backend was not actionable from the affected screen.
+- Repeatability: this reproduced consistently whenever the backend was stopped before the guest action.
+- Masking conditions: with the documented backend running, startup diagnostics showed port 3001 listening, `http://localhost:5173` allowlisted, and successful health and Socket.IO polling requests. A `127.0.0.1:5173` origin was correctly rejected, so the documented localhost path was not a CORS failure. A temporary proxy that blocked WebSocket upgrades but allowed polling reproduced the transport-specific failure; WebSocket-first connection now falls back to polling.
 
 ## Architecture
 
@@ -83,7 +95,7 @@ cd backend && npm run typecheck && npm test
 cd ../frontend && npm run lint && npm run build
 ```
 
-The backend tests cover normalization, all seven question types, Supabase row compatibility, seeded selection, score boundaries, hidden answers, answer privacy and authorization, reveal deadlines and skips, two-sided rematch coordination, fresh question selection, topic summaries, solo deadline handling, ready/countdown transitions, graph/C lifecycle submissions, duplicate-safe service behavior, queue expiry/cancellation, room isolation, reconnect seat restoration and rematch races, Auth token verification, private history authorization and isolation, account progress aggregation, guest fallback, production configuration validation, exact HTTP/Socket.IO origin checks, security headers, request-size and API/Socket.IO abuse limits, health/readiness responses, and runtime shutdown. Focused frontend runner tests cover source generation, machine-readable result parsing, worker failures, and timeout termination. Production hosting needs a Node process for the backend and a static host/reverse proxy for the Vite build; see [`DEPLOYMENT.md`](DEPLOYMENT.md) for those requirements. Live room and match state are intentionally in memory for this MVP. Supabase question loading and terminal persistence use the server-only secret key. Authenticated terminal summaries use server-verified Auth IDs, while local development without Supabase uses an in-memory history fallback.
+The backend tests cover normalization, all seven question types, Supabase row compatibility, seeded selection, score boundaries, hidden answers, answer privacy and authorization, reveal deadlines and skips, two-sided rematch coordination, fresh question selection, topic summaries, solo deadline handling, ready/countdown transitions, graph/C lifecycle submissions, duplicate-safe service behavior, queue expiry/cancellation, room isolation, reconnect seat restoration and rematch races, Auth token verification, private history authorization and isolation, account progress aggregation, guest fallback, production configuration validation, exact HTTP/Socket.IO origin checks, security headers, request-size and API/Socket.IO abuse limits, health/readiness responses, and runtime shutdown. Focused frontend tests cover Socket.IO transport fallback, actionable connection and retry messages, source generation, machine-readable result parsing, worker failures, and timeout termination. Production hosting needs a Node process for the backend and a static host/reverse proxy for the Vite build; see [`DEPLOYMENT.md`](DEPLOYMENT.md) for those requirements. Live room and match state are intentionally in memory for this MVP. Supabase question loading and terminal persistence use the server-only secret key. Authenticated terminal summaries use server-verified Auth IDs, while local development without Supabase uses an in-memory history fallback.
 
 ## Optional Supabase Auth and account history
 

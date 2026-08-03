@@ -22,6 +22,14 @@ type RoomRecord = { metadata: RoomMetadata; seats: RoomSeat[]; acceptingNewGuest
 const rooms = new Map<string, RoomRecord>();
 const socketSeats = new Map<string, { roomId: string; seatId: string }>();
 const tokenSeats = new Map<string, { roomId: string; seatId: string }>();
+const privateRoomRequests = new Map<
+  string,
+  {
+    username: string;
+    config: MatchConfig;
+    created: { metadata: RoomMetadata; seat: RoomSeat };
+  }
+>();
 
 const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const roomCode = () => Array.from({ length: 6 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
@@ -45,6 +53,24 @@ export const createRoom = (source: MatchSource, config: MatchConfig, hostName: s
   rooms.set(metadata.roomId, { metadata, seats: [seat], acceptingNewGuests: true });
   tokenSeats.set(seat.reconnectToken, { roomId: metadata.roomId, seatId: seat.seatId });
   return { metadata, seat };
+};
+
+export const createPrivateRoom = (requestId: string, config: MatchConfig, hostName: string) => {
+  const username = hostName.trim();
+  const existing = privateRoomRequests.get(requestId);
+  if (existing) {
+    const room = getRoom(existing.created.metadata.roomId);
+    const seat = room?.seats.find((candidate) => candidate.seatId === existing.created.seat.seatId);
+    if (room && seat) {
+      if (existing.username !== username || JSON.stringify(existing.config) !== JSON.stringify(config))
+        return { ok: false as const, error: "This room creation request was already used." };
+      return { ok: true as const, created: { metadata: room.metadata, seat } };
+    }
+    privateRoomRequests.delete(requestId);
+  }
+  const created = createRoom("private", config, username);
+  privateRoomRequests.set(requestId, { username, config, created });
+  return { ok: true as const, created };
 };
 
 export const getRoom = (roomId: string) => rooms.get(normalizeRoomId(roomId));
@@ -138,8 +164,12 @@ export const removeSeat = (roomIdInput: string, seatId: string) => {
   if (!seat) return null;
   if (seat.socketId) socketSeats.delete(seat.socketId);
   tokenSeats.delete(seat.reconnectToken);
-  if (record.seats.length === 0) rooms.delete(roomId);
-  else if (record.metadata.hostSeatId === seatId) record.metadata.hostSeatId = record.seats[0]!.seatId;
+  if (record.seats.length === 0) {
+    rooms.delete(roomId);
+    for (const [requestId, request] of privateRoomRequests) {
+      if (request.created.metadata.roomId === roomId) privateRoomRequests.delete(requestId);
+    }
+  } else if (record.metadata.hostSeatId === seatId) record.metadata.hostSeatId = record.seats[0]!.seatId;
   return { roomId, seat, remaining: record.seats };
 };
 
@@ -152,6 +182,9 @@ export const removeRoom = (roomIdInput: string) => {
     tokenSeats.delete(seat.reconnectToken);
   }
   rooms.delete(roomId);
+  for (const [requestId, request] of privateRoomRequests) {
+    if (request.created.metadata.roomId === roomId) privateRoomRequests.delete(requestId);
+  }
 };
 
 export const seatNames = (roomId: string) => getSeats(roomId).map((seat) => seat.name);
@@ -159,4 +192,5 @@ export const clearRoomsForTests = () => {
   rooms.clear();
   socketSeats.clear();
   tokenSeats.clear();
+  privateRoomRequests.clear();
 };

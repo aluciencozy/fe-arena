@@ -5,6 +5,7 @@ import {
   bindSeatAuthIdentity,
   clearRoomsForTests,
   createRoom,
+  createPrivateRoom,
   disconnectSocket,
   getMetadata,
   getSeats,
@@ -33,6 +34,20 @@ test("stable guest seats restore with the reconnect token", () => {
       .join(","),
     "Host,Guest",
   );
+  clearRoomsForTests();
+});
+
+test("private room creation reuses a request id without creating another room", () => {
+  clearRoomsForTests();
+  const requestId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const first = createPrivateRoom(requestId, config, "Host");
+  const second = createPrivateRoom(requestId, config, "Host");
+  assert.equal(first.ok, true);
+  assert.equal(second.ok, true);
+  if (!first.ok || !second.ok) return;
+  assert.equal(second.created.metadata.roomId, first.created.metadata.roomId);
+  assert.equal(getSeats(first.created.metadata.roomId).length, 1);
+  assert.equal(createPrivateRoom(requestId, config, "Other").ok, false);
   clearRoomsForTests();
 });
 
