@@ -499,7 +499,11 @@ export const MatchConfigSchema = z.object({
 });
 export type MatchConfig = z.infer<typeof MatchConfigSchema>;
 
-export const CreatePrivateSchema = z.object({ username: z.string().trim().min(1).max(24), config: MatchConfigSchema });
+export const CreatePrivateSchema = z.object({
+  requestId: z.string().uuid(),
+  username: z.string().trim().min(1).max(24),
+  config: MatchConfigSchema,
+});
 export const JoinRoomSchema = z.object({
   roomId: z
     .string()

@@ -39,6 +39,7 @@ const normalizeCode = (value: string) =>
     .slice(0, 6);
 
 type Notice = { kind: "error" | "info"; text: string } | null;
+type PrivateCreateRequest = { requestId: string; username: string; config: MatchConfig };
 export default function Home() {
   const navigate = useNavigate();
   const playerName = useGameStore((state) => state.playerName);
@@ -57,7 +58,7 @@ export default function Home() {
   );
   const queuedName = useRef<string | null>(null);
   const queueToken = useRef<string | null>(null);
-  const pendingPrivateCreate = useRef(false);
+  const pendingPrivateCreate = useRef<PrivateCreateRequest | null>(null);
   const validName = name.trim().length > 0;
   const config: MatchConfig = useMemo(
     () => ({ topicIds: topics, roundCount: 5, questionTimerSeconds: timer }),
@@ -67,7 +68,7 @@ export default function Home() {
   useEffect(() => {
     const created = (payload: { roomId: string; seatId: string; reconnectToken: string }) => {
       useGameStore.getState().setSession(payload.seatId, payload.reconnectToken, payload.roomId);
-      pendingPrivateCreate.current = false;
+      pendingPrivateCreate.current = null;
       setBusy(false);
       navigate(`/room/${payload.roomId}`);
     };
@@ -92,6 +93,7 @@ export default function Home() {
     };
     const onConnect = () => {
       setConnection("connected");
+      if (pendingPrivateCreate.current) socket.emit("room:create-private", pendingPrivateCreate.current);
       if (queuedName.current)
         socket.emit(
           "queue:join",
@@ -103,20 +105,17 @@ export default function Home() {
     const onDisconnect = () => {
       setConnection("disconnected");
       if (pendingPrivateCreate.current) {
-        pendingPrivateCreate.current = false;
-        setBusy(false);
         setNotice({ kind: "error", text: socketDisconnectedMessage(socketUrl) });
       }
       if (queuedName.current) setNotice({ kind: "error", text: socketDisconnectedMessage(socketUrl) });
     };
     const onConnectError = (reason: unknown) => {
       setConnection("disconnected");
-      pendingPrivateCreate.current = false;
-      setBusy(false);
+      if (!pendingPrivateCreate.current) setBusy(false);
       setNotice({ kind: "error", text: socketConnectionErrorMessage(reason, socketUrl) });
     };
     const failed = (payload: { message?: string } | string) => {
-      pendingPrivateCreate.current = false;
+      pendingPrivateCreate.current = null;
       setBusy(false);
       setNotice({
         kind: "error",
@@ -158,9 +157,22 @@ export default function Home() {
   };
   const createPrivate = () => {
     if (!begin()) return;
-    pendingPrivateCreate.current = true;
+    const request = {
+      requestId: crypto.randomUUID(),
+      username: name.trim(),
+      config,
+    } satisfies PrivateCreateRequest;
+    pendingPrivateCreate.current = request;
     setBusy(true);
-    socket.emit("room:create-private", { username: name.trim(), config });
+    if (socket.connected) socket.emit("room:create-private", request);
+    else connectSocket();
+  };
+  const retryPrivateCreate = () => {
+    if (!pendingPrivateCreate.current) return;
+    setNotice(null);
+    setConnection("connecting");
+    connectSocket();
+    if (socket.connected) socket.emit("room:create-private", pendingPrivateCreate.current);
   };
   const joinPrivate = (event: React.FormEvent) => {
     event.preventDefault();
@@ -303,6 +315,11 @@ export default function Home() {
               <p className={`mt-3 text-sm ${notice.kind === "error" ? "text-red-300" : "text-muted"}`} role="alert">
                 {notice.text}
               </p>
+            )}
+            {notice && busy && (
+              <button className="button button-ghost mt-4 w-full" onClick={retryPrivateCreate}>
+                Retry connection
+              </button>
             )}
             <div className="mt-7 flex items-center justify-between">
               <div>

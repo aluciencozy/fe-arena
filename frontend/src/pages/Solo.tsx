@@ -24,6 +24,7 @@ type SoloState = {
   runCorrect: number;
   runTotal: number;
 };
+type SoloStartRequest = { topicIds: TopicId[]; count: number; timerSeconds: number };
 const DEFAULT_TOPICS: TopicId[] = [
   "arrays-memory",
   "linked-lists",
@@ -42,10 +43,11 @@ export default function Solo() {
   const [now, setNow] = useState(() => Date.now());
   const [error, setError] = useState("");
   const [connection, setConnection] = useState<"connecting" | "connected" | "disconnected">(
-    socket.connected ? "connected" : "disconnected",
+    socket.connected ? "connected" : "connecting",
   );
   const connectionRef = useRef(socket.connected);
   const stateRef = useRef<SoloState | null>(null);
+  const pendingStart = useRef<SoloStartRequest | null>(null);
   useEffect(() => {
     let active = true;
     const onState = (next: SoloState) => {
@@ -58,6 +60,8 @@ export default function Solo() {
     const onConnect = () => {
       const restored = !connectionRef.current;
       connectionRef.current = true;
+      const queuedStart = pendingStart.current;
+      pendingStart.current = null;
       setConnection("connected");
       if (restored && stateRef.current) {
         stateRef.current = null;
@@ -65,8 +69,12 @@ export default function Solo() {
         setAnswer("");
         setOrdered([]);
         setError("Connection restored. Start a new run to continue practicing.");
-      } else if (restored) {
+      } else if (restored && !queuedStart) {
         setError("");
+      }
+      if (queuedStart) {
+        setError("");
+        socket.emit("solo:start", queuedStart);
       }
     };
     const onDisconnect = () => {
@@ -115,17 +123,24 @@ export default function Solo() {
     connectSocket();
     return false;
   };
-  const start = () => {
-    if (topics.length && requireConnection()) {
+  const startRun = (request: SoloStartRequest) => {
+    pendingStart.current = request;
+    if (!socket.connected) {
+      setConnection("connecting");
       setError("");
-      socket.emit("solo:start", { topicIds: topics, count: 5, timerSeconds: 120 });
+      connectSocket();
+      return;
     }
+    pendingStart.current = null;
+    setError("");
+    socket.emit("solo:start", request);
+  };
+  const start = () => {
+    if (topics.length) startRun({ topicIds: topics, count: 5, timerSeconds: 120 });
   };
   const startTopic = (topicId: TopicId) => {
     setTopics([topicId]);
-    if (!requireConnection()) return;
-    setError("");
-    socket.emit("solo:start", { topicIds: [topicId], count: 5, timerSeconds: 120 });
+    startRun({ topicIds: [topicId], count: 5, timerSeconds: 120 });
   };
   const submit = () => {
     if (!state?.question || !requireConnection()) return;
