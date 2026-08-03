@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ArrowRight, BookOpen, Check, Clock3, RotateCcw } from "lucide-react";
 import { AppSettings } from "@/components/AppSettings";
-import { connectSocket, socket } from "@/lib/socket";
+import { connectSocket, scheduleSocketDisconnect, socket, socketUrl } from "@/lib/socket";
+import { socketConnectionErrorMessage, socketDisconnectedMessage } from "@/lib/socket-errors";
 import { graphEdgePoints } from "@/lib/graph";
 import { TOPICS, type PublicQuestion, type TopicId, type TopicPerformance } from "../../../shared/domain";
 
@@ -40,39 +41,85 @@ export default function Solo() {
   const [ordered, setOrdered] = useState<string[]>([]);
   const [now, setNow] = useState(() => Date.now());
   const [error, setError] = useState("");
+  const [connection, setConnection] = useState<"connecting" | "connected" | "disconnected">(
+    socket.connected ? "connected" : "disconnected",
+  );
+  const connectionRef = useRef(socket.connected);
+  const stateRef = useRef<SoloState | null>(null);
   useEffect(() => {
     const onState = (next: SoloState) => {
       setNow(Date.now());
+      stateRef.current = next;
       setState(next);
       setAnswer("");
       setOrdered([]);
     };
-    const onError = (payload: { message?: string }) => setError(payload.message ?? "Something went wrong.");
+    const onConnect = () => {
+      const restored = !connectionRef.current;
+      connectionRef.current = true;
+      setConnection("connected");
+      if (restored && stateRef.current) {
+        stateRef.current = null;
+        setState(null);
+        setAnswer("");
+        setOrdered([]);
+        setError("Connection restored. Start a new run to continue practicing.");
+      } else if (restored) {
+        setError("");
+      }
+    };
+    const onDisconnect = () => {
+      connectionRef.current = false;
+      setConnection("disconnected");
+      setError(socketDisconnectedMessage(socketUrl));
+    };
+    const onConnectError = (reason: unknown) => {
+      connectionRef.current = false;
+      setConnection("disconnected");
+      setError(socketConnectionErrorMessage(reason, socketUrl));
+    };
+    const onError = (payload: { message?: string } | string) =>
+      setError(typeof payload === "string" ? payload : (payload.message ?? "Something went wrong."));
     socket.on("solo:state", onState);
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("connect_error", onConnectError);
     socket.on("server:error", onError);
     connectSocket();
     return () => {
       socket.off("solo:state", onState);
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("connect_error", onConnectError);
       socket.off("server:error", onError);
+      scheduleSocketDisconnect();
     };
   }, []);
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 500);
     return () => window.clearInterval(id);
   }, []);
+  const requireConnection = () => {
+    if (socket.connected) return true;
+    setConnection("connecting");
+    setError(socketConnectionErrorMessage(undefined, socketUrl));
+    connectSocket();
+    return false;
+  };
   const start = () => {
-    if (topics.length) {
+    if (topics.length && requireConnection()) {
       setError("");
       socket.emit("solo:start", { topicIds: topics, count: 5, timerSeconds: 120 });
     }
   };
   const startTopic = (topicId: TopicId) => {
     setTopics([topicId]);
+    if (!requireConnection()) return;
     setError("");
     socket.emit("solo:start", { topicIds: [topicId], count: 5, timerSeconds: 120 });
   };
   const submit = () => {
-    if (!state?.question) return;
+    if (!state?.question || !requireConnection()) return;
     const sequence =
       state.question.type === "ordered-sequence" ||
       (state.question.type === "graph" &&
@@ -80,7 +127,9 @@ export default function Solo() {
     const value = sequence ? ordered : answer;
     socket.emit("solo:submit", { questionId: state.question.id, answer: value });
   };
-  const next = () => socket.emit("solo:next");
+  const next = () => {
+    if (requireConnection()) socket.emit("solo:next");
+  };
   if (!state)
     return (
       <Shell>
@@ -114,7 +163,12 @@ export default function Solo() {
             <button className="button button-primary mt-7" onClick={start} disabled={!topics.length}>
               <BookOpen size={16} /> start five-question run <ArrowRight size={16} />
             </button>
-            {error && <p className="mt-4 text-sm text-red-300">{error}</p>}
+            {error && (
+              <p className="mt-4 text-sm text-red-300" role="alert">
+                {error}
+              </p>
+            )}
+            {connection === "connecting" && <p className="mt-3 text-sm text-muted">Connecting to the study server…</p>}
           </section>
         </main>
       </Shell>
@@ -228,6 +282,14 @@ export default function Solo() {
                   {seconds}s
                 </span>
               </div>
+              {error && (
+                <p className="mt-4 text-sm text-red-300" role="alert">
+                  {error}
+                </p>
+              )}
+              {connection === "connecting" && (
+                <p className="mt-3 text-sm text-muted">Connecting to the study server…</p>
+              )}
               <article className="panel mt-8 p-6 sm:p-9">
                 <h1 className="text-2xl font-semibold leading-snug sm:text-4xl">{question.prompt}</h1>
                 <QuestionArtifact question={question} />
@@ -241,7 +303,7 @@ export default function Solo() {
                 <button
                   className="button button-primary mt-8 w-full"
                   onClick={submit}
-                  disabled={!hasAnswer(question, answer, ordered)}
+                  disabled={connection !== "connected" || !hasAnswer(question, answer, ordered)}
                 >
                   <Check size={16} /> submit once
                 </button>

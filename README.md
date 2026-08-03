@@ -22,10 +22,12 @@ Requirements: Node.js 20+ and npm.
 (cd frontend && npm install && npm run dev)
 ```
 
-The frontend runs at `http://localhost:5173`; the backend runs at `http://localhost:3001`. Copy `.env.example` files when changing those defaults:
+The frontend runs at `http://localhost:5173`; the backend runs at `http://localhost:3001`. Both processes must be running before starting Solo practice or Public queue. Copy `.env.example` files when changing those defaults:
 
 - `frontend/.env.example`: `VITE_SOCKET_URL`, and optional `VITE_SUPABASE_URL` plus `VITE_SUPABASE_PUBLISHABLE_KEY` for Auth only
 - `backend/.env.example`: `NODE_ENV`, `PORT`, exact `FRONTEND_ORIGINS`, `TRUST_PROXY`, optional `SUPABASE_URL` plus `SUPABASE_SECRET_KEY` for server-side question-bank/loading and persistence, and optional `SUPABASE_PUBLISHABLE_KEY` for server-side Auth token verification
+
+If the frontend reports that it cannot connect, verify the backend is reachable with `curl http://localhost:3001/healthz`. Check that `VITE_SOCKET_URL` points to that backend and that `FRONTEND_ORIGINS` exactly matches the browser origin (for example, `http://localhost:5173`).
 
 ## Architecture
 

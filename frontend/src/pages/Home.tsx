@@ -17,7 +17,8 @@ import {
 } from "lucide-react";
 import AuthPanel from "@/components/AuthPanel";
 import { AppSettings } from "@/components/AppSettings";
-import { connectSocket, socket } from "@/lib/socket";
+import { connectSocket, socket, socketUrl } from "@/lib/socket";
+import { socketConnectionErrorMessage, socketDisconnectedMessage } from "@/lib/socket-errors";
 import { useGameStore } from "@/store/gameStore";
 import { TOPICS, type MatchConfig, type TopicId } from "../../../shared/domain";
 
@@ -51,6 +52,9 @@ export default function Home() {
   const [queueExpiresAt, setQueueExpiresAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
+  const [connection, setConnection] = useState<"connecting" | "connected" | "disconnected">(
+    socket.connected ? "connected" : "disconnected",
+  );
   const queuedName = useRef<string | null>(null);
   const queueToken = useRef<string | null>(null);
   const validName = name.trim().length > 0;
@@ -84,6 +88,8 @@ export default function Home() {
       }
     };
     const onConnect = () => {
+      setConnection("connected");
+      setNotice(null);
       if (queuedName.current)
         socket.emit(
           "queue:join",
@@ -91,6 +97,15 @@ export default function Home() {
             ? { username: queuedName.current, queueToken: queueToken.current }
             : { username: queuedName.current },
         );
+    };
+    const onDisconnect = () => {
+      setConnection("disconnected");
+      if (queuedName.current) setNotice({ kind: "error", text: socketDisconnectedMessage(socketUrl) });
+    };
+    const onConnectError = (reason: unknown) => {
+      setConnection("disconnected");
+      setBusy(false);
+      setNotice({ kind: "error", text: socketConnectionErrorMessage(reason, socketUrl) });
     };
     const failed = (payload: { message?: string } | string) => {
       setBusy(false);
@@ -103,12 +118,16 @@ export default function Home() {
     socket.on("queue:seat", queueSeat);
     socket.on("queue:state", waiting);
     socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("connect_error", onConnectError);
     socket.on("server:error", failed);
     return () => {
       socket.off("room:created", created);
       socket.off("queue:seat", queueSeat);
       socket.off("queue:state", waiting);
       socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("connect_error", onConnectError);
       socket.off("server:error", failed);
     };
   }, [navigate]);
@@ -148,6 +167,14 @@ export default function Home() {
     if (socket.connected) socket.emit("queue:join", { username: queuedName.current });
     setView("queue");
   };
+  const retryQueue = () => {
+    if (!queuedName.current) return;
+    queueToken.current = null;
+    setNotice(null);
+    setConnection("connecting");
+    connectSocket();
+    if (socket.connected) socket.emit("queue:join", { username: queuedName.current });
+  };
   const leaveQueue = () => {
     queuedName.current = null;
     queueToken.current = null;
@@ -172,6 +199,17 @@ export default function Home() {
             The public room uses the published reviewed bank; unpublished intro rows are excluded. It has five rounds
             and a five-minute question timer.
           </p>
+          {notice && (
+            <p className="mt-5 max-w-xl text-sm text-red-300" role="alert">
+              {notice.text}
+            </p>
+          )}
+          {connection === "connecting" && <p className="mt-3 text-sm text-muted">Connecting to the study server…</p>}
+          {notice && (
+            <button className="button button-ghost mt-5" onClick={retryQueue}>
+              Retry connection
+            </button>
+          )}
           <div className="mt-8 flex items-center gap-2 font-mono text-sm text-gold">
             <Clock3 size={16} /> max wait {Math.floor(queueSeconds / 60)}:{String(queueSeconds % 60).padStart(2, "0")}
           </div>
