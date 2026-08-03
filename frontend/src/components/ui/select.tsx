@@ -50,11 +50,11 @@ export function Select({
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [open]);
 
-  const choose = (index: number) => {
+  const choose = (index: number, keepOpen = false) => {
     const option = options[index];
     if (!option) return;
     onChange(option.value);
-    setOpen(false);
+    setOpen(keepOpen);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
@@ -80,17 +80,17 @@ export function Select({
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       const direction = event.key === "ArrowDown" ? 1 : -1;
-      setHighlightedIndex((current) => {
-        const start = open ? current : selectedIndex;
-        return (start + direction + options.length) % options.length;
-      });
-      setOpen(true);
+      const start = open ? highlightedIndex : selectedIndex;
+      const nextIndex = (start + direction + options.length) % options.length;
+      setHighlightedIndex(nextIndex);
+      choose(nextIndex, true);
       return;
     }
     if (event.key === "Home" || event.key === "End") {
       event.preventDefault();
-      setHighlightedIndex(event.key === "Home" ? 0 : options.length - 1);
-      setOpen(true);
+      const nextIndex = event.key === "Home" ? 0 : options.length - 1;
+      setHighlightedIndex(nextIndex);
+      choose(nextIndex, true);
     }
   };
 
