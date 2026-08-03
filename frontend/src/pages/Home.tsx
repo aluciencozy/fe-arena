@@ -11,12 +11,12 @@ import {
   Menu,
   Radio,
   ShieldCheck,
-  Sparkles,
   Users,
   X,
 } from "lucide-react";
 import AuthPanel from "@/components/AuthPanel";
 import { AppSettings } from "@/components/AppSettings";
+import { Select } from "@/components/ui/select";
 import { connectSocket, socket } from "@/lib/socket";
 import { useGameStore } from "@/store/gameStore";
 import { TOPICS, type MatchConfig, type TopicId } from "../../../shared/domain";
@@ -187,17 +187,12 @@ export default function Home() {
       <main className="mx-auto max-w-6xl px-5 pb-20 pt-12 sm:px-8 sm:pt-20">
         <section className="grid items-end gap-10 lg:grid-cols-[1.2fr_.8fr]">
           <div>
-            <div className="eyebrow flex items-center gap-2">
-              <Sparkles size={14} className="text-gold" /> foundation exam study arena
-            </div>
-            <h1 className="display mt-5 max-w-3xl text-5xl leading-[.92] sm:text-8xl">
-              think clearly.
-              <br />
-              <span className="text-gold">answer faster.</span>
+            <div className="eyebrow">foundation exam study arena</div>
+            <h1 className="mt-5 max-w-3xl font-mono text-5xl font-bold leading-[.95] tracking-[-.075em] sm:text-7xl">
+              FE Arena study room
             </h1>
             <p className="mt-7 max-w-xl text-lg leading-8 text-muted">
-              A focused, unofficial practice room for core computer science foundations. Solo drills, private 1v1s, and
-              a public study queue.
+              Practice core computer science foundations with solo drills, private 1v1s, and public study rooms.
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
               <button className="button button-primary" onClick={joinQueue}>
@@ -259,15 +254,19 @@ export default function Home() {
             )}
             <div className="mt-7 flex items-center justify-between">
               <div>
-                <p className="field-label">question timer</p>
+                <p id="private-timer-label" className="field-label">
+                  question timer
+                </p>
                 <p className="mt-1 text-sm text-muted">{timer} seconds · five rounds</p>
               </div>
-              <select className="field w-auto" value={timer} onChange={(event) => setTimer(Number(event.target.value))}>
-                <option value={60}>60 sec</option>
-                <option value={90}>90 sec</option>
-                <option value={120}>120 sec</option>
-                <option value={300}>5 min</option>
-              </select>
+              <Select
+                value={String(timer)}
+                options={TIMER_OPTIONS}
+                onChange={(value) => setTimer(Number(value))}
+                containerClassName="w-auto"
+                buttonClassName="w-auto"
+                ariaLabelledBy="private-timer-label"
+              />
             </div>
             <button
               className="button button-primary mt-6 w-full"
@@ -318,11 +317,26 @@ export default function Home() {
           <span>12 topic families · original prompts · seven answer types</span>
           <span>Not affiliated with or endorsed by UCF.</span>
         </section>
-        {view === "private" && <TopicDialog topics={topics} toggleTopic={toggleTopic} close={() => setView("home")} />}
+        {view === "private" && (
+          <TopicDialog
+            topics={topics}
+            toggleTopic={toggleTopic}
+            timer={timer}
+            setTimer={setTimer}
+            close={() => setView("home")}
+          />
+        )}
       </main>
     </Shell>
   );
 }
+
+const TIMER_OPTIONS = [
+  { value: "60", label: "60 sec" },
+  { value: "90", label: "90 sec" },
+  { value: "120", label: "120 sec" },
+  { value: "300", label: "5 min" },
+];
 
 const Feature = ({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) => (
   <div className="flex gap-3">
@@ -336,10 +350,14 @@ const Feature = ({ icon, title, text }: { icon: React.ReactNode; title: string; 
 const TopicDialog = ({
   topics,
   toggleTopic,
+  timer,
+  setTimer,
   close,
 }: {
   topics: TopicId[];
   toggleTopic: (id: TopicId) => void;
+  timer: number;
+  setTimer: (timer: number) => void;
   close: () => void;
 }) => (
   <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-5" role="dialog" aria-modal="true">
@@ -355,6 +373,22 @@ const TopicDialog = ({
         <button className="icon-button" onClick={close} aria-label="Close">
           <X size={17} />
         </button>
+      </div>
+      <div className="mt-7 flex items-center justify-between gap-4 border-y border-line py-4">
+        <div>
+          <p id="topic-dialog-timer-label" className="field-label">
+            question timer
+          </p>
+          <p className="mt-1 text-sm text-muted">{timer} seconds · five rounds</p>
+        </div>
+        <Select
+          value={String(timer)}
+          options={TIMER_OPTIONS}
+          onChange={(value) => setTimer(Number(value))}
+          containerClassName="w-auto"
+          buttonClassName="w-auto"
+          ariaLabelledBy="topic-dialog-timer-label"
+        />
       </div>
       <div className="mt-7 grid gap-2 sm:grid-cols-2">
         {TOPICS.map((topic) => (
