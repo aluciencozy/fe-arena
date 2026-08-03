@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useArenaSocket } from "@/hooks/useSocket";
 import { useGameStore } from "@/store/gameStore";
+import { Select } from "@/components/ui/select";
 import { graphEdgePoints } from "@/lib/graph";
 import { prewarmCWorker, runCInWorker, type CExecutionOutcome, type CTestResult } from "@/lib/c-runner";
 import {
@@ -33,6 +34,12 @@ import {
 import type { MatchPublicState } from "@/types";
 
 const MAX_CODING_READY_ATTEMPTS = 2;
+const TIMER_OPTIONS = [
+  { value: "60", label: "60 sec" },
+  { value: "90", label: "90 sec" },
+  { value: "120", label: "120 sec" },
+  { value: "300", label: "5 min" },
+];
 
 const codeOf = (value: string) =>
   value
@@ -441,14 +448,18 @@ const Lobby = ({
               />
               include reviewed browser C rounds (results are client-reported; no anti-cheat guarantee)
             </label>
-            <div className="mt-4 flex items-center gap-3">
-              <span className="text-sm text-muted">Timer</span>
-              <select className="field w-auto" value={timer} onChange={(event) => setTimer(Number(event.target.value))}>
-                <option value={60}>60 sec</option>
-                <option value={90}>90 sec</option>
-                <option value={120}>120 sec</option>
-                <option value={300}>5 min</option>
-              </select>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <span id="room-timer-label" className="text-sm text-muted">
+                Timer
+              </span>
+              <Select
+                value={String(timer)}
+                options={TIMER_OPTIONS}
+                onChange={(value) => setTimer(Number(value))}
+                containerClassName="w-auto"
+                buttonClassName="w-auto"
+                ariaLabelledBy="room-timer-label"
+              />
               <button className="button button-primary ml-auto" onClick={onConfigure}>
                 save settings
               </button>

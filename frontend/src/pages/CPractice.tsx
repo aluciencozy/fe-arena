@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import Editor from "@monaco-editor/react";
-import { ArrowLeft, Check, ChevronDown, CircleAlert, Clock3, Code2, Play, RotateCcw } from "lucide-react";
+import { ArrowLeft, Check, CircleAlert, Clock3, Code2, Play, RotateCcw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { CODING_PROBLEMS } from "../../../shared/coding-problems";
 import { runCInWorker, type CExecutionOutcome } from "@/lib/c-runner";
 import { AppSettings } from "@/components/AppSettings";
+import { Select } from "@/components/ui/select";
 
 export default function CPractice() {
   const [problemId, setProblemId] = useState(CODING_PROBLEMS[0]!.id);
@@ -135,60 +136,22 @@ const ProblemPicker = ({
   problemId: string;
   onChange: (problemId: string) => void;
   disabled: boolean;
-}) => {
-  const [open, setOpen] = useState(false);
-  const problem = CODING_PROBLEMS.find((item) => item.id === problemId) ?? CODING_PROBLEMS[0]!;
-  return (
-    <div className="relative">
-      <span className="field-label">reviewed problem</span>
-      <button
-        type="button"
-        className="field mt-2 flex items-center justify-between text-left"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        disabled={disabled}
-        onClick={() => setOpen((value) => !value)}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") setOpen(false);
-          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-            event.preventDefault();
-            const index = CODING_PROBLEMS.findIndex((item) => item.id === problemId);
-            const nextIndex =
-              (index + (event.key === "ArrowDown" ? 1 : -1) + CODING_PROBLEMS.length) % CODING_PROBLEMS.length;
-            onChange(CODING_PROBLEMS[nextIndex]!.id);
-            setOpen(true);
-          }
-        }}
-      >
-        <span>{problem.title}</span>
-        <ChevronDown size={16} className={open ? "rotate-180 transition-transform" : "transition-transform"} />
-      </button>
-      {open && (
-        <div
-          className="absolute z-20 mt-2 w-full rounded-lg border border-line bg-panel-raised p-1 shadow-2xl"
-          role="listbox"
-          aria-label="Reviewed C problems"
-        >
-          {CODING_PROBLEMS.map((item) => (
-            <button
-              type="button"
-              role="option"
-              aria-selected={item.id === problemId}
-              key={item.id}
-              className={`w-full rounded px-3 py-2 text-left text-sm hover:bg-gold/10 ${item.id === problemId ? "text-gold" : "text-cream"}`}
-              onClick={() => {
-                onChange(item.id);
-                setOpen(false);
-              }}
-            >
-              {item.title}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
+}) => (
+  <div>
+    <label id="reviewed-problem-label" className="field-label" htmlFor="reviewed-problem">
+      reviewed problem
+    </label>
+    <Select
+      id="reviewed-problem"
+      value={problemId}
+      options={CODING_PROBLEMS.map((item) => ({ value: item.id, label: item.title }))}
+      onChange={onChange}
+      disabled={disabled}
+      containerClassName="mt-2"
+      ariaLabelledBy="reviewed-problem-label"
+    />
+  </div>
+);
 
 const RunnerOutput = ({ outcome }: { outcome: CExecutionOutcome }) => {
   const successful = outcome.kind === "success" && outcome.passed;
