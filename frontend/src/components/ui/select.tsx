@@ -1,10 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { ChevronDown } from "lucide-react";
-
-export type SelectOption = {
-  value: string;
-  label: string;
-};
+import { findTypeaheadOptionIndex, type SelectOption } from "./select-options";
 
 type SelectProps = {
   id?: string;
@@ -34,12 +30,30 @@ export function Select({
   const listboxId = `${triggerId}-options`;
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const typeaheadBufferRef = useRef("");
+  const typeaheadTimeoutRef = useRef<number | null>(null);
   const selectedIndex = Math.max(
     0,
     options.findIndex((option) => option.value === value),
   );
   const [highlightedIndex, setHighlightedIndex] = useState(selectedIndex);
   const selectedOption = options[selectedIndex] ?? options[0];
+
+  const clearTypeahead = () => {
+    typeaheadBufferRef.current = "";
+    if (typeaheadTimeoutRef.current !== null) {
+      window.clearTimeout(typeaheadTimeoutRef.current);
+      typeaheadTimeoutRef.current = null;
+    }
+  };
+
+  const scheduleTypeaheadClear = () => {
+    if (typeaheadTimeoutRef.current !== null) window.clearTimeout(typeaheadTimeoutRef.current);
+    typeaheadTimeoutRef.current = window.setTimeout(() => {
+      typeaheadBufferRef.current = "";
+      typeaheadTimeoutRef.current = null;
+    }, 700);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -49,6 +63,12 @@ export function Select({
     document.addEventListener("pointerdown", handlePointerDown);
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [open]);
+
+  useEffect(() => {
+    return () => {
+      if (typeaheadTimeoutRef.current !== null) window.clearTimeout(typeaheadTimeoutRef.current);
+    };
+  }, []);
 
   const choose = (index: number, keepOpen = false) => {
     const option = options[index];
@@ -60,16 +80,19 @@ export function Select({
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (disabled || options.length === 0) return;
     if (event.key === "Tab") {
+      clearTypeahead();
       setOpen(false);
       return;
     }
     if (event.key === "Escape") {
       event.preventDefault();
+      clearTypeahead();
       setOpen(false);
       return;
     }
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
+      clearTypeahead();
       if (open) choose(highlightedIndex);
       else {
         setHighlightedIndex(selectedIndex);
@@ -79,6 +102,7 @@ export function Select({
     }
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
+      clearTypeahead();
       const direction = event.key === "ArrowDown" ? 1 : -1;
       const start = open ? highlightedIndex : selectedIndex;
       const nextIndex = (start + direction + options.length) % options.length;
@@ -88,10 +112,23 @@ export function Select({
     }
     if (event.key === "Home" || event.key === "End") {
       event.preventDefault();
+      clearTypeahead();
       const nextIndex = event.key === "Home" ? 0 : options.length - 1;
       setHighlightedIndex(nextIndex);
       choose(nextIndex, true);
+      return;
     }
+    if (event.key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) return;
+
+    const nextQuery = `${typeaheadBufferRef.current}${event.key}`;
+    const bufferedIndex = findTypeaheadOptionIndex(options, nextQuery);
+    const nextIndex = bufferedIndex !== -1 ? bufferedIndex : findTypeaheadOptionIndex(options, event.key);
+    if (nextIndex === -1) return;
+    event.preventDefault();
+    typeaheadBufferRef.current = bufferedIndex !== -1 ? nextQuery : event.key;
+    scheduleTypeaheadClear();
+    setHighlightedIndex(nextIndex);
+    choose(nextIndex, open);
   };
 
   return (
@@ -109,6 +146,7 @@ export function Select({
         aria-activedescendant={open ? `${listboxId}-${options[highlightedIndex]?.value}` : undefined}
         disabled={disabled}
         onClick={() => {
+          clearTypeahead();
           setHighlightedIndex(selectedIndex);
           setOpen((current) => !current);
         }}
