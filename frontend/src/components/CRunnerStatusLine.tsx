@@ -24,18 +24,29 @@ export const CRunnerStatusLine = ({
 }) => {
   const failed = status.state === "failed" || Boolean(outcome && outcome.kind !== "success");
   const testsNeedAttention = outcome?.kind === "success" && !outcome.passed;
+  const retryable = failed || testsNeedAttention;
   const loading = active || status.state === "loading";
+  const outcomeLabel =
+    outcome?.kind === "compile-error"
+      ? "compile error - fix the code and try again"
+      : outcome?.kind === "runtime-error"
+        ? "runtime error - try again"
+        : outcome?.kind === "timeout"
+          ? `${outcome.phase} timed out - try again`
+          : undefined;
   const label = loading
     ? loadingLabel(status.phase)
     : testsNeedAttention
       ? "tests need attention"
-      : outcome?.kind === "success" && outcome.passed
-        ? "all tests passed"
-        : failed
-          ? "runner unavailable"
-          : status.state === "ready" || status.phase === "ready"
-            ? "coding environment ready"
-            : "ready to run tests";
+      : outcomeLabel
+        ? outcomeLabel
+        : outcome?.kind === "success" && outcome.passed
+          ? "all tests passed"
+          : failed
+            ? "runner unavailable"
+            : status.state === "ready" || status.phase === "ready"
+              ? "coding environment ready"
+              : "ready to run tests";
   return (
     <div className="flex min-h-8 items-center gap-2 text-sm text-muted" aria-live="polite" role="status">
       {loading ? (
@@ -45,8 +56,8 @@ export const CRunnerStatusLine = ({
       ) : (
         <Check size={15} className="text-green-300" aria-hidden="true" />
       )}
-      <span>{error && failed ? error : label}</span>
-      {onRetry && failed && (
+      <span>{error && failed && !outcome ? error : label}</span>
+      {onRetry && retryable && (
         <button
           className="button button-ghost ml-1 px-2 py-1 text-xs"
           type="button"

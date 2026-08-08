@@ -493,7 +493,13 @@ const SoloCodingQuestionStage = ({
           <CRunnerProgress status={runnerStatus} error={runnerError} onRetry={run} retryLabel="retry tests" />
         ) : (
           <div className="mt-5">
-            <CRunnerStatusLine status={runnerStatus} error={runnerError} outcome={outcome} active={runPending} />
+            <CRunnerStatusLine
+              status={runnerStatus}
+              error={runnerError}
+              outcome={outcome}
+              active={runPending}
+              onRetry={run}
+            />
           </div>
         )}
         <div className="mt-7 border border-line">

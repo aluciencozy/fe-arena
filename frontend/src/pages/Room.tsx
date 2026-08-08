@@ -91,7 +91,7 @@ export default function Room() {
     "recursion",
     "analysis-mathematics",
   ]);
-  const [timer, setTimer] = useState(DEFAULT_TIMER_SECONDS);
+  const [timerOverride, setTimerOverride] = useState<number | null>(null);
   const [includeCoding, setIncludeCoding] = useState(false);
   const [codingReadyError, setCodingReadyError] = useState("");
   const [codingReadyRetry, setCodingReadyRetry] = useState(0);
@@ -102,6 +102,8 @@ export default function Room() {
   const [copied, setCopied] = useState(false);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
   const capabilityReady = isCodingCapabilityAvailable();
+  const timer = timerOverride ?? match?.config.questionTimerSeconds ?? DEFAULT_TIMER_SECONDS;
+  const setTimer = (value: number) => setTimerOverride(value);
   const codingEnvironmentError = capabilityReady
     ? ""
     : CODING_CAPABILITY_MESSAGE;
@@ -222,6 +224,7 @@ export default function Room() {
     if (selectedTopics.length) {
       api.configure({ topicIds: selectedTopics, roundCount: 5, questionTimerSeconds: timer, includeCoding });
     }
+    setTimerOverride(null);
     setSettingsOpen(false);
   };
   const leave = () => {
@@ -725,7 +728,13 @@ const CodingQuestionStage = ({
         <CRunnerProgress status={runnerStatus} error={runnerError} onRetry={run} retryLabel="retry tests" />
       ) : (
         <div className="mt-5">
-          <CRunnerStatusLine status={runnerStatus} error={runnerError} outcome={outcome} active={runPending} />
+          <CRunnerStatusLine
+            status={runnerStatus}
+            error={runnerError}
+            outcome={outcome}
+            active={runPending}
+            onRetry={run}
+          />
         </div>
       )}
       <div className="mt-7 panel overflow-hidden">
