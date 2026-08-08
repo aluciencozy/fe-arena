@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
@@ -17,6 +17,7 @@ import {
 import AuthPanel from "@/components/AuthPanel";
 import { AppSettings } from "@/components/AppSettings";
 import { Select } from "@/components/ui/select";
+import { isPrivateCreateResponseForActiveRequest } from "@/lib/private-create";
 import { connectSocket, socket, socketUrl } from "@/lib/socket";
 import { socketConnectionErrorMessage, socketDisconnectedMessage } from "@/lib/socket-errors";
 import { useGameStore } from "@/store/gameStore";
@@ -40,6 +41,8 @@ const normalizeCode = (value: string) =>
 
 type Notice = { kind: "error" | "info"; text: string } | null;
 type PrivateCreateRequest = { requestId: string; username: string; config: MatchConfig };
+type PrivateCreateAck = { ok: boolean; roomId?: string; error?: string };
+type ActivePrivateCreate = { requestId: string; attempt: number };
 export default function Home() {
   const navigate = useNavigate();
   const playerName = useGameStore((state) => state.playerName);
@@ -53,23 +56,78 @@ export default function Home() {
   const [queueExpiresAt, setQueueExpiresAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
+  const [privateRequestState, setPrivateRequestState] = useState<"idle" | "waiting" | "timed-out">("idle");
   const [connection, setConnection] = useState<"connecting" | "connected" | "disconnected">(
     socket.connected ? "connected" : "disconnected",
   );
   const queuedName = useRef<string | null>(null);
   const queueToken = useRef<string | null>(null);
   const pendingPrivateCreate = useRef<PrivateCreateRequest | null>(null);
+  const activePrivateCreate = useRef<ActivePrivateCreate | null>(null);
+  const privateCreateAttempt = useRef(0);
+  const privateAckTimer = useRef<number | null>(null);
   const validName = name.trim().length > 0;
+  const closeTopicDialog = useCallback(() => setView("home"), []);
+  const clearPrivateAckTimer = useCallback(() => {
+    if (privateAckTimer.current !== null) {
+      window.clearTimeout(privateAckTimer.current);
+      privateAckTimer.current = null;
+    }
+  }, []);
+  const emitPrivateCreate = useCallback(
+    (request: PrivateCreateRequest) => {
+      const attempt = privateCreateAttempt.current + 1;
+      privateCreateAttempt.current = attempt;
+      activePrivateCreate.current = { requestId: request.requestId, attempt };
+      clearPrivateAckTimer();
+      setBusy(true);
+      setPrivateRequestState("waiting");
+      privateAckTimer.current = window.setTimeout(() => {
+        if (activePrivateCreate.current?.attempt !== attempt) return;
+        privateAckTimer.current = null;
+        activePrivateCreate.current = null;
+        setBusy(false);
+        setPrivateRequestState("timed-out");
+        setNotice({ kind: "error", text: "Private room creation timed out. Retry with the same request." });
+      }, 8_000);
+      socket
+        .timeout(8_000)
+        .emit("room:create-private", request, (timeoutError: Error | null, response: PrivateCreateAck) => {
+          if (activePrivateCreate.current?.attempt !== attempt) return;
+          clearPrivateAckTimer();
+          if (timeoutError) {
+            activePrivateCreate.current = null;
+            setBusy(false);
+            setPrivateRequestState("timed-out");
+            setNotice({ kind: "error", text: "Private room creation timed out. Retry with the same request." });
+            return;
+          }
+          if (!response?.ok) {
+            activePrivateCreate.current = null;
+            pendingPrivateCreate.current = null;
+            setBusy(false);
+            setPrivateRequestState("idle");
+            setNotice({ kind: "error", text: response?.error ?? "The private room could not be created." });
+          }
+        });
+    },
+    [clearPrivateAckTimer],
+  );
   const config: MatchConfig = useMemo(
     () => ({ topicIds: topics, roundCount: 5, questionTimerSeconds: timer }),
     [timer, topics],
   );
 
   useEffect(() => {
-    const created = (payload: { roomId: string; seatId: string; reconnectToken: string }) => {
+    const created = (payload: { requestId: string; roomId: string; seatId: string; reconnectToken: string }) => {
+      if (!isPrivateCreateResponseForActiveRequest(activePrivateCreate.current?.requestId ?? null, payload.requestId))
+        return;
+      activePrivateCreate.current = null;
       useGameStore.getState().setSession(payload.seatId, payload.reconnectToken, payload.roomId);
+      clearPrivateAckTimer();
       pendingPrivateCreate.current = null;
       setBusy(false);
+      setPrivateRequestState("idle");
       navigate(`/room/${payload.roomId}`);
     };
     const queueSeat = (payload: { roomId: string; seatId: string; reconnectToken: string }) => {
@@ -85,15 +143,20 @@ export default function Home() {
         setView("queue");
         setQueueExpiresAt(payload.expiresAt ?? Date.now() + 300_000);
       } else {
+        const message =
+          payload.status === "expired"
+            ? "The public queue expired after five minutes. Join the public queue again to retry."
+            : "You left the public queue. Join the public queue again whenever you are ready.";
         queuedName.current = null;
         queueToken.current = null;
         setView("home");
         setQueueExpiresAt(null);
+        setNotice({ kind: "info", text: message });
       }
     };
     const onConnect = () => {
       setConnection("connected");
-      if (pendingPrivateCreate.current) socket.emit("room:create-private", pendingPrivateCreate.current);
+      if (pendingPrivateCreate.current) emitPrivateCreate(pendingPrivateCreate.current);
       if (queuedName.current)
         socket.emit(
           "queue:join",
@@ -111,12 +174,24 @@ export default function Home() {
     };
     const onConnectError = (reason: unknown) => {
       setConnection("disconnected");
-      if (!pendingPrivateCreate.current) setBusy(false);
+      if (pendingPrivateCreate.current) {
+        clearPrivateAckTimer();
+        activePrivateCreate.current = null;
+        setBusy(false);
+        setPrivateRequestState("timed-out");
+      } else {
+        setBusy(false);
+      }
       setNotice({ kind: "error", text: socketConnectionErrorMessage(reason, socketUrl) });
     };
     const failed = (payload: { message?: string } | string) => {
-      pendingPrivateCreate.current = null;
-      setBusy(false);
+      clearPrivateAckTimer();
+      if (pendingPrivateCreate.current) {
+        activePrivateCreate.current = null;
+        pendingPrivateCreate.current = null;
+        setBusy(false);
+        setPrivateRequestState("idle");
+      }
       setNotice({
         kind: "error",
         text: typeof payload === "string" ? payload : (payload.message ?? "Request failed."),
@@ -130,6 +205,7 @@ export default function Home() {
     socket.on("connect_error", onConnectError);
     socket.on("server:error", failed);
     return () => {
+      clearPrivateAckTimer();
       socket.off("room:created", created);
       socket.off("queue:seat", queueSeat);
       socket.off("queue:state", waiting);
@@ -138,7 +214,7 @@ export default function Home() {
       socket.off("connect_error", onConnectError);
       socket.off("server:error", failed);
     };
-  }, [navigate]);
+  }, [clearPrivateAckTimer, emitPrivateCreate, navigate]);
   useEffect(() => {
     if (view !== "queue") return;
     const id = window.setInterval(() => setNow(Date.now()), 500);
@@ -162,9 +238,11 @@ export default function Home() {
       username: name.trim(),
       config,
     } satisfies PrivateCreateRequest;
+    activePrivateCreate.current = null;
     pendingPrivateCreate.current = request;
     setBusy(true);
-    if (socket.connected) socket.emit("room:create-private", request);
+    setPrivateRequestState("waiting");
+    if (socket.connected) emitPrivateCreate(request);
     else connectSocket();
   };
   const retryPrivateCreate = () => {
@@ -172,7 +250,7 @@ export default function Home() {
     setNotice(null);
     setConnection("connecting");
     connectSocket();
-    if (socket.connected) socket.emit("room:create-private", pendingPrivateCreate.current);
+    if (socket.connected) emitPrivateCreate(pendingPrivateCreate.current);
   };
   const joinPrivate = (event: React.FormEvent) => {
     event.preventDefault();
@@ -254,7 +332,11 @@ export default function Home() {
               Practice core computer science foundations with solo drills, private 1v1s, and public study rooms.
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
-              <button className="button button-primary" onClick={joinQueue}>
+              <button
+                className="button button-primary"
+                onClick={joinQueue}
+                aria-describedby={!validName ? "public-queue-validation" : undefined}
+              >
                 <Radio size={16} /> public queue <ArrowRight size={16} />
               </button>
               <Link to="/solo" className="button button-ghost">
@@ -264,6 +346,16 @@ export default function Home() {
                 <Code2 size={16} /> C practice lab
               </Link>
             </div>
+            {!validName && (
+              <p id="public-queue-validation" className="mt-3 text-sm text-muted" role="status">
+                Enter a guest name below before joining the public queue.
+              </p>
+            )}
+            {notice && (
+              <p className={`mt-3 text-sm ${notice.kind === "error" ? "text-red-300" : "text-gold"}`} role="status">
+                {notice.text}
+              </p>
+            )}
           </div>
           <div className="gold-grid rounded-2xl border border-gold/20 bg-panel/80 p-6 sm:p-8">
             <p className="eyebrow text-gold">built for careful practice</p>
@@ -311,9 +403,9 @@ export default function Home() {
                 {notice.text}
               </p>
             )}
-            {notice && busy && (
+            {privateRequestState === "timed-out" && (
               <button className="button button-ghost mt-4 w-full" onClick={retryPrivateCreate}>
-                Retry connection
+                Retry room creation
               </button>
             )}
             <div className="mt-7 flex items-center justify-between">
@@ -337,7 +429,7 @@ export default function Home() {
               disabled={busy || topics.length === 0}
               onClick={createPrivate}
             >
-              <LockKeyhole size={16} /> create private room
+              <LockKeyhole size={16} /> {busy ? "creating private room…" : "create private room"}
             </button>
             <button
               className="mt-4 flex w-full items-center justify-center gap-2 text-sm text-muted underline-offset-4 hover:text-gold hover:underline"
@@ -387,7 +479,7 @@ export default function Home() {
             toggleTopic={toggleTopic}
             timer={timer}
             setTimer={setTimer}
-            close={() => setView("home")}
+            close={closeTopicDialog}
           />
         )}
       </main>
@@ -423,55 +515,108 @@ const TopicDialog = ({
   timer: number;
   setTimer: (timer: number) => void;
   close: () => void;
-}) => (
-  <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-5" role="dialog" aria-modal="true">
-    <section className="panel max-h-[90vh] w-full max-w-2xl overflow-y-auto p-6 sm:p-8">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="eyebrow text-gold">host controls</p>
-          <h2 className="display mt-2 text-3xl">choose your syllabus</h2>
-          <p className="mt-3 text-sm text-muted">
-            Guests see the selected pool. Public queue always uses all reviewed topics.
-          </p>
-        </div>
-        <button className="icon-button" onClick={close} aria-label="Close">
-          <X size={17} />
-        </button>
-      </div>
-      <div className="mt-7 flex items-center justify-between gap-4 border-y border-line py-4">
-        <div>
-          <p id="topic-dialog-timer-label" className="field-label">
-            question timer
-          </p>
-          <p className="mt-1 text-sm text-muted">{timer} seconds · five rounds</p>
-        </div>
-        <Select
-          value={String(timer)}
-          options={TIMER_OPTIONS}
-          onChange={(value) => setTimer(Number(value))}
-          containerClassName="w-auto"
-          buttonClassName="w-auto"
-          ariaLabelledBy="topic-dialog-timer-label"
-        />
-      </div>
-      <div className="mt-7 grid gap-2 sm:grid-cols-2">
-        {TOPICS.map((topic) => (
+}) => {
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+        "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])",
+      );
+      if (!focusable?.length) return;
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      previousFocus?.focus();
+    };
+  }, [close]);
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-5"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="topic-dialog-title"
+      aria-describedby="topic-dialog-description"
+    >
+      <section ref={dialogRef} className="panel max-h-[90vh] w-full max-w-2xl overflow-y-auto p-6 sm:p-8">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="eyebrow text-gold">host controls</p>
+            <h2 id="topic-dialog-title" className="display mt-2 text-3xl">
+              choose your syllabus
+            </h2>
+            <p id="topic-dialog-description" className="mt-3 text-sm text-muted">
+              Guests see the selected pool. Public queue always uses all reviewed topics.
+            </p>
+          </div>
           <button
-            key={topic.id}
-            className={`topic-chip ${topics.includes(topic.id) ? "topic-chip-active" : ""}`}
-            onClick={() => toggleTopic(topic.id)}
+            ref={closeRef}
+            type="button"
+            className="icon-button"
+            onClick={close}
+            aria-label="Close topic settings"
           >
-            <span>{topic.label}</span>
-            {topics.includes(topic.id) && <Check size={15} />}
+            <X size={17} />
           </button>
-        ))}
-      </div>
-      <button className="button button-primary mt-7 w-full" onClick={close}>
-        <Check size={16} /> save topic pool
-      </button>
-    </section>
-  </div>
-);
+        </div>
+        <div className="mt-7 flex items-center justify-between gap-4 border-y border-line py-4">
+          <div>
+            <p id="topic-dialog-timer-label" className="field-label">
+              question timer
+            </p>
+            <p className="mt-1 text-sm text-muted">{timer} seconds · five rounds</p>
+          </div>
+          <Select
+            value={String(timer)}
+            options={TIMER_OPTIONS}
+            onChange={(value) => setTimer(Number(value))}
+            containerClassName="w-auto"
+            buttonClassName="w-auto"
+            ariaLabelledBy="topic-dialog-timer-label"
+          />
+        </div>
+        <div className="mt-7 grid gap-2 sm:grid-cols-2">
+          {TOPICS.map((topic) => {
+            const selected = topics.includes(topic.id);
+            return (
+              <button
+                key={topic.id}
+                type="button"
+                className={`topic-chip ${selected ? "topic-chip-active" : ""}`}
+                aria-pressed={selected}
+                onClick={() => toggleTopic(topic.id)}
+              >
+                <span>{topic.label}</span>
+                {selected && <Check size={15} aria-hidden="true" />}
+              </button>
+            );
+          })}
+        </div>
+        <button type="button" className="button button-primary mt-7 w-full" onClick={close}>
+          <Check size={16} /> save topic pool
+        </button>
+      </section>
+    </div>
+  );
+};
 const Shell = ({ children }: { children: React.ReactNode }) => (
   <div className="min-h-screen bg-ink text-cream">
     <header className="mx-auto flex max-w-7xl items-center justify-between border-b border-line px-5 py-5 sm:px-8">

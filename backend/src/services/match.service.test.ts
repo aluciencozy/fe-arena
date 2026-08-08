@@ -21,6 +21,7 @@ import {
   resumeAfterReconnect,
   skipReveal,
   submitAnswer,
+  submitCodingProgress,
   submitCodingResult,
   toggleReady,
   requestRematch,
@@ -191,15 +192,23 @@ test("graph and C submissions stay server-authoritative through the match lifecy
   }
 });
 
-test("mixed matches gate coding rounds on browser readiness and accept typed completion ordering", (t) => {
+test("mixed matches gate coding rounds and keep failed coding runs retryable", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
   clearMatchesForTests();
   clearRoomsForTests();
-  const coding = QUESTION_BANK.find((question) => question.type === "coding");
-  const graph = QUESTION_BANK.find((question) => question.id === "q-graph-bfs");
+  const coding = QUESTION_BANK.find(
+    (question) => question.published === true && question.type === "coding" && question.topicId === "arrays-memory",
+  );
+  const graph = QUESTION_BANK.find(
+    (question) => question.published === true && question.id === "q-graph-bfs" && question.topicId === "binary-trees",
+  );
   assert.ok(coding && coding.type === "coding");
   assert.ok(graph && graph.type === "graph");
   if (!coding || coding.type !== "coding" || !graph || graph.type !== "graph") return;
+  assert.equal(coding.published, true);
+  assert.equal(coding.topicId, "arrays-memory");
+  assert.equal(graph.published, true);
+  assert.equal(graph.topicId, "binary-trees");
   setQuestionRepository(fixedQuestionRepository([coding, graph]));
   const mixedConfig = {
     topicIds: ["arrays-memory"],
@@ -226,6 +235,14 @@ test("mixed matches gate coding rounds on browser readiness and accept typed com
     assert.equal(state.questionEndsAt, (state.questionStartedAt ?? 0) + 60_000);
     t.mock.timers.tick(59_999);
     assert.equal(getMatchState(room.metadata.roomId)?.phase, "QUESTION");
+    assert.equal(submitCodingProgress(room.metadata.roomId, room.seat.seatId, "failed", events()).ok, true);
+    const active = getMatchState(room.metadata.roomId)!;
+    assert.equal(active.phase, "QUESTION");
+    assert.equal(active.codingProgress[room.seat.seatId]?.status, "failed");
+    assert.equal(active.submissions[room.seat.seatId]?.submitted, false);
+    assert.equal(active.codingProgress[room.seat.seatId]?.passed, null);
+    assert.deepEqual(active.codingProgress[room.seat.seatId]?.tests, []);
+    assert.equal(active.codingProgress[room.seat.seatId]?.outcome, null);
     assert.equal(
       submitCodingResult(
         room.metadata.roomId,
@@ -238,22 +255,38 @@ test("mixed matches gate coding rounds on browser readiness and accept typed com
         },
         events(),
       ).ok,
+      false,
+    );
+    assert.equal(submitCodingProgress(room.metadata.roomId, room.seat.seatId, "compiling", events()).ok, true);
+    assert.equal(submitCodingProgress(room.metadata.roomId, room.seat.seatId, "running", events()).ok, true);
+    assert.equal(
+      submitCodingResult(
+        room.metadata.roomId,
+        room.seat.seatId,
+        {
+          questionId: state.question!.id,
+          passed: false,
+          tests: [{ index: 1, name: "sum", passed: false }],
+          outcome: "success",
+        },
+        events(),
+      ).ok,
       true,
     );
-    const active = getMatchState(room.metadata.roomId)!;
-    assert.equal(active.phase, "QUESTION");
-    assert.equal(active.codingProgress[room.seat.seatId]?.passed, null);
-    assert.deepEqual(active.codingProgress[room.seat.seatId]?.tests, []);
-    assert.equal(active.codingProgress[room.seat.seatId]?.outcome, null);
+    const afterRetry = getMatchState(room.metadata.roomId)!;
+    assert.equal(afterRetry.phase, "QUESTION");
+    assert.equal(afterRetry.codingProgress[room.seat.seatId]?.status, "complete");
+    assert.equal(afterRetry.codingProgress[room.seat.seatId]?.passed, null);
+    assert.equal(afterRetry.submissions[room.seat.seatId]?.submitted, true);
     assert.equal(
       submitCodingResult(
         room.metadata.roomId,
         guest.seat.seatId,
         {
           questionId: state.question!.id,
-          passed: false,
-          tests: [{ index: 1, name: "sum", passed: false }],
-          outcome: "compile-error",
+          passed: true,
+          tests: [{ index: 1, name: "sum", passed: true }],
+          outcome: "success",
         },
         events(),
       ).ok,
@@ -263,7 +296,7 @@ test("mixed matches gate coding rounds on browser readiness and accept typed com
     assert.equal(reveal.phase, "REVEAL");
     assert.equal(reveal.codingProgress[room.seat.seatId]?.passed, false);
     assert.deepEqual(reveal.codingProgress[room.seat.seatId]?.tests, [{ index: 1, name: "sum", passed: false }]);
-    assert.equal(reveal.codingProgress[room.seat.seatId]?.outcome, "compile-error");
+    assert.equal(reveal.codingProgress[room.seat.seatId]?.outcome, "success");
   } finally {
     setQuestionRepository(inMemoryQuestionRepository);
     clearMatchesForTests();
@@ -275,11 +308,19 @@ test("mixed rematches do not reuse an exhausted coding question", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
   clearMatchesForTests();
   clearRoomsForTests();
-  const coding = QUESTION_BANK.find((question) => question.type === "coding");
-  const graph = QUESTION_BANK.find((question) => question.id === "q-graph-bfs");
+  const coding = QUESTION_BANK.find(
+    (question) => question.published === true && question.type === "coding" && question.topicId === "arrays-memory",
+  );
+  const graph = QUESTION_BANK.find(
+    (question) => question.published === true && question.id === "q-graph-bfs" && question.topicId === "binary-trees",
+  );
   assert.ok(coding && coding.type === "coding");
   assert.ok(graph && graph.type === "graph");
   if (!coding || coding.type !== "coding" || !graph || graph.type !== "graph") return;
+  assert.equal(coding.published, true);
+  assert.equal(coding.topicId, "arrays-memory");
+  assert.equal(graph.published, true);
+  assert.equal(graph.topicId, "binary-trees");
   setQuestionRepository(fixedQuestionRepository([coding, graph]));
   const mixedConfig = {
     topicIds: [graph.topicId],
@@ -301,15 +342,15 @@ test("mixed rematches do not reuse an exhausted coding question", (t) => {
     t.mock.timers.tick(3_000);
     const first = getMatchState(room.metadata.roomId)!;
     assert.equal(first.question?.id, coding.id);
-    const result = {
+    const codingResult = {
       questionId: coding.id,
       passed: false,
       tests: [{ index: 1, name: "sum", passed: false }],
-      outcome: "compile-error" as const,
+      outcome: "success" as const,
     };
-    assert.equal(submitCodingResult(room.metadata.roomId, room.seat.seatId, result, events()).ok, true);
-    assert.equal(submitCodingResult(room.metadata.roomId, guest.seat.seatId, result, events()).ok, true);
-    t.mock.timers.tick(30_000);
+    assert.equal(submitCodingResult(room.metadata.roomId, room.seat.seatId, codingResult, events()).ok, true);
+    assert.equal(submitCodingResult(room.metadata.roomId, guest.seat.seatId, codingResult, events()).ok, true);
+    t.mock.timers.tick(60_000);
     assert.equal(getMatchState(room.metadata.roomId)?.phase, "RESULTS");
     assert.equal(requestRematch(room.metadata.roomId, room.seat.seatId, events()).ok, true);
     assert.equal(requestRematch(room.metadata.roomId, guest.seat.seatId, events()).ok, true);
@@ -331,13 +372,25 @@ test("rematches exclude every previously used question while fresh questions rem
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
   clearMatchesForTests();
   clearRoomsForTests();
-  const coding = QUESTION_BANK.find((question) => question.type === "coding");
-  const graph = QUESTION_BANK.find((question) => question.id === "q-graph-bfs");
-  const extra = QUESTION_BANK.find((question) => question.id === "q-tree-height");
+  const coding = QUESTION_BANK.find(
+    (question) => question.published === true && question.type === "coding" && question.topicId === "arrays-memory",
+  );
+  const graph = QUESTION_BANK.find(
+    (question) => question.published === true && question.id === "q-graph-bfs" && question.topicId === "binary-trees",
+  );
+  const extra = QUESTION_BANK.find(
+    (question) => question.published !== false && question.topicId === graph?.topicId && question.id === "q-tree-level",
+  );
   assert.ok(coding && coding.type === "coding");
   assert.ok(graph && graph.type === "graph");
   assert.ok(extra);
   if (!coding || coding.type !== "coding" || !graph || graph.type !== "graph" || !extra) return;
+  assert.equal(coding.published, true);
+  assert.equal(coding.topicId, "arrays-memory");
+  assert.equal(graph.published, true);
+  assert.equal(graph.topicId, "binary-trees");
+  assert.equal(extra.published, true);
+  assert.equal(extra.topicId, "binary-trees");
   let available: Question[] = [coding, graph];
   setQuestionRepository({
     list: () => [...available],
@@ -368,7 +421,7 @@ test("rematches exclude every previously used question while fresh questions rem
       questionId: coding.id,
       passed: false,
       tests: [{ index: 1, name: "sum", passed: false }],
-      outcome: "compile-error" as const,
+      outcome: "success" as const,
     };
     assert.equal(submitCodingResult(room.metadata.roomId, room.seat.seatId, codingResult, events()).ok, true);
     assert.equal(submitCodingResult(room.metadata.roomId, guest.seat.seatId, codingResult, events()).ok, true);
@@ -443,7 +496,7 @@ test("rematch is two-sided, preserves results while pending, and selects a fresh
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
   clearMatchesForTests();
   clearRoomsForTests();
-  const eligible = QUESTION_BANK.filter((question) => question.topicId === "stacks");
+  const eligible = QUESTION_BANK.filter((question) => question.published !== false && question.topicId === "stacks");
   const first = eligible[0];
   const second = eligible[1];
   assert.ok(first && second);

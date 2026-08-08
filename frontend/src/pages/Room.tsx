@@ -6,7 +6,6 @@ import {
   Check,
   ChevronDown,
   CircleHelp,
-  Clock3,
   Copy,
   LogOut,
   MessageCircle,
@@ -21,14 +20,27 @@ import {
 } from "lucide-react";
 import { useArenaSocket } from "@/hooks/useSocket";
 import { useGameStore } from "@/store/gameStore";
+import { CRunnerProgress } from "@/components/CRunnerProgress";
 import { Select } from "@/components/ui/select";
-import { graphEdgePoints } from "@/lib/graph";
-import { prewarmCWorker, runCInWorker, type CExecutionOutcome, type CTestResult } from "@/lib/c-runner";
+import { DeadlineTimer } from "@/components/DeadlineTimer";
+import { copyTextWithFallback } from "@/lib/clipboard";
+import { graphEdgePoints, graphTextAlternative } from "@/lib/graph";
+import { attachRoomAsyncCompletion, isActiveRoomAsyncContext, type RoomAsyncContext } from "@/lib/room-async";
+import {
+  codingProgressForRunnerStatus,
+  getCPrewarmStatus,
+  prewarmCWorker,
+  runCInWorker,
+  type CExecutionOutcome,
+  type CRunnerStatus,
+  type CTestResult,
+} from "@/lib/c-runner";
 import {
   canConfigureMatch,
   TOPICS,
   type PublicAnswer,
   type PublicQuestion,
+  type CodingProgressUpdate,
   type TopicId,
 } from "../../../shared/domain";
 import type { MatchPublicState } from "@/types";
@@ -83,14 +95,29 @@ export default function Room() {
   const [includeCoding, setIncludeCoding] = useState(false);
   const [codingReadyError, setCodingReadyError] = useState("");
   const [codingReadyRetry, setCodingReadyRetry] = useState(0);
+  const [codingRunnerStatus, setCodingRunnerStatus] = useState<CRunnerStatus>(() => getCPrewarmStatus());
   const codingReadyAttempted = useRef(false);
+  const codingReadyScopeRef = useRef(`${roomId}:${seatId ?? ""}`);
   const [codingReadyAttempts, setCodingReadyAttempts] = useState(0);
   const [copied, setCopied] = useState(false);
-  const [now, setNow] = useState(() => Date.now());
-  const codingEnvironmentError = window.crossOriginIsolated
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const capabilityReady = typeof window !== "undefined" && window.crossOriginIsolated;
+  const codingEnvironmentError = capabilityReady
     ? ""
-    : "Coding rounds require a cross-origin isolated Chromium tab.";
-  const codingReadyNotice = codingEnvironmentError || codingReadyError;
+    : "Coding rounds need a cross-origin isolated Chromium tab. Use a supported Chromium-based browser, keep the site's COOP/COEP headers enabled, then reload the room.";
+  const activeRoomContextRef = useRef<RoomAsyncContext>({
+    roomId,
+    seatId,
+    stageId: match?.phase === "QUESTION" ? `question:${match.question?.id ?? ""}` : `prewarm:${match?.phase ?? "none"}`,
+  });
+  useEffect(() => {
+    activeRoomContextRef.current = {
+      roomId,
+      seatId,
+      stageId:
+        match?.phase === "QUESTION" ? `question:${match.question?.id ?? ""}` : `prewarm:${match?.phase ?? "none"}`,
+    };
+  }, [match?.phase, match?.question?.id, roomId, seatId]);
   const answer = answerState.questionId === questionId ? answerState.value : "";
   const ordered = orderedState.questionId === questionId ? orderedState.value : [];
   const setAnswer = (value: string | number | boolean | string[]) => setAnswerState({ questionId, value });
@@ -106,49 +133,81 @@ export default function Room() {
     if (!name || !roomId) navigate("/", { replace: true });
   }, [name, navigate, roomId]);
   useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 250);
-    return () => window.clearInterval(id);
-  }, []);
-  useEffect(() => {
+    let active = true;
+    const capturedContext: RoomAsyncContext = {
+      roomId,
+      seatId,
+      stageId: `prewarm:${match?.phase ?? "none"}`,
+    };
+    const isCurrent = () => active && isActiveRoomAsyncContext(capturedContext, activeRoomContextRef.current);
+    const scope = `${roomId}:${seatId ?? ""}`;
+    const scopeChanged = codingReadyScopeRef.current !== scope;
+    if (scopeChanged) {
+      codingReadyScopeRef.current = scope;
+      codingReadyAttempted.current = false;
+      queueMicrotask(() => setCodingReadyAttempts(0));
+    }
+    const cleanup = (detach?: () => void) => {
+      active = false;
+      detach?.();
+    };
+    const attachPrewarmCompletion = () => {
+      const prewarm = prewarmCWorker({
+        onProgress: (status) => {
+          if (isCurrent()) setCodingRunnerStatus(status);
+        },
+      });
+      return attachRoomAsyncCompletion(
+        prewarm,
+        capturedContext,
+        () => activeRoomContextRef.current,
+        () => {
+          if (!isCurrent()) return;
+          setCodingReadyError("");
+          markCodingReady();
+        },
+        (error) => {
+          if (!isCurrent()) return;
+          codingReadyAttempted.current = false;
+          setCodingReadyError(error instanceof Error ? error.message : "The browser C compiler could not initialize.");
+        },
+      );
+    };
     if (!match?.config.includeCoding) {
       codingReadyAttempted.current = false;
       queueMicrotask(() => setCodingReadyAttempts(0));
-      return;
+      return cleanup;
     }
     if (match.phase === "REMATCH") {
       codingReadyAttempted.current = false;
       queueMicrotask(() => setCodingReadyAttempts(0));
-      return;
+      return cleanup;
     }
     if (
       !seatId ||
       match.codingReady[seatId] ||
-      codingReadyAttempted.current ||
-      codingReadyAttempts >= MAX_CODING_READY_ATTEMPTS ||
+      (!codingReadyAttempted.current && !scopeChanged && codingReadyAttempts >= MAX_CODING_READY_ATTEMPTS) ||
       !["LOBBY", "SETUP", "READY"].includes(match.phase)
     )
-      return;
-    codingReadyAttempted.current = true;
-    queueMicrotask(() => setCodingReadyAttempts((attempts) => attempts + 1));
-    if (!window.crossOriginIsolated) return;
-    // Match updates must not cancel this browser-local initialization. The server
-    // accepts readiness only after the worker has initialized successfully.
-    void prewarmCWorker()
-      .then(() => {
-        setCodingReadyError("");
-        markCodingReady();
-      })
-      .catch((error) => {
-        codingReadyAttempted.current = false;
-        setCodingReadyError(error instanceof Error ? error.message : "The browser C compiler could not initialize.");
+      return cleanup;
+    if (!capabilityReady) return cleanup;
+    if (!codingReadyAttempted.current) {
+      codingReadyAttempted.current = true;
+      queueMicrotask(() => {
+        if (isCurrent()) setCodingReadyAttempts((attempts) => attempts + 1);
       });
+    }
+    const detach = attachPrewarmCompletion();
+    return () => cleanup(detach);
   }, [
     codingReadyAttempts,
     codingReadyRetry,
+    capabilityReady,
     markCodingReady,
     match?.codingReady,
     match?.config.includeCoding,
     match?.phase,
+    roomId,
     seatId,
   ]);
   const seats = room?.seats ?? [];
@@ -159,12 +218,6 @@ export default function Room() {
       ? canConfigureMatch(room.metadata.source, room.metadata.hostSeatId, seatId)
       : false;
   const isSubmitted = seatId ? Boolean(match?.submissions[seatId]?.submitted) : false;
-  const seconds =
-    match?.phase === "COUNTDOWN"
-      ? Math.max(0, Math.ceil(((match.countdownEndsAt ?? now) - now) / 1000))
-      : match?.questionEndsAt
-        ? Math.max(0, Math.ceil((match.questionEndsAt - now) / 1000))
-        : null;
   const configure = () => {
     if (selectedTopics.length) {
       api.configure({ topicIds: selectedTopics, roundCount: 5, questionTimerSeconds: timer, includeCoding });
@@ -191,13 +244,13 @@ export default function Room() {
     setChatText("");
   };
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(roomId);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
-    } catch {
-      /* clipboard is optional */
-    }
+    const copiedSuccessfully = await copyTextWithFallback(roomId);
+    setCopyStatus(copiedSuccessfully ? "copied" : "failed");
+    setCopied(copiedSuccessfully);
+    window.setTimeout(() => {
+      setCopied(false);
+      setCopyStatus("idle");
+    }, 1600);
   };
   const submit = () => {
     if (!match?.question || isSubmitted || match.phase !== "QUESTION") return;
@@ -226,10 +279,13 @@ export default function Room() {
               {self?.name ?? name} <span className="text-line">vs</span> {opponent?.name ?? "open seat"}
             </p>
           </div>
-          <button className="code-pill" onClick={copy}>
+          <button className="code-pill" type="button" onClick={copy} aria-label={`Copy room code ${roomId}`}>
             <span>{roomId}</span>
             {copied ? <Check size={14} /> : <Copy size={14} />}
           </button>
+          <span className="sr-only" role="status" aria-live="polite">
+            {copyStatus === "copied" ? "Room code copied." : copyStatus === "failed" ? "Could not copy room code." : ""}
+          </span>
           <button
             className="icon-button relative"
             onClick={() => setChatOpen((open) => !open)}
@@ -256,18 +312,6 @@ export default function Room() {
             {api.errorNotice}
           </div>
         )}
-        {codingReadyNotice && match?.config.includeCoding && match.phase !== "REMATCH" && (
-          <div className="notice-error mb-5 flex items-center justify-between gap-3">
-            <span>{codingReadyNotice}</span>
-            <button
-              className="button button-primary shrink-0"
-              onClick={retryCodingReady}
-              disabled={codingReadyAttempts >= MAX_CODING_READY_ATTEMPTS}
-            >
-              retry readiness
-            </button>
-          </div>
-        )}
         {!match ? (
           <Loading />
         ) : match.phase === "LOBBY" ||
@@ -290,16 +334,23 @@ export default function Room() {
             setIncludeCoding={setIncludeCoding}
             onConfigure={configure}
             onReady={api.ready}
+            copyRoom={copy}
+            copyStatus={copyStatus}
+            capabilityReady={capabilityReady}
+            codingEnvironmentError={codingEnvironmentError}
+            codingRunnerStatus={codingRunnerStatus}
+            codingReadyError={codingReadyError}
+            codingReadyAttempts={codingReadyAttempts}
+            onRetryCodingReady={retryCodingReady}
           />
         ) : match.phase === "COUNTDOWN" ? (
-          <Countdown seconds={seconds ?? 3} round={match.roundIndex + 1} />
+          <Countdown deadline={match.countdownEndsAt} round={match.roundIndex + 1} />
         ) : match.phase === "QUESTION" ? (
           match.question?.type === "coding" ? (
             <CodingQuestionStage
               key={match.question.id}
               match={match}
               seatId={seatId}
-              now={now}
               onProgress={api.codingProgress}
               onComplete={api.codingComplete}
             />
@@ -308,7 +359,7 @@ export default function Room() {
               match={match}
               seatId={seatId}
               opponent={opponent?.name}
-              seconds={seconds}
+              deadline={match.questionEndsAt}
               answer={answer}
               setAnswer={setAnswer}
               ordered={ordered}
@@ -321,13 +372,12 @@ export default function Room() {
           <Reveal
             match={match}
             seatId={seatId}
-            now={now}
             selfName={self?.name ?? name}
             opponentName={opponent?.name ?? "opponent"}
             onSkip={api.skipReveal}
           />
         ) : match.phase === "PAUSED" ? (
-          <Paused pause={match.pause} now={now} />
+          <Paused pause={match.pause} />
         ) : (
           <Results
             match={match}
@@ -368,6 +418,14 @@ const Lobby = ({
   setIncludeCoding,
   onConfigure,
   onReady,
+  copyRoom,
+  copyStatus,
+  capabilityReady,
+  codingEnvironmentError,
+  codingRunnerStatus,
+  codingReadyError,
+  codingReadyAttempts,
+  onRetryCodingReady,
 }: {
   match: MatchPublicState;
   seatId: string | null;
@@ -384,6 +442,14 @@ const Lobby = ({
   setIncludeCoding: (include: boolean) => void;
   onConfigure: () => void;
   onReady: () => void;
+  copyRoom: () => void;
+  copyStatus: "idle" | "copied" | "failed";
+  capabilityReady: boolean;
+  codingEnvironmentError: string;
+  codingRunnerStatus: CRunnerStatus;
+  codingReadyError: string;
+  codingReadyAttempts: number;
+  onRetryCodingReady: () => void;
 }) => (
   <section className="mx-auto max-w-5xl py-6 sm:py-14">
     <div className="text-center">
@@ -392,9 +458,17 @@ const Lobby = ({
       <p className="mx-auto mt-4 max-w-lg text-muted">
         Both guests ready up when the pool and timer feel right. Five rounds. One server clock.
       </p>
-      <button className="code-pill mx-auto mt-6" onClick={() => navigator.clipboard.writeText(match.roomId)}>
+      <button
+        className="code-pill mx-auto mt-6"
+        type="button"
+        onClick={copyRoom}
+        aria-label={`Copy room code ${match.roomId}`}
+      >
         {match.roomId} <Copy size={14} />
       </button>
+      <p className="sr-only" role="status" aria-live="polite">
+        {copyStatus === "copied" ? "Room code copied." : copyStatus === "failed" ? "Could not copy room code." : ""}
+      </p>
     </div>
     <div className="mt-10 grid gap-4 sm:grid-cols-2">
       <SeatCard label="you" name={self} ready={Boolean(seatId && match.ready[seatId])} />
@@ -405,6 +479,27 @@ const Lobby = ({
         empty={!opponent}
       />
     </div>
+    {match.config.includeCoding && ["LOBBY", "SETUP", "READY"].includes(match.phase) && (
+      <div className="mt-5">
+        <div className="panel p-5">
+          <p className="eyebrow text-gold">browser C round readiness</p>
+          <p className="mt-2 text-sm text-muted">
+            The shared browser worker warms up before the match starts. Phase labels report state only; no percentage is
+            estimated.
+          </p>
+          {!capabilityReady && <div className="notice-error mt-4">{codingEnvironmentError}</div>}
+          <div className="mt-4">
+            <CRunnerProgress
+              status={codingRunnerStatus}
+              error={capabilityReady ? codingReadyError : ""}
+              onRetry={onRetryCodingReady}
+              retryLabel="retry readiness"
+              retryDisabled={!capabilityReady || codingReadyAttempts >= MAX_CODING_READY_ATTEMPTS}
+            />
+          </div>
+        </div>
+      </div>
+    )}
     {host && (
       <div className="panel mt-5 p-5">
         <button
@@ -426,7 +521,9 @@ const Lobby = ({
               {TOPICS.map((topic) => (
                 <button
                   key={topic.id}
+                  type="button"
                   className={`topic-chip ${selectedTopics.includes(topic.id) ? "topic-chip-active" : ""}`}
+                  aria-pressed={selectedTopics.includes(topic.id)}
                   onClick={() =>
                     setSelectedTopics(
                       selectedTopics.includes(topic.id)
@@ -489,10 +586,10 @@ const SeatCard = ({ label, name, ready, empty }: { label: string; name: string; 
   </article>
 );
 
-const Countdown = ({ seconds, round }: { seconds: number; round: number }) => (
+const Countdown = ({ deadline, round }: { deadline: number | null; round: number }) => (
   <section className="mx-auto flex min-h-[65vh] max-w-xl flex-col items-center justify-center text-center">
     <p className="eyebrow text-gold">round {round} of 5</p>
-    <p className="display mt-4 text-[9rem] leading-none text-gold">{seconds}</p>
+    <DeadlineTimer deadline={deadline} urgentAfter={0} className="display mt-4 text-[9rem] leading-none text-gold" />
     <p className="mt-5 text-muted">Get your scratch paper ready. The next prompt is coming.</p>
   </section>
 );
@@ -500,47 +597,77 @@ const Countdown = ({ seconds, round }: { seconds: number; round: number }) => (
 const CodingQuestionStage = ({
   match,
   seatId,
-  now,
   onProgress,
   onComplete,
 }: {
   match: MatchPublicState;
   seatId: string | null;
-  now: number;
-  onProgress: (status: "compiling" | "running") => void;
-  onComplete: (result: {
-    questionId: string;
-    passed: boolean;
-    tests: CTestResult[];
-    outcome: "success" | "compile-error" | "runtime-error" | "timeout";
-  }) => void;
+  onProgress: (status: CodingProgressUpdate) => void;
+  onComplete: (result: { questionId: string; passed: boolean; tests: CTestResult[]; outcome: "success" }) => void;
 }) => {
   const question = match.question;
   const problem = question?.type === "coding" ? question.problem : undefined;
+  const capabilityReady = typeof window !== "undefined" && window.crossOriginIsolated;
   const [code, setCode] = useState(problem?.starterCode ?? "");
   const [outcome, setOutcome] = useState<CExecutionOutcome | null>(null);
   const [runPending, setRunPending] = useState(false);
+  const [runnerStatus, setRunnerStatus] = useState<CRunnerStatus>({ phase: "worker", state: "idle" });
+  const [runnerError, setRunnerError] = useState("");
   const runInFlight = useRef(false);
+  const stageQuestionId = question?.type === "coding" ? question.id : "";
+  const stageContext: RoomAsyncContext = {
+    roomId: match.roomId,
+    seatId,
+    stageId: `question:${stageQuestionId}`,
+  };
+  const activeStageContextRef = useRef<RoomAsyncContext>(stageContext);
+  const stageMountedRef = useRef(true);
+  useEffect(() => {
+    activeStageContextRef.current = {
+      roomId: match.roomId,
+      seatId,
+      stageId: `question:${stageQuestionId}`,
+    };
+    stageMountedRef.current = true;
+    return () => {
+      stageMountedRef.current = false;
+    };
+  }, [match.roomId, seatId, stageQuestionId]);
+  const isCurrentStage = () =>
+    stageMountedRef.current && isActiveRoomAsyncContext(stageContext, activeStageContextRef.current);
   if (!question || question.type !== "coding" || !problem) return null;
   const submitted = Boolean(seatId && match.submissions[seatId]?.submitted);
-  const complete = (result: CExecutionOutcome) => {
+  const reportRunnerProgress = (status: CRunnerStatus) => {
+    if (!isCurrentStage()) return;
+    setRunnerStatus(status);
+    const progress = codingProgressForRunnerStatus(status);
+    if (progress) onProgress(progress);
+    if (status.state === "failed") setRunnerError(status.message ?? "The browser C runner failed.");
+    else if (status.state === "loading") setRunnerError("");
+  };
+  const reportOutcome = (result: CExecutionOutcome) => {
+    if (!isCurrentStage()) return;
     setOutcome(result);
-    onComplete({
-      questionId: question.id,
-      passed: result.kind === "success" && result.passed,
-      tests: result.tests,
-      outcome: result.kind === "success" ? "success" : result.kind,
-    });
+    if (result.kind !== "success") {
+      onProgress("failed");
+      return;
+    }
+    onComplete({ questionId: question.id, passed: result.passed, tests: result.tests, outcome: "success" });
   };
   const run = async () => {
-    if (runInFlight.current || submitted) return;
+    if (!isCurrentStage() || runInFlight.current || submitted || !capabilityReady) return;
     runInFlight.current = true;
     setRunPending(true);
+    setOutcome(null);
+    setRunnerError("");
     try {
-      onProgress("compiling");
-      complete(await runCInWorker(problem, code));
+      reportOutcome(
+        await runCInWorker(problem, code, {
+          onProgress: reportRunnerProgress,
+        }),
+      );
     } catch (error) {
-      complete({
+      reportOutcome({
         kind: "runtime-error",
         stdout: "",
         stderr: error instanceof Error ? error.message : "The browser C runner failed.",
@@ -548,7 +675,7 @@ const CodingQuestionStage = ({
       });
     } finally {
       runInFlight.current = false;
-      setRunPending(false);
+      if (isCurrentStage()) setRunPending(false);
     }
   };
   return (
@@ -558,14 +685,18 @@ const CodingQuestionStage = ({
           <p className="eyebrow text-gold">coding round · browser worker</p>
           <h1 className="display mt-3 text-5xl">run the solution.</h1>
         </div>
-        <div className="timer">
-          <Clock3 size={16} />
-          {match.questionEndsAt ? Math.max(0, Math.ceil((match.questionEndsAt - now) / 1000)) : 0}s
-        </div>
+        <DeadlineTimer deadline={match.questionEndsAt} />
       </div>
       <p className="mt-4 max-w-2xl text-muted">
         {problem.description} The server receives only typed progress and test results, never source code.
       </p>
+      {!capabilityReady && (
+        <div id="room-c-capability-help" className="notice-error mt-5" role="alert">
+          Browser C execution is unavailable in this tab. Use a supported Chromium-based browser with the site&apos;s
+          COOP/COEP headers enabled, then reload the room.
+        </div>
+      )}
+      <CRunnerProgress status={runnerStatus} error={runnerError} onRetry={run} retryLabel="retry tests" />
       <div className="mt-7 panel overflow-hidden">
         <div className="border-b border-line bg-ink px-4 py-3 font-mono text-xs text-gold">
           locked · {problem.functionSignature} {"{"}
@@ -585,13 +716,18 @@ const CodingQuestionStage = ({
         />
         <div className="flex items-center justify-between border-t border-line p-4">
           <span className="text-xs text-muted">Local-only execution · no anti-cheat guarantee</span>
-          <button className="button button-primary" onClick={run} disabled={submitted || runPending || !code.trim()}>
-            <Zap size={15} /> {runPending ? "running…" : "run tests"}
+          <button
+            className="button button-primary"
+            onClick={run}
+            disabled={!capabilityReady || submitted || runPending || !code.trim()}
+            aria-describedby={!capabilityReady ? "room-c-capability-help" : undefined}
+          >
+            <Zap size={15} /> {runPending ? "running…" : runnerStatus.state === "failed" ? "retry tests" : "run tests"}
           </button>
         </div>
       </div>
       {outcome && (
-        <div className="panel mt-5 p-5 text-sm">
+        <div className="panel mt-5 p-5 text-sm" aria-live="polite">
           <p className="eyebrow">runner result</p>
           <p className="mt-2">
             {outcome.kind === "success" && outcome.passed
@@ -617,6 +753,11 @@ const CodingQuestionStage = ({
               ))}
             </div>
           )}
+          {outcome.kind !== "success" && (
+            <p className="mt-3 text-xs text-muted">
+              This attempt stayed unlocked. Fix the code or retry the browser run.
+            </p>
+          )}
         </div>
       )}
     </section>
@@ -627,7 +768,7 @@ const QuestionStage = ({
   match,
   seatId,
   opponent,
-  seconds,
+  deadline,
   answer,
   setAnswer,
   ordered,
@@ -638,7 +779,7 @@ const QuestionStage = ({
   match: MatchPublicState;
   seatId: string | null;
   opponent?: string;
-  seconds: number | null;
+  deadline: number | null;
   answer: string | number | boolean | string[];
   setAnswer: (answer: string | number | boolean | string[]) => void;
   ordered: string[];
@@ -661,10 +802,7 @@ const QuestionStage = ({
             {topicName(question.topicId)} · {question.difficulty}
           </p>
         </div>
-        <div className={`timer ${seconds !== null && seconds <= 10 ? "timer-hot" : ""}`}>
-          <Clock3 size={16} />
-          {seconds ?? "--"}s
-        </div>
+        <DeadlineTimer deadline={deadline} />
       </div>
       <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_18rem]">
         <article className="panel p-6 sm:p-9">
@@ -684,6 +822,7 @@ const QuestionStage = ({
           <button
             className="button button-primary mt-8 w-full"
             disabled={submitted || !hasAnswer(question, answer, ordered)}
+            aria-label={submitted ? "Answer locked" : "Submit answer"}
             onClick={submit}
           >
             {submitted ? (
@@ -853,11 +992,15 @@ const QuestionArtifact = ({ question }: { question: PublicQuestion }) => {
   const positions = new Map(question.graph.nodes.map((node) => [node.id, node]));
   return (
     <div className="graph-card mt-8">
+      <p id={`graph-description-${question.id}`} className="sr-only">
+        {graphTextAlternative(question.graph)} Question: {graphQueryLabel(question)}.
+      </p>
       <svg
         className="graph-svg"
         viewBox="0 0 100 100"
         role="img"
-        aria-label={`${question.graph.directed ? "Directed" : "Undirected"} graph diagram`}
+        aria-label={`${question.graph.directed ? "Directed" : "Undirected"} graph diagram for ${graphQueryLabel(question)}`}
+        aria-describedby={`graph-description-${question.id}`}
       >
         <defs>
           <marker id={`arrow-${question.id}`} markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
@@ -924,21 +1067,18 @@ const MiniScore = ({
 const Reveal = ({
   match,
   seatId,
-  now,
   selfName,
   opponentName,
   onSkip,
 }: {
   match: MatchPublicState;
   seatId: string | null;
-  now: number;
   selfName: string;
   opponentName: string;
   onSkip: () => void;
 }) => {
   const question = match.revealedQuestion;
   const skipped = Boolean(seatId && match.revealSkips[seatId]);
-  const seconds = Math.max(0, Math.ceil(((match.revealEndsAt ?? now) - now) / 1000));
   return (
     <section className="mx-auto max-w-3xl py-6 sm:py-12">
       <div className="flex items-center justify-between">
@@ -946,10 +1086,7 @@ const Reveal = ({
           <p className="eyebrow text-gold">round reveal · {match.history.at(-1)?.round ?? match.roundIndex + 1}</p>
           <h1 className="display mt-3 text-5xl">review the reasoning.</h1>
         </div>
-        <div className="timer">
-          <Clock3 size={16} />
-          {seconds}s
-        </div>
+        <DeadlineTimer deadline={match.revealEndsAt} />
       </div>
       <div className="panel mt-8 p-7 text-left">
         <p className="eyebrow">correct answer</p>
@@ -1006,15 +1143,13 @@ const Reveal = ({
   );
 };
 
-const Paused = ({ pause, now }: { pause: MatchPublicState["pause"]; now: number }) => (
+const Paused = ({ pause }: { pause: MatchPublicState["pause"] }) => (
   <section className="mx-auto flex min-h-[65vh] max-w-xl flex-col items-center justify-center text-center">
     <WifiOff className="text-gold" size={34} />
     <p className="eyebrow mt-6 text-gold">match paused</p>
     <h1 className="display mt-3 text-4xl">waiting for {pause?.seatName ?? "a guest"}</h1>
     <p className="mt-4 text-muted">Both players are paused. Timers resume only when the guest reconnects.</p>
-    <p className="mt-7 font-mono text-2xl text-gold">
-      {pause ? Math.max(0, Math.ceil((pause.expiresAt - now) / 1000)) : 0}s
-    </p>
+    <DeadlineTimer deadline={pause?.expiresAt ?? null} className="mt-7 font-mono text-2xl text-gold" />
   </section>
 );
 

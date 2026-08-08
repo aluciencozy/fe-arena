@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { link, mkdir, open, readFile, readdir, rm, unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { emptyAccountHistory } from "./account-history.js";
 import type { AccountHistory } from "./account-history.js";
 import type {
@@ -16,18 +17,23 @@ type ActiveWrite = {
   idempotencyKey: string;
   promise: Promise<PersistTerminalResult>;
 };
+export type OutboxReadiness = "starting" | "ready" | "degraded";
 
 export class DurableMatchRepository implements MatchRepository, AccountHistoryRepository {
   private readonly activeWrites = new Map<string, ActiveWrite>();
+  private readonly pendingSnapshots = new Map<string, TerminalMatchSnapshot>();
   private readonly startupReplay: Promise<void>;
   private retryTimer: ReturnType<typeof setTimeout> | undefined;
+  private outboxReadiness: OutboxReadiness = "starting";
 
   constructor(
     private readonly delegate: MatchRepository,
     private readonly outboxDirectory = DEFAULT_MATCH_OUTBOX_DIRECTORY,
     private readonly retryDelayMs = 5_000,
   ) {
-    this.startupReplay = this.replayOutbox().catch(() => this.scheduleRetry());
+    this.startupReplay = this.replayOutbox().catch(() => {
+      this.markDegraded();
+    });
   }
 
   async getAccountHistory(authUserId: string): Promise<AccountHistory> {
@@ -56,18 +62,39 @@ export class DurableMatchRepository implements MatchRepository, AccountHistoryRe
     await this.replayOutbox();
   }
 
+  readiness(): { status: OutboxReadiness } {
+    return { status: this.outboxReadiness };
+  }
+
   close(): void {
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.retryTimer = undefined;
   }
 
   private async persist(snapshot: TerminalMatchSnapshot): Promise<PersistTerminalResult> {
-    const stagedSnapshot = await this.stage(snapshot);
-    await this.startupReplay;
+    const pending = this.pendingSnapshots.get(snapshot.matchId);
+    if (pending && !isDeepStrictEqual(pending, snapshot)) {
+      throw new Error("A pending match snapshot cannot be replaced with a different idempotency key or payload.");
+    }
+    let stagedSnapshot: TerminalMatchSnapshot;
     try {
+      stagedSnapshot = await this.stage(snapshot);
+      this.pendingSnapshots.delete(snapshot.matchId);
+    } catch (error) {
+      // A staging failure has no durable copy to replay, so retain only this
+      // snapshot until the retry loop can stage it successfully.
+      this.pendingSnapshots.set(snapshot.matchId, snapshot);
+      this.markDegraded();
+      throw error;
+    }
+
+    try {
+      await this.startupReplay;
       return await this.deliver(stagedSnapshot);
     } catch (error) {
-      this.scheduleRetry();
+      // Once staging succeeds, the outbox file is the sole retry payload. Do
+      // not retain a second full snapshot in memory while delivery retries.
+      this.markDegraded();
       throw error;
     }
   }
@@ -133,10 +160,22 @@ export class DurableMatchRepository implements MatchRepository, AccountHistoryRe
       try {
         const snapshot = this.parseSnapshot(await readFile(path, "utf8"), path);
         await this.deliver(snapshot);
+        this.pendingSnapshots.delete(snapshot.matchId);
       } catch {
         retryNeeded = true;
       }
     }
+    for (const [matchId, snapshot] of this.pendingSnapshots) {
+      try {
+        const stagedSnapshot = await this.stage(snapshot);
+        // The file is now durable, so it is the retry source if delivery fails.
+        this.pendingSnapshots.delete(matchId);
+        await this.deliver(stagedSnapshot);
+      } catch {
+        retryNeeded = true;
+      }
+    }
+    this.outboxReadiness = retryNeeded || this.pendingSnapshots.size > 0 ? "degraded" : "ready";
     if (retryNeeded) this.scheduleRetry();
   }
 
@@ -160,9 +199,14 @@ export class DurableMatchRepository implements MatchRepository, AccountHistoryRe
     if (this.retryTimer) return;
     this.retryTimer = setTimeout(() => {
       this.retryTimer = undefined;
-      void this.replayOutbox().catch(() => this.scheduleRetry());
+      void this.replayOutbox().catch(() => this.markDegraded());
     }, this.retryDelayMs);
     this.retryTimer.unref();
+  }
+
+  private markDegraded(): void {
+    this.outboxReadiness = "degraded";
+    this.scheduleRetry();
   }
 
   private async syncDirectory(): Promise<void> {

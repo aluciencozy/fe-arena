@@ -1,6 +1,33 @@
-import type { CodingProblem } from "../../../shared/domain";
+import type { CodingProblem, CodingProgressUpdate } from "../../../shared/domain";
 
 export type CTestResult = { index: number; name: string; passed: boolean };
+export type CRunnerPhase =
+  "worker" | "sdk" | "runtime" | "compiler" | "ready" | "compilation" | "execution" | "complete";
+export type CRunnerStatus = {
+  phase: CRunnerPhase;
+  state: "idle" | "loading" | "ready" | "failed";
+  message?: string;
+};
+export const codingProgressForRunnerStatus = (status: CRunnerStatus): CodingProgressUpdate | null => {
+  if (status.state === "failed") return "failed";
+  if (status.state !== "loading") return null;
+  switch (status.phase) {
+    case "worker":
+      return "worker";
+    case "sdk":
+      return "sdk";
+    case "runtime":
+      return "runtime";
+    case "compiler":
+      return "compiler";
+    case "compilation":
+      return "compiling";
+    case "execution":
+      return "running";
+    default:
+      return null;
+  }
+};
 export type CExecutionOutcome =
   | { kind: "success"; stdout: string; stderr: string; tests: CTestResult[]; passed: boolean }
   | { kind: "compile-error"; stdout: string; stderr: string; tests: CTestResult[] }
@@ -14,7 +41,8 @@ export type CExecutionOutcome =
     };
 
 type WorkerMessage = {
-  kind: "ready" | "compiled" | "success" | "compile-error" | "runtime-error";
+  kind: "progress" | "ready" | "compiled" | "success" | "compile-error" | "runtime-error";
+  phase?: "sdk" | "runtime" | "compiler";
   stdout?: string;
   stderr?: string;
   exitCode?: number;
@@ -30,6 +58,28 @@ type WorkerFactory = () => WorkerLike;
 
 let prewarmedWorker: WorkerLike | undefined;
 let prewarmPromise: Promise<void> | undefined;
+let prewarmStatus: CRunnerStatus = { phase: "worker", state: "idle" };
+const prewarmStatusListeners = new Set<(status: CRunnerStatus) => void>();
+
+const publishPrewarmStatus = (status: CRunnerStatus) => {
+  prewarmStatus = status;
+  for (const listener of prewarmStatusListeners) listener(status);
+};
+
+export const getCPrewarmStatus = () => prewarmStatus;
+const subscribeToStatus = (
+  listeners: Set<(status: CRunnerStatus) => void>,
+  currentStatus: CRunnerStatus,
+  listener: (status: CRunnerStatus) => void,
+) => {
+  listeners.add(listener);
+  listener(currentStatus);
+  return () => {
+    listeners.delete(listener);
+  };
+};
+export const subscribeCPrewarmStatus = (listener: (status: CRunnerStatus) => void) =>
+  subscribeToStatus(prewarmStatusListeners, prewarmStatus, listener);
 
 export const generateCSource = (problem: CodingProblem, studentCode: string): string =>
   `${problem.prefix}\n${problem.functionSignature};\n${problem.testHarness}\n${problem.functionSignature} {\n${studentCode}\n}\n`;
@@ -78,7 +128,11 @@ const initializationFailure = (error: unknown): CExecutionOutcome => {
   return { kind: "runtime-error", stdout: "", stderr, tests: [] };
 };
 
-const initializeWorker = (worker: WorkerLike, timeoutMs: number) =>
+const initializeWorker = (
+  worker: WorkerLike,
+  timeoutMs: number,
+  onProgress?: (phase: "sdk" | "runtime" | "compiler") => void,
+) =>
   new Promise<void>((resolve, reject) => {
     let settled = false;
     const timer = globalThis.setTimeout(() => {
@@ -97,6 +151,7 @@ const initializeWorker = (worker: WorkerLike, timeoutMs: number) =>
       } else resolve();
     };
     worker.onmessage = ({ data }) => {
+      if (data.kind === "progress" && data.phase) onProgress?.(data.phase);
       if (data.kind === "ready") finish();
       if (data.kind === "compile-error" || data.kind === "runtime-error")
         finish(new Error(data.stderr || "The browser compiler worker failed during startup."));
@@ -110,40 +165,79 @@ const initializeWorker = (worker: WorkerLike, timeoutMs: number) =>
   });
 
 export const prewarmCWorker = (
-  options: { initializationTimeoutMs?: number; createWorker?: WorkerFactory } = {},
+  options: {
+    initializationTimeoutMs?: number;
+    createWorker?: WorkerFactory;
+    onProgress?: (status: CRunnerStatus) => void;
+  } = {},
 ): Promise<void> => {
-  if (prewarmedWorker) return Promise.resolve();
-  if (prewarmPromise) return prewarmPromise;
+  const scopedListener = options.onProgress;
+  if (scopedListener) prewarmStatusListeners.add(scopedListener);
+  const releaseScopedListener = () => {
+    if (scopedListener) prewarmStatusListeners.delete(scopedListener);
+  };
+  if (prewarmedWorker) {
+    publishPrewarmStatus({ phase: "ready", state: "ready" });
+    releaseScopedListener();
+    return Promise.resolve();
+  }
+  if (prewarmPromise) {
+    void prewarmPromise.then(releaseScopedListener, releaseScopedListener);
+    return prewarmPromise;
+  }
   const workerFactory = options.createWorker ?? defaultWorkerFactory;
+  publishPrewarmStatus({ phase: "worker", state: "loading" });
   let worker: WorkerLike;
   try {
     worker = workerFactory();
   } catch (error) {
-    return Promise.reject(error instanceof Error ? error : new Error("The browser compiler worker could not start."));
+    const failure = error instanceof Error ? error : new Error("The browser compiler worker could not start.");
+    publishPrewarmStatus({ phase: "worker", state: "failed", message: failure.message });
+    releaseScopedListener();
+    return Promise.reject(failure);
   }
-  prewarmPromise = initializeWorker(worker, options.initializationTimeoutMs ?? 30_000).then(
+  prewarmPromise = initializeWorker(worker, options.initializationTimeoutMs ?? 30_000, (phase) =>
+    publishPrewarmStatus({ phase, state: "loading" }),
+  ).then(
     () => {
       prewarmedWorker = worker;
+      publishPrewarmStatus({ phase: "ready", state: "ready" });
     },
     (error) => {
       prewarmPromise = undefined;
-      throw error;
+      const failure = error instanceof Error ? error : new Error("The browser compiler worker could not initialize.");
+      publishPrewarmStatus({
+        phase: failure.message.includes("startup") ? "worker" : prewarmStatus.phase,
+        state: "failed",
+        message: failure.message,
+      });
+      throw failure;
     },
   );
+  void prewarmPromise.then(releaseScopedListener, releaseScopedListener);
   return prewarmPromise;
 };
 
 export const runCInWorker = (
   problem: CodingProblem,
   studentCode: string,
-  options: { timeoutMs?: number; initializationTimeoutMs?: number; createWorker?: WorkerFactory } = {},
+  options: {
+    timeoutMs?: number;
+    initializationTimeoutMs?: number;
+    createWorker?: WorkerFactory;
+    onProgress?: (status: CRunnerStatus) => void;
+  } = {},
 ): Promise<CExecutionOutcome> => {
   const executionTimeoutMs = options.timeoutMs ?? EXECUTION_TIMEOUT_MS;
   const initializationTimeoutMs = options.initializationTimeoutMs ?? 30_000;
   const source = generateCSource(problem, studentCode);
+  const reportRunStatus = (status: CRunnerStatus) => {
+    options.onProgress?.(status);
+  };
   const execute = (worker: WorkerLike) =>
     new Promise<CExecutionOutcome>((resolve) => {
       let settled = false;
+      let activePhase: CRunnerPhase = "worker";
       let compilationTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
       let executionTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
       const clearTimers = () => {
@@ -155,6 +249,13 @@ export const runCInWorker = (
         if (settled) return;
         settled = true;
         clearTimers();
+        reportRunStatus({
+          phase: outcome.kind === "success" ? "complete" : activePhase,
+          state: outcome.kind === "success" ? "ready" : "failed",
+          ...(outcome.kind === "success"
+            ? {}
+            : { message: outcome.stderr || `${outcome.kind} during browser execution.` }),
+        });
         if (!options.createWorker && isReusableOutcome(outcome) && !prewarmedWorker && !prewarmPromise) {
           // Keep the initialized Wasmer runtime hot. Rebuilding the compiler
           // worker after every run makes the next run pay the full startup cost
@@ -208,12 +309,17 @@ export const runCInWorker = (
       worker.onmessage = ({ data }) => {
         if (data.kind === "ready") {
           if (initializationTimer !== undefined) globalThis.clearTimeout(initializationTimer);
+          reportRunStatus({ phase: "ready", state: "ready" });
+          activePhase = "compilation";
           startCompilationTimer();
+          reportRunStatus({ phase: "compilation", state: "loading" });
           return;
         }
         if (data.kind === "compiled") {
           if (compilationTimer !== undefined) globalThis.clearTimeout(compilationTimer);
+          activePhase = "execution";
           startExecutionTimer();
+          reportRunStatus({ phase: "execution", state: "loading" });
           return;
         }
         if (data.kind === "compile-error") {
@@ -262,16 +368,23 @@ export const runCInWorker = (
     return options.createWorker();
   };
   const runAttempt = (attempt: number): Promise<CExecutionOutcome> => {
-    const start = options.createWorker ? Promise.resolve() : prewarmCWorker({ initializationTimeoutMs });
+    const start = options.createWorker
+      ? Promise.resolve().then(() => reportRunStatus({ phase: "worker", state: "loading" }))
+      : prewarmCWorker({
+          initializationTimeoutMs,
+          onProgress: reportRunStatus,
+        });
     return start
       .then(() => {
         try {
           return execute(takeWorker());
         } catch (error) {
+          const failure = error instanceof Error ? error.message : "The browser compiler worker could not start.";
+          reportRunStatus({ phase: "worker", state: "failed", message: failure });
           return {
             kind: "runtime-error" as const,
             stdout: "",
-            stderr: error instanceof Error ? error.message : "The browser compiler worker could not start.",
+            stderr: failure,
             tests: [],
           };
         }

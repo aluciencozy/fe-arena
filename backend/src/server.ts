@@ -4,7 +4,12 @@ import { createApp } from "./http/app.js";
 import { createMatchRepository } from "./persistence/index.js";
 import { setAccountHistoryRepository } from "./services/account-history.service.js";
 import { createAuthVerifier } from "./services/auth.service.js";
-import { loadQuestionRepository, setQuestionRepository } from "./services/question-bank.service.js";
+import {
+  isQuestionBankReady,
+  loadQuestionRepository,
+  questionBankStats,
+  setQuestionRepository,
+} from "./services/question-bank.service.js";
 import { setMatchRepository } from "./services/match.service.js";
 import { registerHandlers } from "./sockets/handlers.js";
 import type { RuntimeConfig } from "./config.js";
@@ -23,15 +28,26 @@ export const createServerRuntime = async (config: RuntimeConfig): Promise<Server
   // A configured Supabase question bank is intentionally fail-closed: serving a partial or stale bank in production is unsafe.
   const questionRepository = await loadQuestionRepository();
   setQuestionRepository(questionRepository);
+  const questionBankSummary = questionBankStats();
   const authVerifier = createAuthVerifier();
+  const repositoryReadiness = (
+    matchRepository as Partial<{ readiness: () => { status: "starting" | "ready" | "degraded" } }>
+  ).readiness;
   const app = createApp({
     runtimeConfig: config,
     authVerifier,
     accountHistoryRepository: matchRepository,
+    questionBank: {
+      ready: isQuestionBankReady(questionRepository),
+      mode: config.supabase.configured ? "supabase" : "in-memory-fallback",
+      publishedQuestions: questionBankSummary.total,
+    },
     persistence: {
       configured: config.supabase.configured,
       mode: config.supabase.configured ? "supabase" : "in-memory-fallback",
       ready: true,
+      outbox: config.supabase.configured ? "starting" : "not-configured",
+      ...(repositoryReadiness ? { readiness: repositoryReadiness.bind(matchRepository) } : {}),
     },
   });
 

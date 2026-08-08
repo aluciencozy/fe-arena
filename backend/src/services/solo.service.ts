@@ -50,6 +50,12 @@ const clearTimer = (record: SoloRecord) => {
   if (record.timer) clearTimeout(record.timer);
   record.timer = undefined;
 };
+const clearSoloRecord = (record: SoloRecord) => {
+  clearTimer(record);
+  for (const [sessionId, current] of sessions) {
+    if (current === record) sessions.delete(sessionId);
+  }
+};
 const sendQuestion = (record: SoloRecord, emit: (state: SoloState) => void) => {
   clearTimer(record);
   const question = questionRepository.get(record.ids[record.index] ?? "");
@@ -57,6 +63,7 @@ const sendQuestion = (record: SoloRecord, emit: (state: SoloState) => void) => {
     record.state.phase = "COMPLETE";
     record.state.question = null;
     emit(record.state);
+    clearSoloRecord(record);
     return;
   }
   const now = Date.now();
@@ -122,6 +129,7 @@ export const startSolo = (
   const questions = questionRepository.select(`solo:${sessionId}:${Date.now()}`, config.roundCount, config.topicIds);
   if (questions.length !== config.roundCount)
     return { ok: false as const, error: "There are not enough reviewed questions for that topic selection." };
+  clearSolo(sessionId);
   const record: SoloRecord = {
     state: initial(),
     ids: questions.map((question) => question.id),
@@ -159,6 +167,7 @@ export const soloNext = (sessionId: string, emit: (state: SoloState) => void) =>
     record.state.question = null;
     record.state.revealedQuestion = null;
     emit(record.state);
+    clearSoloRecord(record);
     return true;
   }
   sendQuestion(record, emit);
@@ -169,6 +178,7 @@ export const clearSolo = (sessionId: string) => {
   if (record) clearTimer(record);
   sessions.delete(sessionId);
 };
+export const soloSessionCountForTests = () => sessions.size;
 export const clearSoloForTests = () => {
   for (const id of sessions.keys()) clearSolo(id);
 };

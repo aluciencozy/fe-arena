@@ -1,7 +1,9 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
+  DEFAULT_ROUND_COUNT,
   QuestionSchema,
   selectSeededQuestions,
+  TOPICS,
   toPublicQuestion,
   toRevealedQuestion,
   type PublicQuestion,
@@ -12,6 +14,7 @@ import {
 import { QUESTION_BANK, validateQuestionBank } from "../data/questions.js";
 
 const reviewedQuestions = validateQuestionBank(QUESTION_BANK);
+export const MIN_PLAYABLE_NONCODING_QUESTIONS = DEFAULT_ROUND_COUNT;
 
 const LEGACY_C_CODE: Record<string, string> = {
   "q-array-c-output": `int a[3] = {2, 4, 6};
@@ -209,6 +212,14 @@ export let questionRepository: QuestionRepository = inMemoryQuestionRepository;
 export const setQuestionRepository = (repository: QuestionRepository) => {
   questionRepository = repository;
 };
+
+export const isQuestionBankReady = (repository: Pick<QuestionRepository, "select"> = questionRepository) =>
+  repository.select(
+    "readyz",
+    MIN_PLAYABLE_NONCODING_QUESTIONS,
+    TOPICS.map((topic) => topic.id),
+    false,
+  ).length >= MIN_PLAYABLE_NONCODING_QUESTIONS;
 
 export const publicQuestion = (question: Question): PublicQuestion => toPublicQuestion(question);
 export const revealedQuestion = (question: Question): RevealedQuestion => toRevealedQuestion(question);

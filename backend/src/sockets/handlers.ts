@@ -32,7 +32,7 @@ import {
   submitCodingResult,
   requestRematch,
 } from "../services/match.service.js";
-import { soloNext, soloSubmit, startSolo } from "../services/solo.service.js";
+import { clearSolo, soloNext, soloSubmit, startSolo } from "../services/solo.service.js";
 import { FixedWindowLimiter } from "../security.js";
 
 const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -118,6 +118,10 @@ const validate = (socket: Socket, schema: { safeParse: (value: unknown) => any }
   }
   return result.data;
 };
+type PrivateRoomAck = { ok: true; roomId: string } | { ok: false; error: string };
+const respondPrivateRoom = (ack: unknown, response: PrivateRoomAck) => {
+  if (typeof ack === "function") (ack as (value: PrivateRoomAck) => void)(response);
+};
 const validateEmpty = (
   socket: Socket,
   schema: { safeParse: (value: unknown) => { success: boolean } },
@@ -166,21 +170,27 @@ export const registerHandlers = (io: Server, socket: Socket, authVerifier: AuthV
     if (current) bindSeatAuthIdentity(current.roomId, current.seat.seatId, authUserId);
   });
 
-  socket.on("room:create-private", (payload: unknown) => {
+  socket.on("room:create-private", (payload: unknown, ack?: (response: PrivateRoomAck) => void) => {
     const input = validate(socket, ClientEventSchemas["room:create-private"], payload);
-    if (!input) return;
+    if (!input) {
+      respondPrivateRoom(ack, { ok: false, error: "The request shape is invalid." });
+      return;
+    }
     const result = createPrivateRoom(input.requestId, input.config, input.username);
     if (!result.ok) {
       error(socket, result.error, "ROOM_CREATE_REPLAY");
+      respondPrivateRoom(ack, { ok: false, error: result.error });
       return;
     }
     const created = result.created;
     attachSeat(created.metadata.roomId, created.seat, socket.id);
     bindVerifiedIdentity(socket, created.metadata.roomId, created.seat.seatId);
     enterRoom(io, socket, created.metadata.roomId, created.seat);
+    respondPrivateRoom(ack, { ok: true, roomId: created.metadata.roomId });
     socket.emit(
       "room:created",
       output(ServerEventSchemas["room:created"], {
+        requestId: input.requestId,
         roomId: created.metadata.roomId,
         metadata: created.metadata,
         seatId: created.seat.seatId,
@@ -442,6 +452,7 @@ export const registerHandlers = (io: Server, socket: Socket, authVerifier: AuthV
   });
 
   socket.on("disconnect", () => {
+    clearSolo(socket.id);
     suspend(socket.id);
     chatTimes.delete(socket.id);
     const current = session(socket);

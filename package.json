@@ -1,0 +1,7 @@
+{
+  "name": "fe-arena",
+  "private": true,
+  "scripts": {
+    "ci": "bash scripts/ci.sh"
+  }
+}

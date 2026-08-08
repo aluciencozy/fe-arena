@@ -27,8 +27,88 @@ test("health and readiness expose state without configuration details", async ()
     assert.equal(readiness.status, 503);
     assert.deepEqual(await readiness.json(), {
       status: "not_ready",
-      persistence: { status: "fallback", configured: false, guestGameplay: true },
+      liveness: { status: "ok" },
+      questionBank: { status: "ready", mode: "in-memory-fallback", publishedQuestions: 186 },
+      persistence: { status: "fallback", configured: false, guestGameplay: true, outbox: "not-configured" },
     });
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test("readiness rejects a partial playable question bank", async () => {
+  const { server, base } = await listen(
+    createApp({
+      runtimeConfig: { frontendOrigins: ["https://arena.example"], trustProxy: true, isProduction: true },
+      questionBank: { ready: false, mode: "supabase", publishedQuestions: 4 },
+      persistence: {
+        configured: true,
+        mode: "supabase",
+        ready: true,
+        outbox: "ready",
+      },
+    }),
+  );
+  try {
+    const response = await fetch(`${base}/readyz`);
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), {
+      status: "not_ready",
+      liveness: { status: "ok" },
+      questionBank: { status: "unavailable", mode: "supabase", publishedQuestions: 4 },
+      persistence: { status: "configured", configured: true, guestGameplay: true, outbox: "ready" },
+    });
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test("readiness reports a degraded outbox without hiding a live question bank", async () => {
+  const { server, base } = await listen(
+    createApp({
+      questionBank: { ready: true, mode: "supabase", publishedQuestions: 5 },
+      persistence: {
+        configured: true,
+        mode: "supabase",
+        ready: true,
+        outbox: "degraded",
+      },
+    }),
+  );
+  try {
+    const response = await fetch(`${base}/readyz`);
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), {
+      status: "not_ready",
+      liveness: { status: "ok" },
+      questionBank: { status: "ready", mode: "supabase", publishedQuestions: 5 },
+      persistence: { status: "configured", configured: true, guestGameplay: true, outbox: "degraded" },
+    });
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test("readiness waits for configured outbox startup replay", async () => {
+  const { server, base } = await listen(
+    createApp({
+      runtimeConfig: { frontendOrigins: ["https://arena.example"], trustProxy: true, isProduction: true },
+      questionBank: { ready: true, mode: "supabase", publishedQuestions: 5 },
+      persistence: {
+        configured: true,
+        mode: "supabase",
+        ready: true,
+        outbox: "ready",
+        readiness: () => ({ status: "starting" as const }),
+      },
+    }),
+  );
+  try {
+    const response = await fetch(`${base}/readyz`);
+    const body = (await response.json()) as { status: string; persistence: { outbox: string } };
+    assert.equal(response.status, 503);
+    assert.equal(body.status, "not_ready");
+    assert.equal(body.persistence.outbox, "starting");
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
