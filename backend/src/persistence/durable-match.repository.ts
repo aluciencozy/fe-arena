@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { link, mkdir, open, readFile, readdir, rm, unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { emptyAccountHistory } from "./account-history.js";
 import type { AccountHistory } from "./account-history.js";
 import type {
@@ -71,6 +72,10 @@ export class DurableMatchRepository implements MatchRepository, AccountHistoryRe
   }
 
   private async persist(snapshot: TerminalMatchSnapshot): Promise<PersistTerminalResult> {
+    const pending = this.pendingSnapshots.get(snapshot.matchId);
+    if (pending && !isDeepStrictEqual(pending, snapshot)) {
+      throw new Error("A pending match snapshot cannot be replaced with a different idempotency key or payload.");
+    }
     let stagedSnapshot: TerminalMatchSnapshot;
     try {
       stagedSnapshot = await this.stage(snapshot);

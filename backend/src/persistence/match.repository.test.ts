@@ -243,6 +243,44 @@ test("retains a snapshot only until live staging succeeds", async () => {
   }
 });
 
+test("rejects conflicting retries while retaining a pending snapshot", async () => {
+  const directory = await mkdtemp(join(process.cwd(), ".terminal-outbox-test-"));
+  const blockedPath = join(directory, "blocked-outbox");
+  await writeFile(blockedPath, "not a directory", "utf8");
+  const first = snapshot();
+  const delivered: TerminalMatchSnapshot[] = [];
+  const delegate: MatchRepository = {
+    persistTerminalMatch: async (value) => {
+      delivered.push(structuredClone(value));
+      return { status: "inserted", matchId: value.matchId };
+    },
+  };
+
+  try {
+    const repository = new DurableMatchRepository(delegate, blockedPath, 60_000);
+    await assert.rejects(repository.persistTerminalMatch(first));
+    await assert.rejects(
+      repository.persistTerminalMatch({
+        ...first,
+        idempotencyKey: "44444444-4444-4444-8444-444444444444",
+      }),
+      /pending match snapshot/,
+    );
+    await assert.rejects(
+      repository.persistTerminalMatch({ ...first, terminalOutcome: "draw" }),
+      /pending match snapshot/,
+    );
+    const pending = (repository as unknown as { pendingSnapshots: Map<string, TerminalMatchSnapshot> }).pendingSnapshots;
+    assert.deepEqual(pending.get(first.matchId), first);
+    await rm(blockedPath, { force: true });
+    await repository.replayPending();
+    assert.deepEqual(delivered, [first]);
+    repository.close();
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("retries a terminal snapshot after live staging fails", async () => {
   const directory = await mkdtemp(join(process.cwd(), ".terminal-outbox-test-"));
   const blockedPath = join(directory, "blocked-outbox");
