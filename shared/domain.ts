@@ -735,6 +735,7 @@ export const ClientEventSchemas = {
 } as const;
 export const ServerEventSchemas = {
   "room:created": z.object({
+    requestId: z.string().uuid(),
     roomId: z.string().regex(/^[A-Z0-9]{6}$/),
     metadata: RoomMetadataSchema,
     seatId: z.string().uuid(),

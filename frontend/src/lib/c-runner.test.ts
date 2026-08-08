@@ -6,11 +6,9 @@ import {
   parseExecutionOutput,
   codingProgressForRunnerStatus,
   getCPrewarmStatus,
-  getCWorkerStatus,
   prewarmCWorker,
   runCInWorker,
   subscribeCPrewarmStatus,
-  subscribeCWorkerStatus,
   type CExecutionOutcome,
 } from "./c-runner";
 
@@ -61,7 +59,7 @@ test("shares an in-flight prewarm and permits one retry after initialization fai
   let workerCount = 0;
   const statuses: string[] = [];
   const scopedStatuses: string[] = [];
-  const unsubscribe = subscribeCWorkerStatus((status) => statuses.push(`${status.phase}:${status.state}`));
+  const unsubscribe = subscribeCPrewarmStatus((status) => statuses.push(`${status.phase}:${status.state}`));
   const createWorker = () => {
     workerCount += 1;
     const worker = {
@@ -104,7 +102,7 @@ test("shares an in-flight prewarm and permits one retry after initialization fai
   assert.ok(statuses.includes("sdk:loading"));
   assert.ok(statuses.includes("runtime:loading"));
   assert.ok(statuses.includes("compiler:loading"));
-  assert.equal(getCWorkerStatus().phase, "ready");
+  assert.equal(getCPrewarmStatus().phase, "ready");
   assert.ok(scopedStatuses.includes("sdk:loading"));
   assert.ok(scopedStatuses.includes("ready:ready"));
 });

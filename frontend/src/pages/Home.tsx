@@ -17,6 +17,7 @@ import {
 import AuthPanel from "@/components/AuthPanel";
 import { AppSettings } from "@/components/AppSettings";
 import { Select } from "@/components/ui/select";
+import { isPrivateCreateResponseForActiveRequest } from "@/lib/private-create";
 import { connectSocket, socket, socketUrl } from "@/lib/socket";
 import { socketConnectionErrorMessage, socketDisconnectedMessage } from "@/lib/socket-errors";
 import { useGameStore } from "@/store/gameStore";
@@ -41,6 +42,7 @@ const normalizeCode = (value: string) =>
 type Notice = { kind: "error" | "info"; text: string } | null;
 type PrivateCreateRequest = { requestId: string; username: string; config: MatchConfig };
 type PrivateCreateAck = { ok: boolean; roomId?: string; error?: string };
+type ActivePrivateCreate = { requestId: string; attempt: number };
 export default function Home() {
   const navigate = useNavigate();
   const playerName = useGameStore((state) => state.playerName);
@@ -61,6 +63,8 @@ export default function Home() {
   const queuedName = useRef<string | null>(null);
   const queueToken = useRef<string | null>(null);
   const pendingPrivateCreate = useRef<PrivateCreateRequest | null>(null);
+  const activePrivateCreate = useRef<ActivePrivateCreate | null>(null);
+  const privateCreateAttempt = useRef(0);
   const privateAckTimer = useRef<number | null>(null);
   const validName = name.trim().length > 0;
   const closeTopicDialog = useCallback(() => setView("home"), []);
@@ -72,11 +76,16 @@ export default function Home() {
   }, []);
   const emitPrivateCreate = useCallback(
     (request: PrivateCreateRequest) => {
+      const attempt = privateCreateAttempt.current + 1;
+      privateCreateAttempt.current = attempt;
+      activePrivateCreate.current = { requestId: request.requestId, attempt };
       clearPrivateAckTimer();
       setBusy(true);
       setPrivateRequestState("waiting");
       privateAckTimer.current = window.setTimeout(() => {
+        if (activePrivateCreate.current?.attempt !== attempt) return;
         privateAckTimer.current = null;
+        activePrivateCreate.current = null;
         setBusy(false);
         setPrivateRequestState("timed-out");
         setNotice({ kind: "error", text: "Private room creation timed out. Retry with the same request." });
@@ -84,14 +93,18 @@ export default function Home() {
       socket
         .timeout(8_000)
         .emit("room:create-private", request, (timeoutError: Error | null, response: PrivateCreateAck) => {
+          if (activePrivateCreate.current?.attempt !== attempt) return;
           clearPrivateAckTimer();
           if (timeoutError) {
+            activePrivateCreate.current = null;
             setBusy(false);
             setPrivateRequestState("timed-out");
             setNotice({ kind: "error", text: "Private room creation timed out. Retry with the same request." });
             return;
           }
           if (!response?.ok) {
+            activePrivateCreate.current = null;
+            pendingPrivateCreate.current = null;
             setBusy(false);
             setPrivateRequestState("idle");
             setNotice({ kind: "error", text: response?.error ?? "The private room could not be created." });
@@ -106,7 +119,12 @@ export default function Home() {
   );
 
   useEffect(() => {
-    const created = (payload: { roomId: string; seatId: string; reconnectToken: string }) => {
+    const created = (payload: { requestId: string; roomId: string; seatId: string; reconnectToken: string }) => {
+      if (
+        !isPrivateCreateResponseForActiveRequest(activePrivateCreate.current?.requestId ?? null, payload.requestId)
+      )
+        return;
+      activePrivateCreate.current = null;
       useGameStore.getState().setSession(payload.seatId, payload.reconnectToken, payload.roomId);
       clearPrivateAckTimer();
       pendingPrivateCreate.current = null;
@@ -159,6 +177,8 @@ export default function Home() {
     const onConnectError = (reason: unknown) => {
       setConnection("disconnected");
       if (pendingPrivateCreate.current) {
+        clearPrivateAckTimer();
+        activePrivateCreate.current = null;
         setBusy(false);
         setPrivateRequestState("timed-out");
       } else {
@@ -169,6 +189,7 @@ export default function Home() {
     const failed = (payload: { message?: string } | string) => {
       clearPrivateAckTimer();
       if (pendingPrivateCreate.current) {
+        activePrivateCreate.current = null;
         pendingPrivateCreate.current = null;
         setBusy(false);
         setPrivateRequestState("idle");
@@ -219,6 +240,7 @@ export default function Home() {
       username: name.trim(),
       config,
     } satisfies PrivateCreateRequest;
+    activePrivateCreate.current = null;
     pendingPrivateCreate.current = request;
     setBusy(true);
     setPrivateRequestState("waiting");

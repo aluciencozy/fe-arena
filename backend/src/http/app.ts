@@ -1,7 +1,7 @@
 import cors from "cors";
 import express, { type Express, type ErrorRequestHandler } from "express";
 import { TOPICS } from "../../../shared/domain.js";
-import { questionBankStats } from "../services/question-bank.service.js";
+import { isQuestionBankReady, questionBankStats } from "../services/question-bank.service.js";
 import { getAccountHistory } from "../services/account-history.service.js";
 import { createAuthVerifier, verifyBearerHeader, type AuthVerifier } from "../services/auth.service.js";
 import type { AccountHistoryRepository } from "../persistence/match.repository.js";
@@ -46,10 +46,11 @@ export const createApp = (options: AppOptions = {}): Express => {
     outbox: "not-configured" as const,
     ...options.persistence,
   };
+  const defaultQuestionBankStats = questionBankStats();
   const questionBank = options.questionBank ?? {
-    ready: questionBankStats().total > 0,
+    ready: isQuestionBankReady(),
     mode: "in-memory-fallback" as const,
-    publishedQuestions: questionBankStats().total,
+    publishedQuestions: defaultQuestionBankStats.total,
   };
   const authVerifier = options.authVerifier ?? createAuthVerifier();
   const historyRepository = options.accountHistoryRepository;

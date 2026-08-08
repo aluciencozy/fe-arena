@@ -4,10 +4,9 @@ import { ArrowLeft, Check, CircleAlert, Clock3, Code2, Play, RotateCcw } from "l
 import { Link } from "react-router-dom";
 import { CODING_PROBLEMS } from "../../../shared/coding-problems";
 import {
-  getCWorkerStatus,
+  getCPrewarmStatus,
   prewarmCWorker,
   runCInWorker,
-  subscribeCWorkerStatus,
   type CExecutionOutcome,
   type CRunnerStatus,
 } from "@/lib/c-runner";
@@ -21,18 +20,17 @@ export default function CPractice() {
   const [studentCode, setStudentCode] = useState(problem.starterCode);
   const [outcome, setOutcome] = useState<CExecutionOutcome | null>(null);
   const [running, setRunning] = useState(false);
-  const [workerStatus, setWorkerStatus] = useState<CRunnerStatus>(() => getCWorkerStatus());
+  const [workerStatus, setWorkerStatus] = useState<CRunnerStatus>(() => getCPrewarmStatus());
   const [prewarmError, setPrewarmError] = useState("");
   const capabilityReady = typeof window !== "undefined" && window.crossOriginIsolated;
   const startPrewarm = useCallback(() => {
     if (!capabilityReady) return;
     setPrewarmError("");
-    void prewarmCWorker().catch((error) => {
+    void prewarmCWorker({ onProgress: setWorkerStatus }).catch((error) => {
       setPrewarmError(error instanceof Error ? error.message : "The browser C runner could not initialize.");
     });
   }, [capabilityReady]);
 
-  useEffect(() => subscribeCWorkerStatus(setWorkerStatus), []);
   useEffect(() => {
     // Start loading the SDK, runtime, and public compiler as soon as the lab
     // opens so the first click does not pay the complete cold-start cost.
@@ -52,7 +50,7 @@ export default function CPractice() {
     setOutcome(null);
     setPrewarmError("");
     try {
-      const result = await runCInWorker(problem, studentCode);
+      const result = await runCInWorker(problem, studentCode, { onProgress: setWorkerStatus });
       setOutcome(result);
     } catch (error) {
       setOutcome({

@@ -55,25 +55,17 @@ type WorkerLike = {
   onerror: ((event: ErrorEvent) => void) | null;
 };
 type WorkerFactory = () => WorkerLike;
-type RunnerOperation = "prewarm" | "run";
 
 let prewarmedWorker: WorkerLike | undefined;
 let prewarmPromise: Promise<void> | undefined;
-let runnerStatus: CRunnerStatus = { phase: "worker", state: "idle" };
 let prewarmStatus: CRunnerStatus = { phase: "worker", state: "idle" };
-const allStatusListeners = new Set<(status: CRunnerStatus) => void>();
 const prewarmStatusListeners = new Set<(status: CRunnerStatus) => void>();
 
-const publishRunnerStatus = (status: CRunnerStatus, operation: RunnerOperation) => {
-  runnerStatus = status;
-  if (operation === "prewarm") {
-    prewarmStatus = status;
-  }
-  for (const listener of allStatusListeners) listener(status);
-  if (operation === "prewarm") for (const listener of prewarmStatusListeners) listener(status);
+const publishPrewarmStatus = (status: CRunnerStatus) => {
+  prewarmStatus = status;
+  for (const listener of prewarmStatusListeners) listener(status);
 };
 
-export const getCWorkerStatus = () => runnerStatus;
 export const getCPrewarmStatus = () => prewarmStatus;
 const subscribeToStatus = (
   listeners: Set<(status: CRunnerStatus) => void>,
@@ -85,9 +77,6 @@ const subscribeToStatus = (
   return () => {
     listeners.delete(listener);
   };
-};
-export const subscribeCWorkerStatus = (listener: (status: CRunnerStatus) => void) => {
-  return subscribeToStatus(allStatusListeners, runnerStatus, listener);
 };
 export const subscribeCPrewarmStatus = (listener: (status: CRunnerStatus) => void) =>
   subscribeToStatus(prewarmStatusListeners, prewarmStatus, listener);
@@ -188,7 +177,7 @@ export const prewarmCWorker = (
     if (scopedListener) prewarmStatusListeners.delete(scopedListener);
   };
   if (prewarmedWorker) {
-    publishRunnerStatus({ phase: "ready", state: "ready" }, "prewarm");
+    publishPrewarmStatus({ phase: "ready", state: "ready" });
     releaseScopedListener();
     return Promise.resolve();
   }
@@ -197,34 +186,31 @@ export const prewarmCWorker = (
     return prewarmPromise;
   }
   const workerFactory = options.createWorker ?? defaultWorkerFactory;
-  publishRunnerStatus({ phase: "worker", state: "loading" }, "prewarm");
+  publishPrewarmStatus({ phase: "worker", state: "loading" });
   let worker: WorkerLike;
   try {
     worker = workerFactory();
   } catch (error) {
     const failure = error instanceof Error ? error : new Error("The browser compiler worker could not start.");
-    publishRunnerStatus({ phase: "worker", state: "failed", message: failure.message }, "prewarm");
+    publishPrewarmStatus({ phase: "worker", state: "failed", message: failure.message });
     releaseScopedListener();
     return Promise.reject(failure);
   }
   prewarmPromise = initializeWorker(worker, options.initializationTimeoutMs ?? 30_000, (phase) =>
-    publishRunnerStatus({ phase, state: "loading" }, "prewarm"),
+    publishPrewarmStatus({ phase, state: "loading" }),
   ).then(
     () => {
       prewarmedWorker = worker;
-      publishRunnerStatus({ phase: "ready", state: "ready" }, "prewarm");
+      publishPrewarmStatus({ phase: "ready", state: "ready" });
     },
     (error) => {
       prewarmPromise = undefined;
       const failure = error instanceof Error ? error : new Error("The browser compiler worker could not initialize.");
-      publishRunnerStatus(
-        {
-          phase: failure.message.includes("startup") ? "worker" : prewarmStatus.phase,
-          state: "failed",
-          message: failure.message,
-        },
-        "prewarm",
-      );
+      publishPrewarmStatus({
+        phase: failure.message.includes("startup") ? "worker" : prewarmStatus.phase,
+        state: "failed",
+        message: failure.message,
+      });
       throw failure;
     },
   );
@@ -246,7 +232,6 @@ export const runCInWorker = (
   const initializationTimeoutMs = options.initializationTimeoutMs ?? 30_000;
   const source = generateCSource(problem, studentCode);
   const reportRunStatus = (status: CRunnerStatus) => {
-    publishRunnerStatus(status, "run");
     options.onProgress?.(status);
   };
   const execute = (worker: WorkerLike) =>

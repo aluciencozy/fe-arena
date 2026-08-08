@@ -190,6 +190,7 @@ export const registerHandlers = (io: Server, socket: Socket, authVerifier: AuthV
     socket.emit(
       "room:created",
       output(ServerEventSchemas["room:created"], {
+        requestId: input.requestId,
         roomId: created.metadata.roomId,
         metadata: created.metadata,
         seatId: created.seat.seatId,

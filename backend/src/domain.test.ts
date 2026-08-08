@@ -18,9 +18,11 @@ import { CODING_PROBLEMS } from "../../shared/coding-problems.js";
 import { QUESTION_BANK, validateQuestionBank } from "./data/questions.js";
 import {
   inMemoryQuestionRepository,
+  isQuestionBankReady,
   loadQuestionRepository,
   questionFromRow,
   questionToRow,
+  type QuestionRepository,
 } from "./services/question-bank.service.js";
 
 const CODE_OUTPUT_ORACLE: Record<string, string[]> = {
@@ -190,6 +192,22 @@ test("publication policy retains retired content but excludes it from play", () 
   assert.ok(stacks.length > 0);
   assert.ok(stacks.every((question) => question.published !== false && question.topicId === "stacks"));
   assert.equal(selectSeededQuestions([retired], "retired-only", 1, [retired.topicId]).length, 0);
+});
+
+test("question-bank readiness requires five published noncoding questions", () => {
+  const publishedNoncoding = QUESTION_BANK.filter(
+    (question) => question.published !== false && question.type !== "coding",
+  );
+  const repositoryFor = (questions: readonly Question[]): Pick<QuestionRepository, "select"> => ({
+    select: (seed, count, topicIds, includeCoding = false) =>
+      selectSeededQuestions(questions, seed, count, topicIds, includeCoding),
+  });
+  const partial = [
+    ...publishedNoncoding.slice(0, 4),
+    QUESTION_BANK.find((question) => question.type === "coding")!,
+  ];
+  assert.equal(isQuestionBankReady(repositoryFor(partial)), false);
+  assert.equal(isQuestionBankReady(repositoryFor(publishedNoncoding.slice(0, 5))), true);
 });
 
 test("reviewed C traces match independent output oracles", () => {
