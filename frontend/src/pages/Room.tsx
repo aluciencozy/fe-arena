@@ -528,12 +528,7 @@ const CodingQuestionStage = ({
   match: MatchPublicState;
   seatId: string | null;
   onProgress: (status: CodingProgressUpdate) => void;
-  onComplete: (result: {
-    questionId: string;
-    passed: boolean;
-    tests: CTestResult[];
-    outcome: "success";
-  }) => void;
+  onComplete: (result: { questionId: string; passed: boolean; tests: CTestResult[]; outcome: "success" }) => void;
 }) => {
   const question = match.question;
   const problem = question?.type === "coding" ? question.problem : undefined;
@@ -661,7 +656,9 @@ const CodingQuestionStage = ({
             </div>
           )}
           {outcome.kind !== "success" && (
-            <p className="mt-3 text-xs text-muted">This attempt stayed unlocked. Fix the code or retry the browser run.</p>
+            <p className="mt-3 text-xs text-muted">
+              This attempt stayed unlocked. Fix the code or retry the browser run.
+            </p>
           )}
         </div>
       )}
