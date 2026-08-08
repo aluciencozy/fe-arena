@@ -2,7 +2,6 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   calculateScore,
   compareScores,
-  CODING_QUESTION_SECONDS,
   gradeQuestion,
   DEFAULT_ROUND_COUNT,
   PAUSE_SECONDS,
@@ -322,8 +321,7 @@ export const ensureMatch = (roomId: string, events?: MatchEvents) => {
 };
 
 const questionFor = (record: MatchRecord) => questionRepository.get(record.questionIds[record.state.roundIndex] ?? "");
-const questionTimerSeconds = (record: MatchRecord, question: NonNullable<ReturnType<typeof questionFor>>) =>
-  question.type === "coding" ? CODING_QUESTION_SECONDS : record.state.config.questionTimerSeconds;
+const questionTimerSeconds = (record: MatchRecord) => record.state.config.questionTimerSeconds;
 const hasCodingRounds = (record: MatchRecord) =>
   record.questionIds.some((id) => questionRepository.get(id)?.type === "coding");
 const allCodingReady = (record: MatchRecord) =>
@@ -363,11 +361,11 @@ const startQuestion = (roomId: string, events: MatchEvents) => {
   record.state.revealEndsAt = null;
   record.state.revealSkips = makeRevealSkips(roomId);
   record.state.questionStartedAt = now;
-  record.state.questionEndsAt = now + questionTimerSeconds(record, question) * 1000;
+  record.state.questionEndsAt = now + questionTimerSeconds(record) * 1000;
   record.state.submissions = makeSubmissions(roomId);
   record.state.codingProgress = makeCodingProgress(roomId);
   emit(record, events);
-  record.timer = setTimeout(() => revealRound(roomId, events), questionTimerSeconds(record, question) * 1000);
+  record.timer = setTimeout(() => revealRound(roomId, events), questionTimerSeconds(record) * 1000);
 };
 
 const advanceOrFinish = (roomId: string, events: MatchEvents) => {
@@ -602,7 +600,7 @@ export const submitCodingResult = (roomId: string, seatId: string, result: Codin
   if (!progress || !submission || progress.status === "complete" || submission.submitted)
     return { ok: false as const, error: "Your coding result is already locked." };
   const elapsedMs = Math.max(0, Date.now() - (record.state.questionStartedAt ?? Date.now()));
-  const score = calculateScore(parsed.data.passed, elapsedMs, questionTimerSeconds(record, question) * 1000);
+  const score = calculateScore(parsed.data.passed, elapsedMs, questionTimerSeconds(record) * 1000);
   progress.status = "complete";
   progress.completedAt = Date.now();
   progress.passed = parsed.data.passed;
@@ -627,7 +625,7 @@ export const submitCodingResult = (roomId: string, seatId: string, result: Codin
   roundTiming[seatId] = elapsedMs;
   record.roundResponseMs[record.state.roundIndex] = roundTiming;
   emit(record, events);
-  if (parsed.data.passed || allSubmitted(record)) revealRound(roomId, events);
+  if (allSubmitted(record)) revealRound(roomId, events);
   return { ok: true as const, score };
 };
 

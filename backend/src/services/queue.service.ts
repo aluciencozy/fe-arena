@@ -18,6 +18,8 @@ type StoredQueueEntry = QueueEntry & { queueToken: string; connected: boolean };
 const entries: StoredQueueEntry[] = [];
 const queueTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const expiryHandlers = new Map<string, () => void>();
+export const QUEUE_NAME_TAKEN_MESSAGE =
+  "That guest name is already waiting in the public queue. Choose a different name.";
 export const publicConfig: MatchConfig = {
   topicIds: TOPICS.map((topic) => topic.id),
   roundCount: DEFAULT_ROUND_COUNT,
@@ -59,7 +61,6 @@ export const enqueue = (entry: QueueEntry, onExpire?: () => void) => {
   if (existing) {
     if (existing.socketId !== entry.socketId) dequeue(entry.socketId);
     existing.socketId = entry.socketId;
-    existing.username = entry.username;
     existing.supportsCoding = entry.supportsCoding;
     existing.connected = true;
     if (onExpire) expiryHandlers.set(existing.queueToken, onExpire);
@@ -70,8 +71,30 @@ export const enqueue = (entry: QueueEntry, onExpire?: () => void) => {
     };
   }
 
+  const existingForSocket = entries.find((candidate) => candidate.socketId === entry.socketId);
+  if (existingForSocket) {
+    existingForSocket.connected = true;
+    existingForSocket.supportsCoding = entry.supportsCoding;
+    if (onExpire) expiryHandlers.set(existingForSocket.queueToken, onExpire);
+    return {
+      status: "waiting" as const,
+      expiresAt: existingForSocket.queuedAt + PUBLIC_QUEUE_MAX_WAIT_SECONDS * 1000,
+      queueToken: existingForSocket.queueToken,
+    };
+  }
+
+  const username = entry.username.trim();
+  const normalizedUsername = username.toLocaleLowerCase("en-US");
+  if (entries.some((candidate) => candidate.username.trim().toLocaleLowerCase("en-US") === normalizedUsername))
+    return { status: "name-taken" as const };
+
   dequeue(entry.socketId);
-  const normalized: StoredQueueEntry = { ...entry, queueToken: entry.queueToken ?? randomUUID(), connected: true };
+  const normalized: StoredQueueEntry = {
+    ...entry,
+    username,
+    queueToken: entry.queueToken ?? randomUUID(),
+    connected: true,
+  };
   const opponentIndex = entries.findIndex(
     (candidate) => candidate.connected && candidate.supportsCoding === normalized.supportsCoding,
   );

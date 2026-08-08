@@ -214,13 +214,22 @@ export default function Home() {
       }
       setNotice({ kind: "error", text: socketConnectionErrorMessage(reason, socketUrl) });
     };
-    const failed = (payload: { message?: string } | string) => {
+    const failed = (payload: { code?: string; message?: string } | string) => {
       clearPrivateAckTimer();
       if (pendingPrivateCreate.current) {
         activePrivateCreate.current = null;
         pendingPrivateCreate.current = null;
         setBusy(false);
         setPrivateRequestState("idle");
+      }
+      if (typeof payload !== "string" && payload.code === "QUEUE_NAME_TAKEN") {
+        queuePrewarmCleanup.current?.();
+        queuePrewarmCleanup.current = null;
+        queuedName.current = null;
+        queueToken.current = null;
+        setBusy(false);
+        setView("home");
+        setQueueExpiresAt(null);
       }
       setNotice({
         kind: "error",
