@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Editor from "@monaco-editor/react";
 import { ArrowLeft, Check, CircleAlert, Clock3, Code2, Play, RotateCcw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { CODING_PROBLEMS } from "../../../shared/coding-problems";
-import { runCInWorker, type CExecutionOutcome } from "@/lib/c-runner";
+import { prewarmCWorker, runCInWorker, type CExecutionOutcome } from "@/lib/c-runner";
 import { AppSettings } from "@/components/AppSettings";
 import { Select } from "@/components/ui/select";
 
@@ -13,6 +13,12 @@ export default function CPractice() {
   const [studentCode, setStudentCode] = useState(problem.starterCode);
   const [outcome, setOutcome] = useState<CExecutionOutcome | null>(null);
   const [running, setRunning] = useState(false);
+
+  useEffect(() => {
+    // Start loading the SDK, runtime, and public compiler as soon as the lab
+    // opens so the first click does not pay the complete cold-start cost.
+    void prewarmCWorker().catch(() => undefined);
+  }, []);
 
   const chooseProblem = (nextId: string) => {
     const next = CODING_PROBLEMS.find((item) => item.id === nextId);
@@ -77,8 +83,9 @@ export default function CPractice() {
             <div className="notice-info">
               <Clock3 size={16} className="mt-0.5 shrink-0" />
               <span>
-                Worker startup, compilation, and execution each have a 30-second limit. Infinite loops recover by
-                terminating the worker.
+                The browser compiler warms up while this page loads. A cold visit downloads the local toolchain and
+                can take around 30 seconds; later runs reuse it. Worker startup, compilation, and execution each have
+                a 30-second limit. Infinite loops recover by terminating the worker.
               </span>
             </div>
           </aside>

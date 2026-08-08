@@ -55,6 +55,21 @@ export const parseExecutionOutput = (stdout: string, stderr: string, exitCode: n
 const defaultWorkerFactory: WorkerFactory = () =>
   new Worker(new URL("../workers/c-runner.worker.ts", import.meta.url), { type: "module" });
 const EXECUTION_TIMEOUT_MS = 30_000;
+const MAX_TRANSIENT_RETRIES = 1;
+
+const terminateWorker = (worker: WorkerLike) => {
+  try {
+    worker.terminate();
+  } catch (error) {
+    void error;
+  }
+};
+
+const isReusableOutcome = (outcome: CExecutionOutcome) =>
+  outcome.kind !== "timeout" && (outcome.kind !== "runtime-error" || outcome.exitCode !== undefined);
+
+const isTransientCancellation = (outcome: CExecutionOutcome) =>
+  outcome.kind === "runtime-error" && /oneshot\s+canceled/i.test(outcome.stderr);
 
 const initializationFailure = (error: unknown): CExecutionOutcome => {
   const stderr = error instanceof Error ? error.message : "The browser compiler worker could not initialize.";
@@ -140,12 +155,14 @@ export const runCInWorker = (
         if (settled) return;
         settled = true;
         clearTimers();
-        try {
-          worker.terminate();
-        } catch (error) {
-          void error;
+        if (!options.createWorker && isReusableOutcome(outcome) && !prewarmedWorker && !prewarmPromise) {
+          // Keep the initialized Wasmer runtime hot. Rebuilding the compiler
+          // worker after every run makes the next run pay the full startup cost
+          // again and can leave a Wasmer process wait without its owner.
+          prewarmedWorker = worker;
+        } else {
+          terminateWorker(worker);
         }
-        if (!options.createWorker) void prewarmCWorker({ initializationTimeoutMs }).catch(() => undefined);
         resolve(outcome);
       };
       const initializationTimer = globalThis.setTimeout(
@@ -216,7 +233,7 @@ export const runCInWorker = (
         complete(parseExecutionOutput(data.stdout ?? "", data.stderr ?? "", data.exitCode ?? 0));
       };
       worker.onerror = (event) =>
-        complete({
+        finish({
           kind: "runtime-error",
           stdout: "",
           stderr: event.message || "The browser compiler worker failed.",
@@ -225,12 +242,13 @@ export const runCInWorker = (
       try {
         worker.postMessage({ source });
       } catch (error) {
-        complete({
+        const outcome: CExecutionOutcome = {
           kind: "runtime-error",
           stdout: "",
           stderr: error instanceof Error ? error.message : "The browser compiler worker could not receive the request.",
           tests: [],
-        });
+        };
+        finish(outcome);
       }
     });
   const takeWorker = () => {
@@ -243,17 +261,25 @@ export const runCInWorker = (
     }
     return options.createWorker();
   };
-  const start = options.createWorker ? Promise.resolve() : prewarmCWorker({ initializationTimeoutMs });
-  return start.then(() => {
-    try {
-      return execute(takeWorker());
-    } catch (error) {
-      return {
-        kind: "runtime-error" as const,
-        stdout: "",
-        stderr: error instanceof Error ? error.message : "The browser compiler worker could not start.",
-        tests: [],
-      };
-    }
-  }, initializationFailure);
+  const runAttempt = (attempt: number): Promise<CExecutionOutcome> => {
+    const start = options.createWorker ? Promise.resolve() : prewarmCWorker({ initializationTimeoutMs });
+    return start
+      .then(() => {
+        try {
+          return execute(takeWorker());
+        } catch (error) {
+          return {
+            kind: "runtime-error" as const,
+            stdout: "",
+            stderr: error instanceof Error ? error.message : "The browser compiler worker could not start.",
+            tests: [],
+          };
+        }
+      }, initializationFailure)
+      .then((outcome) => {
+        if (attempt < MAX_TRANSIENT_RETRIES && isTransientCancellation(outcome)) return runAttempt(attempt + 1);
+        return outcome;
+      });
+  };
+  return runAttempt(0);
 };

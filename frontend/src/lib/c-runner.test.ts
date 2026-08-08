@@ -100,6 +100,41 @@ test("runs the curated sum fixture after compilation completes", async () => {
   assert.match(receivedSource, /int sum_array\(const int values\[\], size_t length\)/);
 });
 
+test("retries a transient Wasmer cancellation with a fresh worker", async () => {
+  let workerCount = 0;
+  const outcome = await runCInWorker(CODING_PROBLEMS[0]!, CODING_PROBLEMS[0]!.starterCode, {
+    createWorker: () => {
+      workerCount += 1;
+      const worker = {
+        onmessage: null as ((event: MessageEvent) => void) | null,
+        onerror: null as ((event: ErrorEvent) => void) | null,
+        postMessage: () => {
+          setTimeout(() => {
+            worker.onmessage?.({ data: { kind: "ready" } } as MessageEvent);
+            worker.onmessage?.({ data: { kind: "compiled" } } as MessageEvent);
+            worker.onmessage?.({
+              data:
+                workerCount === 1
+                  ? { kind: "runtime-error", stderr: "oneshot canceled" }
+                  : {
+                      kind: "success",
+                      stdout: "FEA_TEST|1|mixed values|PASS\n",
+                      stderr: "",
+                      exitCode: 0,
+                    },
+            } as MessageEvent);
+          }, 0);
+        },
+        terminate: () => undefined,
+      };
+      return worker;
+    },
+  });
+
+  assert.equal(outcome.kind, "success");
+  assert.equal(workerCount, 2);
+});
+
 test("classifies non-zero WASM exits as runtime errors", () => {
   const result = parseExecutionOutput("FEA_TEST|1|crash|FAIL", "trap", wasmExitCode());
   assert.equal(result.kind, "runtime-error");
