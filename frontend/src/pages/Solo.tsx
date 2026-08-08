@@ -4,9 +4,12 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, ArrowRight, BookOpen, Check, CircleAlert, Play, RotateCcw } from "lucide-react";
 import { AppSettings } from "@/components/AppSettings";
 import { CRunnerProgress } from "@/components/CRunnerProgress";
+import { CRunnerStatusLine } from "@/components/CRunnerStatusLine";
+import { Select } from "@/components/ui/select";
 import { connectSocket, scheduleSocketDisconnect, socket, socketUrl } from "@/lib/socket";
 import { socketConnectionErrorMessage, socketDisconnectedMessage } from "@/lib/socket-errors";
 import { CODING_CAPABILITY_MESSAGE, isCodingCapabilityAvailable } from "@/lib/coding-capability";
+import { isDevelopmentBuild } from "@/lib/environment";
 import {
   getCPrewarmStatus,
   prewarmCWorker,
@@ -18,6 +21,7 @@ import {
 import { DeadlineTimer } from "@/components/DeadlineTimer";
 import { graphEdgePoints, graphTextAlternative } from "@/lib/graph";
 import { QuestionPrompt } from "@/components/QuestionPrompt";
+import { DEFAULT_TIMER_SECONDS, formatQuestionTimer, QUESTION_TIMER_OPTIONS } from "@/lib/question-timer";
 import {
   TOPICS,
   type PublicAnswer,
@@ -56,6 +60,7 @@ const DEFAULT_TOPICS: TopicId[] = [
 ];
 export default function Solo() {
   const [topics, setTopics] = useState<TopicId[]>(DEFAULT_TOPICS);
+  const [timer, setTimer] = useState(DEFAULT_TIMER_SECONDS);
   const [state, setState] = useState<SoloState | null>(null);
   const [answer, setAnswer] = useState<string | number | boolean | string[]>("");
   const [ordered, setOrdered] = useState<string[]>([]);
@@ -177,12 +182,12 @@ export default function Solo() {
   };
   const start = () => {
     if (topics.length && requireCodingRunner())
-      startRun({ topicIds: topics, count: 5, timerSeconds: 120, supportsCoding: true });
+      startRun({ topicIds: topics, count: 5, timerSeconds: timer, supportsCoding: true });
   };
   const startTopic = (topicId: TopicId) => {
     setTopics([topicId]);
     if (requireCodingRunner())
-      startRun({ topicIds: [topicId], count: 5, timerSeconds: 120, supportsCoding: true });
+      startRun({ topicIds: [topicId], count: 5, timerSeconds: timer, supportsCoding: true });
   };
   const submit = () => {
     if (!state?.question || !requireConnection()) return;
@@ -226,18 +231,43 @@ export default function Solo() {
                 </button>
               ))}
             </div>
+            <div className="mt-7 flex items-center justify-between gap-4 border-y border-line py-4">
+              <div>
+                <p id="solo-timer-label" className="field-label">
+                  question timer
+                </p>
+                <p className="mt-1 text-sm text-muted">{formatQuestionTimer(timer)} · five questions</p>
+              </div>
+              <Select
+                value={String(timer)}
+                options={QUESTION_TIMER_OPTIONS}
+                onChange={(value) => setTimer(Number(value))}
+                containerClassName="w-auto"
+                buttonClassName="w-auto"
+                ariaLabelledBy="solo-timer-label"
+              />
+            </div>
             {!capabilityReady && (
               <div className="notice-error mt-7" role="alert">
                 <CircleAlert size={16} className="shrink-0" />
                 <span>{CODING_CAPABILITY_MESSAGE}</span>
               </div>
             )}
-            <CRunnerProgress
-              status={workerStatus}
-              error={capabilityReady ? prewarmError : ""}
-              onRetry={startPrewarm}
-              retryDisabled={!capabilityReady}
-            />
+            {isDevelopmentBuild ? (
+              <CRunnerProgress
+                status={workerStatus}
+                error={capabilityReady ? prewarmError : ""}
+                onRetry={startPrewarm}
+                retryDisabled={!capabilityReady}
+              />
+            ) : (
+              <CRunnerStatusLine
+                status={workerStatus}
+                error={capabilityReady ? prewarmError : ""}
+                onRetry={startPrewarm}
+                retryDisabled={!capabilityReady}
+              />
+            )}
             <button
               className="button button-primary mt-7"
               onClick={start}
@@ -436,7 +466,7 @@ const SoloCodingQuestionStage = ({
     try {
       const result = await runCInWorker(problem, code, { onProgress: setRunnerStatus });
       setOutcome(result);
-      if (result.kind === "success") {
+      if (result.kind === "success" && result.passed) {
         setLocked(true);
         onComplete({ questionId: question.id, passed: result.passed, tests: result.tests, outcome: "success" });
       }
@@ -451,7 +481,7 @@ const SoloCodingQuestionStage = ({
   return (
     <article className="panel mt-8 overflow-hidden">
       <div className="p-6 sm:p-9">
-        <p className="eyebrow text-gold">{problem.title} · browser worker</p>
+        <p className="eyebrow text-gold">{problem.title}</p>
         <QuestionPrompt className="mt-3 text-2xl font-semibold leading-snug sm:text-4xl" prompt={question.prompt} />
         {!capabilityReady && (
           <div id="solo-c-capability-help" className="notice-error mt-5" role="alert">
@@ -459,7 +489,13 @@ const SoloCodingQuestionStage = ({
             <span>{CODING_CAPABILITY_MESSAGE}</span>
           </div>
         )}
-        <CRunnerProgress status={runnerStatus} error={runnerError} onRetry={run} retryLabel="retry tests" />
+        {isDevelopmentBuild ? (
+          <CRunnerProgress status={runnerStatus} error={runnerError} onRetry={run} retryLabel="retry tests" />
+        ) : (
+          <div className="mt-5">
+            <CRunnerStatusLine status={runnerStatus} error={runnerError} outcome={outcome} active={runPending} />
+          </div>
+        )}
         <div className="mt-7 border border-line">
           <div className="border-b border-line bg-ink px-4 py-3 font-mono text-xs text-gold">
             locked · {problem.functionSignature} {"{"}
@@ -478,7 +514,7 @@ const SoloCodingQuestionStage = ({
             }}
           />
           <div className="flex items-center justify-between gap-3 border-t border-line p-4">
-            <span className="text-xs text-muted">Local-only execution · no anti-cheat guarantee</span>
+            <span className="text-xs text-muted">Run the reviewed tests when you are ready.</span>
             <button
               className="button button-primary"
               onClick={run}
@@ -513,7 +549,7 @@ const SoloCodingQuestionStage = ({
                 ))}
               </div>
             )}
-            {outcome.kind !== "success" && (
+            {(outcome.kind !== "success" || !outcome.passed) && (
               <p className="mt-3 text-xs text-muted">This attempt stayed unlocked. Fix the code or retry the run.</p>
             )}
           </div>

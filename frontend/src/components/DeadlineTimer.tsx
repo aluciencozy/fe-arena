@@ -5,10 +5,12 @@ export const DeadlineTimer = ({
   deadline,
   urgentAfter = 10,
   className = "timer",
+  showIcon = true,
 }: {
   deadline: number | null;
   urgentAfter?: number;
   className?: string;
+  showIcon?: boolean;
 }) => {
   const seconds = useDeadlineSeconds(deadline);
   const urgent = seconds !== null && seconds <= urgentAfter;
@@ -20,7 +22,7 @@ export const DeadlineTimer = ({
         : `${seconds} seconds remaining`;
   return (
     <span className={`${className} ${urgent ? "timer-hot" : ""}`} role="timer" aria-label={label}>
-      <Clock3 size={16} aria-hidden="true" />
+      {showIcon && <Clock3 size={16} aria-hidden="true" />}
       <span>{seconds ?? "--"}s</span>
       {urgent && <span className="sr-only"> Time is running low.</span>}
     </span>

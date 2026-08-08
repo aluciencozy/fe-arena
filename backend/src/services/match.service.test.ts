@@ -273,6 +273,27 @@ test("mixed matches gate coding rounds and keep failed coding runs retryable", (
       ).ok,
       true,
     );
+    const afterFailedRun = getMatchState(room.metadata.roomId)!;
+    assert.equal(afterFailedRun.phase, "QUESTION");
+    assert.equal(afterFailedRun.codingProgress[room.seat.seatId]?.status, "failed");
+    assert.equal(afterFailedRun.codingProgress[room.seat.seatId]?.passed, null);
+    assert.equal(afterFailedRun.submissions[room.seat.seatId]?.submitted, false);
+    assert.equal(submitCodingProgress(room.metadata.roomId, room.seat.seatId, "compiling", events()).ok, true);
+    assert.equal(submitCodingProgress(room.metadata.roomId, room.seat.seatId, "running", events()).ok, true);
+    assert.equal(
+      submitCodingResult(
+        room.metadata.roomId,
+        room.seat.seatId,
+        {
+          questionId: state.question!.id,
+          passed: true,
+          tests: [{ index: 1, name: "sum", passed: true }],
+          outcome: "success",
+        },
+        events(),
+      ).ok,
+      true,
+    );
     const afterRetry = getMatchState(room.metadata.roomId)!;
     assert.equal(afterRetry.phase, "QUESTION");
     assert.equal(afterRetry.codingProgress[room.seat.seatId]?.status, "complete");
@@ -294,8 +315,8 @@ test("mixed matches gate coding rounds and keep failed coding runs retryable", (
     );
     const reveal = getMatchState(room.metadata.roomId)!;
     assert.equal(reveal.phase, "REVEAL");
-    assert.equal(reveal.codingProgress[room.seat.seatId]?.passed, false);
-    assert.deepEqual(reveal.codingProgress[room.seat.seatId]?.tests, [{ index: 1, name: "sum", passed: false }]);
+    assert.equal(reveal.codingProgress[room.seat.seatId]?.passed, true);
+    assert.deepEqual(reveal.codingProgress[room.seat.seatId]?.tests, [{ index: 1, name: "sum", passed: true }]);
     assert.equal(reveal.codingProgress[room.seat.seatId]?.outcome, "success");
   } finally {
     setQuestionRepository(inMemoryQuestionRepository);
@@ -408,8 +429,8 @@ test("mixed rematches do not reuse an exhausted coding question", (t) => {
     assert.equal(first.question?.id, coding.id);
     const codingResult = {
       questionId: coding.id,
-      passed: false,
-      tests: [{ index: 1, name: "sum", passed: false }],
+      passed: true,
+      tests: [{ index: 1, name: "sum", passed: true }],
       outcome: "success" as const,
     };
     assert.equal(submitCodingResult(room.metadata.roomId, room.seat.seatId, codingResult, events()).ok, true);
@@ -483,8 +504,8 @@ test("rematches exclude every previously used question while fresh questions rem
     assert.equal(first.question?.id, coding.id);
     const codingResult = {
       questionId: coding.id,
-      passed: false,
-      tests: [{ index: 1, name: "sum", passed: false }],
+      passed: true,
+      tests: [{ index: 1, name: "sum", passed: true }],
       outcome: "success" as const,
     };
     assert.equal(submitCodingResult(room.metadata.roomId, room.seat.seatId, codingResult, events()).ok, true);

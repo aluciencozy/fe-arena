@@ -124,6 +124,20 @@ test("solo coding results stay retryable until a completed browser run arrives",
         "solo-coding",
         {
           questionId: question.id,
+          passed: false,
+          tests: [{ index: 1, name: "reviewed case", passed: false }],
+          outcome: "success",
+        },
+        (state) => states.push(state),
+      ).ok,
+      true,
+    );
+    assert.equal(states.at(-1)?.phase, "QUESTION");
+    assert.equal(
+      soloCodingComplete(
+        "solo-coding",
+        {
+          questionId: question.id,
           passed: true,
           tests: [{ index: 1, name: "reviewed case", passed: true }],
           outcome: "success",

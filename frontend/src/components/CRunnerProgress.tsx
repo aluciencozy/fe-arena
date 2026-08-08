@@ -31,7 +31,7 @@ export const CRunnerProgress = ({
     <section className="panel mb-5 p-5" aria-live="polite">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="eyebrow text-gold">browser runner readiness</p>
+          <p className="eyebrow text-gold">coding environment setup</p>
           <p className="mt-1 text-sm text-muted">Phases report state only; no unmeasured percentage is shown.</p>
         </div>
         {(error || status.state === "failed") && (

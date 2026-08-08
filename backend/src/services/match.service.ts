@@ -599,6 +599,15 @@ export const submitCodingResult = (roomId: string, seatId: string, result: Codin
   const submission = record.state.submissions[seatId];
   if (!progress || !submission || progress.status === "complete" || submission.submitted)
     return { ok: false as const, error: "Your coding result is already locked." };
+  if (!parsed.data.passed) {
+    progress.status = "failed";
+    progress.completedAt = null;
+    progress.passed = false;
+    progress.tests = structuredClone(parsed.data.tests);
+    progress.outcome = parsed.data.outcome;
+    emit(record, events);
+    return { ok: true as const, retryable: true as const };
+  }
   const elapsedMs = Math.max(0, Date.now() - (record.state.questionStartedAt ?? Date.now()));
   const score = calculateScore(parsed.data.passed, elapsedMs, questionTimerSeconds(record) * 1000);
   progress.status = "complete";

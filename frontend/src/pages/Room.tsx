@@ -7,6 +7,7 @@ import {
   ChevronDown,
   CircleHelp,
   Copy,
+  Clock3,
   LogOut,
   MessageCircle,
   RotateCcw,
@@ -21,12 +22,15 @@ import {
 import { useArenaSocket } from "@/hooks/useSocket";
 import { useGameStore } from "@/store/gameStore";
 import { CRunnerProgress } from "@/components/CRunnerProgress";
+import { CRunnerStatusLine } from "@/components/CRunnerStatusLine";
 import { QuestionPrompt } from "@/components/QuestionPrompt";
 import { Select } from "@/components/ui/select";
 import { DeadlineTimer } from "@/components/DeadlineTimer";
 import { copyTextWithFallback } from "@/lib/clipboard";
 import { CODING_CAPABILITY_MESSAGE, isCodingCapabilityAvailable } from "@/lib/coding-capability";
+import { isDevelopmentBuild } from "@/lib/environment";
 import { graphEdgePoints, graphTextAlternative } from "@/lib/graph";
+import { DEFAULT_TIMER_SECONDS, formatQuestionTimer, QUESTION_TIMER_OPTIONS } from "@/lib/question-timer";
 import { attachRoomAsyncCompletion, isActiveRoomAsyncContext, type RoomAsyncContext } from "@/lib/room-async";
 import {
   codingProgressForRunnerStatus,
@@ -48,12 +52,6 @@ import {
 import type { MatchPublicState } from "@/types";
 
 const MAX_CODING_READY_ATTEMPTS = 2;
-const TIMER_OPTIONS = [
-  { value: "60", label: "60 sec" },
-  { value: "90", label: "90 sec" },
-  { value: "120", label: "120 sec" },
-  { value: "300", label: "5 min" },
-];
 
 const codeOf = (value: string) =>
   value
@@ -93,7 +91,7 @@ export default function Room() {
     "recursion",
     "analysis-mathematics",
   ]);
-  const [timer, setTimer] = useState(90);
+  const [timer, setTimer] = useState(DEFAULT_TIMER_SECONDS);
   const [includeCoding, setIncludeCoding] = useState(false);
   const [codingReadyError, setCodingReadyError] = useState("");
   const [codingReadyRetry, setCodingReadyRetry] = useState(0);
@@ -483,23 +481,39 @@ const Lobby = ({
     </div>
     {match.config.includeCoding && ["LOBBY", "SETUP", "READY"].includes(match.phase) && (
       <div className="mt-5">
-        <div className="panel p-5">
-          <p className="eyebrow text-gold">browser C round readiness</p>
-          <p className="mt-2 text-sm text-muted">
-            The shared browser worker warms up before the match starts. Phase labels report state only; no percentage is
-            estimated.
-          </p>
-          {!capabilityReady && <div className="notice-error mt-4">{codingEnvironmentError}</div>}
-          <div className="mt-4">
-            <CRunnerProgress
-              status={codingRunnerStatus}
-              error={capabilityReady ? codingReadyError : ""}
-              onRetry={onRetryCodingReady}
-              retryLabel="retry readiness"
-              retryDisabled={!capabilityReady || codingReadyAttempts >= MAX_CODING_READY_ATTEMPTS}
-            />
+        {isDevelopmentBuild ? (
+          <div className="panel p-5">
+            <p className="eyebrow text-gold">coding environment</p>
+            <p className="mt-2 text-sm text-muted">
+              The coding environment prepares before the match starts. Detailed phase information is enabled for this
+              build.
+            </p>
+            {!capabilityReady && <div className="notice-error mt-4">{codingEnvironmentError}</div>}
+            <div className="mt-4">
+              <CRunnerProgress
+                status={codingRunnerStatus}
+                error={capabilityReady ? codingReadyError : ""}
+                onRetry={onRetryCodingReady}
+                retryLabel="retry setup"
+                retryDisabled={!capabilityReady || codingReadyAttempts >= MAX_CODING_READY_ATTEMPTS}
+              />
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="panel p-5">
+            <p className="eyebrow text-gold">coding rounds enabled</p>
+            <p className="mt-2 text-sm text-muted">The coding environment prepares automatically before the round.</p>
+            {!capabilityReady && <div className="notice-error mt-4">{codingEnvironmentError}</div>}
+            <div className="mt-3">
+              <CRunnerStatusLine
+                status={codingRunnerStatus}
+                error={capabilityReady ? codingReadyError : ""}
+                onRetry={onRetryCodingReady}
+                retryDisabled={!capabilityReady || codingReadyAttempts >= MAX_CODING_READY_ATTEMPTS}
+              />
+            </div>
+          </div>
+        )}
       </div>
     )}
     {host && (
@@ -511,7 +525,7 @@ const Lobby = ({
           <span>
             <span className="eyebrow text-gold">host controls</span>
             <span className="mt-1 block font-semibold">
-              {selectedTopics.length} topics · {timer}s per question
+              {selectedTopics.length} topics · {formatQuestionTimer(timer)} per question
               {includeCoding ? " · includes coding rounds" : ""}
             </span>
           </span>
@@ -545,7 +559,7 @@ const Lobby = ({
                 checked={includeCoding}
                 onChange={(event) => setIncludeCoding(event.target.checked)}
               />
-              include reviewed browser C rounds (results are client-reported; no anti-cheat guarantee)
+              include reviewed C coding rounds
             </label>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <span id="room-timer-label" className="text-sm text-muted">
@@ -553,7 +567,7 @@ const Lobby = ({
               </span>
               <Select
                 value={String(timer)}
-                options={TIMER_OPTIONS}
+                options={QUESTION_TIMER_OPTIONS}
                 onChange={(value) => setTimer(Number(value))}
                 containerClassName="w-auto"
                 buttonClassName="w-auto"
@@ -591,7 +605,15 @@ const SeatCard = ({ label, name, ready, empty }: { label: string; name: string; 
 const Countdown = ({ deadline, round }: { deadline: number | null; round: number }) => (
   <section className="mx-auto flex min-h-[65vh] max-w-xl flex-col items-center justify-center text-center">
     <p className="eyebrow text-gold">round {round} of 5</p>
-    <DeadlineTimer deadline={deadline} urgentAfter={0} className="display mt-4 text-[9rem] leading-none text-gold" />
+    <div className="mt-4 flex items-center justify-center gap-4 text-gold">
+      <Clock3 size={38} strokeWidth={1.8} aria-hidden="true" />
+      <DeadlineTimer
+        deadline={deadline}
+        urgentAfter={0}
+        showIcon={false}
+        className="display text-[9rem] leading-none text-gold"
+      />
+    </div>
     <p className="mt-5 text-muted">Get your scratch paper ready. The next prompt is coming.</p>
   </section>
 );
@@ -654,6 +676,10 @@ const CodingQuestionStage = ({
       onProgress("failed");
       return;
     }
+    if (!result.passed) {
+      onProgress("failed");
+      return;
+    }
     onComplete({ questionId: question.id, passed: result.passed, tests: result.tests, outcome: "success" });
   };
   const run = async () => {
@@ -684,20 +710,24 @@ const CodingQuestionStage = ({
     <section className="mx-auto max-w-5xl py-6 sm:py-12">
       <div className="flex items-center justify-between">
         <div>
-          <p className="eyebrow text-gold">coding round · browser worker</p>
+          <p className="eyebrow text-gold">coding round</p>
           <h1 className="display mt-3 text-5xl">run the solution.</h1>
         </div>
         <DeadlineTimer deadline={match.questionEndsAt} />
       </div>
-      <p className="mt-4 max-w-2xl text-muted">
-        {problem.description} The server receives only typed progress and test results, never source code.
-      </p>
+      <p className="mt-4 max-w-2xl text-muted">{problem.description}</p>
       {!capabilityReady && (
         <div id="room-c-capability-help" className="notice-error mt-5" role="alert">
           {CODING_CAPABILITY_MESSAGE}
         </div>
       )}
-      <CRunnerProgress status={runnerStatus} error={runnerError} onRetry={run} retryLabel="retry tests" />
+      {isDevelopmentBuild ? (
+        <CRunnerProgress status={runnerStatus} error={runnerError} onRetry={run} retryLabel="retry tests" />
+      ) : (
+        <div className="mt-5">
+          <CRunnerStatusLine status={runnerStatus} error={runnerError} outcome={outcome} active={runPending} />
+        </div>
+      )}
       <div className="mt-7 panel overflow-hidden">
         <div className="border-b border-line bg-ink px-4 py-3 font-mono text-xs text-gold">
           locked · {problem.functionSignature} {"{"}
@@ -716,7 +746,7 @@ const CodingQuestionStage = ({
           }}
         />
         <div className="flex items-center justify-between border-t border-line p-4">
-          <span className="text-xs text-muted">Local-only execution · no anti-cheat guarantee</span>
+          <span className="text-xs text-muted">Run the reviewed tests when you are ready.</span>
           <button
             className="button button-primary"
             onClick={run}
@@ -754,9 +784,9 @@ const CodingQuestionStage = ({
               ))}
             </div>
           )}
-          {outcome.kind !== "success" && (
+          {(outcome.kind !== "success" || !outcome.passed) && (
             <p className="mt-3 text-xs text-muted">
-              This attempt stayed unlocked. Fix the code or retry the browser run.
+              This attempt stayed unlocked. Fix the failing tests and run the code again.
             </p>
           )}
         </div>
