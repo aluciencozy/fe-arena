@@ -71,13 +71,24 @@ export class DurableMatchRepository implements MatchRepository, AccountHistoryRe
   }
 
   private async persist(snapshot: TerminalMatchSnapshot): Promise<PersistTerminalResult> {
+    let stagedSnapshot: TerminalMatchSnapshot;
     try {
-      const stagedSnapshot = await this.stage(snapshot);
+      stagedSnapshot = await this.stage(snapshot);
       this.pendingSnapshots.delete(snapshot.matchId);
+    } catch (error) {
+      // A staging failure has no durable copy to replay, so retain only this
+      // snapshot until the retry loop can stage it successfully.
+      this.pendingSnapshots.set(snapshot.matchId, snapshot);
+      this.markDegraded();
+      throw error;
+    }
+
+    try {
       await this.startupReplay;
       return await this.deliver(stagedSnapshot);
     } catch (error) {
-      this.pendingSnapshots.set(snapshot.matchId, snapshot);
+      // Once staging succeeds, the outbox file is the sole retry payload. Do
+      // not retain a second full snapshot in memory while delivery retries.
       this.markDegraded();
       throw error;
     }
@@ -152,8 +163,9 @@ export class DurableMatchRepository implements MatchRepository, AccountHistoryRe
     for (const [matchId, snapshot] of this.pendingSnapshots) {
       try {
         const stagedSnapshot = await this.stage(snapshot);
-        await this.deliver(stagedSnapshot);
+        // The file is now durable, so it is the retry source if delivery fails.
         this.pendingSnapshots.delete(matchId);
+        await this.deliver(stagedSnapshot);
       } catch {
         retryNeeded = true;
       }

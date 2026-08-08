@@ -210,10 +210,33 @@ test("marks live outbox failures degraded and retries a delivery", async () => {
     await assert.rejects(repository.persistTerminalMatch(first));
     assert.deepEqual(repository.readiness(), { status: "degraded" });
     assert.equal((await readdir(directory)).filter((name) => name.endsWith(".json")).length, 1);
+    assert.equal((repository as unknown as { pendingSnapshots: Map<string, unknown> }).pendingSnapshots.size, 0);
     unavailable = false;
     await repository.replayPending();
     assert.deepEqual(delivered, [first]);
     assert.deepEqual(repository.readiness(), { status: "ready" });
+    repository.close();
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("retains a snapshot only until live staging succeeds", async () => {
+  const directory = await mkdtemp(join(process.cwd(), ".terminal-outbox-test-"));
+  const blockedPath = join(directory, "blocked-outbox");
+  await writeFile(blockedPath, "not a directory", "utf8");
+  const first = snapshot();
+  const delegate: MatchRepository = {
+    persistTerminalMatch: async (value) => ({ status: "inserted", matchId: value.matchId }),
+  };
+
+  try {
+    const repository = new DurableMatchRepository(delegate, blockedPath, 60_000);
+    await assert.rejects(repository.persistTerminalMatch(first));
+    assert.equal((repository as unknown as { pendingSnapshots: Map<string, unknown> }).pendingSnapshots.size, 1);
+    await rm(blockedPath, { force: true });
+    await repository.replayPending();
+    assert.equal((repository as unknown as { pendingSnapshots: Map<string, unknown> }).pendingSnapshots.size, 0);
     repository.close();
   } finally {
     await rm(directory, { recursive: true, force: true });

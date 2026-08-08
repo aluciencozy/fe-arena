@@ -58,6 +58,7 @@ test("parses machine-readable test results while preserving student stdout", () 
 test("shares an in-flight prewarm and permits one retry after initialization failure", async () => {
   let workerCount = 0;
   const statuses: string[] = [];
+  const scopedStatuses: string[] = [];
   const unsubscribe = subscribeCWorkerStatus((status) => statuses.push(`${status.phase}:${status.state}`));
   const createWorker = () => {
     workerCount += 1;
@@ -81,8 +82,17 @@ test("shares an in-flight prewarm and permits one retry after initialization fai
     return worker;
   };
 
-  await assert.rejects(prewarmCWorker({ createWorker }), /transient startup failure/);
-  const first = prewarmCWorker({ createWorker });
+  await assert.rejects(
+    prewarmCWorker({
+      createWorker,
+      onProgress: (status) => scopedStatuses.push(`${status.phase}:${status.state}`),
+    }),
+    /transient startup failure/,
+  );
+  const first = prewarmCWorker({
+    createWorker,
+    onProgress: (status) => scopedStatuses.push(`${status.phase}:${status.state}`),
+  });
   const second = prewarmCWorker({ createWorker });
   assert.strictEqual(first, second);
   await Promise.all([first, second]);
@@ -93,6 +103,8 @@ test("shares an in-flight prewarm and permits one retry after initialization fai
   assert.ok(statuses.includes("runtime:loading"));
   assert.ok(statuses.includes("compiler:loading"));
   assert.equal(getCWorkerStatus().phase, "ready");
+  assert.ok(scopedStatuses.includes("sdk:loading"));
+  assert.ok(scopedStatuses.includes("ready:ready"));
 });
 
 test("runs the curated sum fixture after compilation completes", async () => {

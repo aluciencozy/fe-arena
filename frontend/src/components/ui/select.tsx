@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { ChevronDown } from "lucide-react";
-import { findTypeaheadOptionIndex, type SelectOption } from "./select-options";
+import { findTypeaheadOptionIndex, shouldContainEscape, type SelectOption } from "./select-options";
 
 type SelectProps = {
   id?: string;
@@ -85,6 +85,7 @@ export function Select({
       return;
     }
     if (event.key === "Escape") {
+      if (!shouldContainEscape(open)) return;
       event.preventDefault();
       event.stopPropagation();
       clearTypeahead();

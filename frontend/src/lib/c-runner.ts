@@ -60,10 +60,12 @@ let prewarmedWorker: WorkerLike | undefined;
 let prewarmPromise: Promise<void> | undefined;
 let runnerStatus: CRunnerStatus = { phase: "worker", state: "idle" };
 const statusListeners = new Set<(status: CRunnerStatus) => void>();
+const prewarmStatusListeners = new Set<(status: CRunnerStatus) => void>();
 
 const publishRunnerStatus = (status: CRunnerStatus) => {
   runnerStatus = status;
   for (const listener of statusListeners) listener(status);
+  for (const listener of prewarmStatusListeners) listener(status);
 };
 
 export const getCWorkerStatus = () => runnerStatus;
@@ -159,13 +161,26 @@ const initializeWorker = (
   });
 
 export const prewarmCWorker = (
-  options: { initializationTimeoutMs?: number; createWorker?: WorkerFactory } = {},
+  options: {
+    initializationTimeoutMs?: number;
+    createWorker?: WorkerFactory;
+    onProgress?: (status: CRunnerStatus) => void;
+  } = {},
 ): Promise<void> => {
+  const scopedListener = options.onProgress;
+  if (scopedListener) prewarmStatusListeners.add(scopedListener);
+  const releaseScopedListener = () => {
+    if (scopedListener) prewarmStatusListeners.delete(scopedListener);
+  };
   if (prewarmedWorker) {
     publishRunnerStatus({ phase: "ready", state: "ready" });
+    releaseScopedListener();
     return Promise.resolve();
   }
-  if (prewarmPromise) return prewarmPromise;
+  if (prewarmPromise) {
+    void prewarmPromise.then(releaseScopedListener, releaseScopedListener);
+    return prewarmPromise;
+  }
   const workerFactory = options.createWorker ?? defaultWorkerFactory;
   publishRunnerStatus({ phase: "worker", state: "loading" });
   let worker: WorkerLike;
@@ -174,6 +189,7 @@ export const prewarmCWorker = (
   } catch (error) {
     const failure = error instanceof Error ? error : new Error("The browser compiler worker could not start.");
     publishRunnerStatus({ phase: "worker", state: "failed", message: failure.message });
+    releaseScopedListener();
     return Promise.reject(failure);
   }
   prewarmPromise = initializeWorker(worker, options.initializationTimeoutMs ?? 30_000, (phase) =>
@@ -194,6 +210,7 @@ export const prewarmCWorker = (
       throw failure;
     },
   );
+  void prewarmPromise.then(releaseScopedListener, releaseScopedListener);
   return prewarmPromise;
 };
 

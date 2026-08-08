@@ -15,11 +15,13 @@ export const CRunnerProgress = ({
   error,
   onRetry,
   retryLabel = "retry setup",
+  retryDisabled = false,
 }: {
   status: CRunnerStatus;
   error: string;
   onRetry: () => void;
   retryLabel?: string;
+  retryDisabled?: boolean;
 }) => {
   const currentIndex =
     status.phase === "complete" || status.phase === "ready"
@@ -33,7 +35,12 @@ export const CRunnerProgress = ({
           <p className="mt-1 text-sm text-muted">Phases report state only; no unmeasured percentage is shown.</p>
         </div>
         {(error || status.state === "failed") && (
-          <button className="button button-ghost px-3 py-2 text-xs" type="button" onClick={onRetry}>
+          <button
+            className="button button-ghost px-3 py-2 text-xs"
+            type="button"
+            onClick={onRetry}
+            disabled={retryDisabled}
+          >
             <RotateCcw size={14} /> {retryLabel}
           </button>
         )}

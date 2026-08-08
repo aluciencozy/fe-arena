@@ -25,6 +25,7 @@ import { Select } from "@/components/ui/select";
 import { DeadlineTimer } from "@/components/DeadlineTimer";
 import { copyTextWithFallback } from "@/lib/clipboard";
 import { graphEdgePoints, graphTextAlternative } from "@/lib/graph";
+import { isActiveRoomAsyncContext, type RoomAsyncContext } from "@/lib/room-async";
 import {
   codingProgressForRunnerStatus,
   getCWorkerStatus,
@@ -94,6 +95,7 @@ export default function Room() {
   const [includeCoding, setIncludeCoding] = useState(false);
   const [codingReadyError, setCodingReadyError] = useState("");
   const [codingReadyRetry, setCodingReadyRetry] = useState(0);
+  const [codingRunnerStatus, setCodingRunnerStatus] = useState<CRunnerStatus>(() => getCWorkerStatus());
   const codingReadyAttempted = useRef(false);
   const [codingReadyAttempts, setCodingReadyAttempts] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -102,7 +104,19 @@ export default function Room() {
   const codingEnvironmentError = capabilityReady
     ? ""
     : "Coding rounds need a cross-origin isolated Chromium tab. Use a supported Chromium-based browser, keep the site's COOP/COEP headers enabled, then reload the room.";
-  const codingReadyNotice = codingEnvironmentError || codingReadyError;
+  const activeRoomContextRef = useRef<RoomAsyncContext>({
+    roomId,
+    seatId,
+    stageId: match?.phase === "QUESTION" ? `question:${match.question?.id ?? ""}` : `prewarm:${match?.phase ?? "none"}`,
+  });
+  useEffect(() => {
+    activeRoomContextRef.current = {
+      roomId,
+      seatId,
+      stageId:
+        match?.phase === "QUESTION" ? `question:${match.question?.id ?? ""}` : `prewarm:${match?.phase ?? "none"}`,
+    };
+  }, [match?.phase, match?.question?.id, roomId, seatId]);
   const answer = answerState.questionId === questionId ? answerState.value : "";
   const ordered = orderedState.questionId === questionId ? orderedState.value : [];
   const setAnswer = (value: string | number | boolean | string[]) => setAnswerState({ questionId, value });
@@ -118,15 +132,25 @@ export default function Room() {
     if (!name || !roomId) navigate("/", { replace: true });
   }, [name, navigate, roomId]);
   useEffect(() => {
+    let active = true;
+    const capturedContext: RoomAsyncContext = {
+      roomId,
+      seatId,
+      stageId: `prewarm:${match?.phase ?? "none"}`,
+    };
+    const isCurrent = () => active && isActiveRoomAsyncContext(capturedContext, activeRoomContextRef.current);
+    const cleanup = () => {
+      active = false;
+    };
     if (!match?.config.includeCoding) {
       codingReadyAttempted.current = false;
       queueMicrotask(() => setCodingReadyAttempts(0));
-      return;
+      return cleanup;
     }
     if (match.phase === "REMATCH") {
       codingReadyAttempted.current = false;
       queueMicrotask(() => setCodingReadyAttempts(0));
-      return;
+      return cleanup;
     }
     if (
       !seatId ||
@@ -135,21 +159,30 @@ export default function Room() {
       codingReadyAttempts >= MAX_CODING_READY_ATTEMPTS ||
       !["LOBBY", "SETUP", "READY"].includes(match.phase)
     )
-      return;
+      return cleanup;
     codingReadyAttempted.current = true;
-    queueMicrotask(() => setCodingReadyAttempts((attempts) => attempts + 1));
-    if (!capabilityReady) return;
+    queueMicrotask(() => {
+      if (isCurrent()) setCodingReadyAttempts((attempts) => attempts + 1);
+    });
+    if (!capabilityReady) return cleanup;
     // Match updates must not cancel this browser-local initialization. The server
     // accepts readiness only after the worker has initialized successfully.
-    void prewarmCWorker()
+    void prewarmCWorker({
+      onProgress: (status) => {
+        if (isCurrent()) setCodingRunnerStatus(status);
+      },
+    })
       .then(() => {
+        if (!isCurrent()) return;
         setCodingReadyError("");
         markCodingReady();
       })
       .catch((error) => {
+        if (!isCurrent()) return;
         codingReadyAttempted.current = false;
         setCodingReadyError(error instanceof Error ? error.message : "The browser C compiler could not initialize.");
       });
+    return cleanup;
   }, [
     codingReadyAttempts,
     codingReadyRetry,
@@ -158,6 +191,7 @@ export default function Room() {
     match?.codingReady,
     match?.config.includeCoding,
     match?.phase,
+    roomId,
     seatId,
   ]);
   const seats = room?.seats ?? [];
@@ -262,20 +296,6 @@ export default function Room() {
             {api.errorNotice}
           </div>
         )}
-        {codingReadyNotice && match?.config.includeCoding && match.phase !== "REMATCH" && (
-          <div className="notice-error mb-5 flex items-center justify-between gap-3">
-            <span>{codingReadyNotice}</span>
-            {!codingEnvironmentError && (
-              <button
-                className="button button-primary shrink-0"
-                onClick={retryCodingReady}
-                disabled={codingReadyAttempts >= MAX_CODING_READY_ATTEMPTS}
-              >
-                retry readiness
-              </button>
-            )}
-          </div>
-        )}
         {!match ? (
           <Loading />
         ) : match.phase === "LOBBY" ||
@@ -300,6 +320,12 @@ export default function Room() {
             onReady={api.ready}
             copyRoom={copy}
             copyStatus={copyStatus}
+            capabilityReady={capabilityReady}
+            codingEnvironmentError={codingEnvironmentError}
+            codingRunnerStatus={codingRunnerStatus}
+            codingReadyError={codingReadyError}
+            codingReadyAttempts={codingReadyAttempts}
+            onRetryCodingReady={retryCodingReady}
           />
         ) : match.phase === "COUNTDOWN" ? (
           <Countdown deadline={match.countdownEndsAt} round={match.roundIndex + 1} />
@@ -378,6 +404,12 @@ const Lobby = ({
   onReady,
   copyRoom,
   copyStatus,
+  capabilityReady,
+  codingEnvironmentError,
+  codingRunnerStatus,
+  codingReadyError,
+  codingReadyAttempts,
+  onRetryCodingReady,
 }: {
   match: MatchPublicState;
   seatId: string | null;
@@ -396,6 +428,12 @@ const Lobby = ({
   onReady: () => void;
   copyRoom: () => void;
   copyStatus: "idle" | "copied" | "failed";
+  capabilityReady: boolean;
+  codingEnvironmentError: string;
+  codingRunnerStatus: CRunnerStatus;
+  codingReadyError: string;
+  codingReadyAttempts: number;
+  onRetryCodingReady: () => void;
 }) => (
   <section className="mx-auto max-w-5xl py-6 sm:py-14">
     <div className="text-center">
@@ -425,6 +463,27 @@ const Lobby = ({
         empty={!opponent}
       />
     </div>
+    {match.config.includeCoding && ["LOBBY", "SETUP", "READY"].includes(match.phase) && (
+      <div className="mt-5">
+        <div className="panel p-5">
+          <p className="eyebrow text-gold">browser C round readiness</p>
+          <p className="mt-2 text-sm text-muted">
+            The shared browser worker warms up before the match starts. Phase labels report state only; no percentage is
+            estimated.
+          </p>
+          {!capabilityReady && <div className="notice-error mt-4">{codingEnvironmentError}</div>}
+          <div className="mt-4">
+            <CRunnerProgress
+              status={codingRunnerStatus}
+              error={capabilityReady ? codingReadyError : ""}
+              onRetry={onRetryCodingReady}
+              retryLabel="retry readiness"
+              retryDisabled={!capabilityReady || codingReadyAttempts >= MAX_CODING_READY_ATTEMPTS}
+            />
+          </div>
+        </div>
+      </div>
+    )}
     {host && (
       <div className="panel mt-5 p-5">
         <button
@@ -539,9 +598,31 @@ const CodingQuestionStage = ({
   const [runnerStatus, setRunnerStatus] = useState<CRunnerStatus>(() => getCWorkerStatus());
   const [runnerError, setRunnerError] = useState("");
   const runInFlight = useRef(false);
+  const stageQuestionId = question?.type === "coding" ? question.id : "";
+  const stageContext: RoomAsyncContext = {
+    roomId: match.roomId,
+    seatId,
+    stageId: `question:${stageQuestionId}`,
+  };
+  const activeStageContextRef = useRef<RoomAsyncContext>(stageContext);
+  const stageMountedRef = useRef(true);
+  useEffect(() => {
+    activeStageContextRef.current = {
+      roomId: match.roomId,
+      seatId,
+      stageId: `question:${stageQuestionId}`,
+    };
+    stageMountedRef.current = true;
+    return () => {
+      stageMountedRef.current = false;
+    };
+  }, [match.roomId, seatId, stageQuestionId]);
+  const isCurrentStage = () =>
+    stageMountedRef.current && isActiveRoomAsyncContext(stageContext, activeStageContextRef.current);
   if (!question || question.type !== "coding" || !problem) return null;
   const submitted = Boolean(seatId && match.submissions[seatId]?.submitted);
   const reportRunnerProgress = (status: CRunnerStatus) => {
+    if (!isCurrentStage()) return;
     setRunnerStatus(status);
     const progress = codingProgressForRunnerStatus(status);
     if (progress) onProgress(progress);
@@ -549,6 +630,7 @@ const CodingQuestionStage = ({
     else if (status.state === "loading") setRunnerError("");
   };
   const reportOutcome = (result: CExecutionOutcome) => {
+    if (!isCurrentStage()) return;
     setOutcome(result);
     if (result.kind !== "success") {
       onProgress("failed");
@@ -557,7 +639,7 @@ const CodingQuestionStage = ({
     onComplete({ questionId: question.id, passed: result.passed, tests: result.tests, outcome: "success" });
   };
   const run = async () => {
-    if (runInFlight.current || submitted || !capabilityReady) return;
+    if (!isCurrentStage() || runInFlight.current || submitted || !capabilityReady) return;
     runInFlight.current = true;
     setRunPending(true);
     setOutcome(null);
@@ -577,7 +659,7 @@ const CodingQuestionStage = ({
       });
     } finally {
       runInFlight.current = false;
-      setRunPending(false);
+      if (isCurrentStage()) setRunPending(false);
     }
   };
   return (
