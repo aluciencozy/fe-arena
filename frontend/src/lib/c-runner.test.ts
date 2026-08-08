@@ -111,7 +111,9 @@ test("isolates concurrent run status from prewarm and other runs", async () => {
   const prewarmStatuses: string[] = [];
   const oldRunStatuses: string[] = [];
   const newRunStatuses: string[] = [];
-  const unsubscribePrewarm = subscribeCPrewarmStatus((status) => prewarmStatuses.push(`${status.phase}:${status.state}`));
+  const unsubscribePrewarm = subscribeCPrewarmStatus((status) =>
+    prewarmStatuses.push(`${status.phase}:${status.state}`),
+  );
   const initialPrewarmStatus = getCPrewarmStatus();
   let workerCount = 0;
   const createWorker = () => {

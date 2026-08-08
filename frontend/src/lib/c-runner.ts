@@ -249,15 +249,13 @@ export const runCInWorker = (
         if (settled) return;
         settled = true;
         clearTimers();
-        reportRunStatus(
-          {
-            phase: outcome.kind === "success" ? "complete" : activePhase,
-            state: outcome.kind === "success" ? "ready" : "failed",
-            ...(outcome.kind === "success"
-              ? {}
-              : { message: outcome.stderr || `${outcome.kind} during browser execution.` }),
-          },
-        );
+        reportRunStatus({
+          phase: outcome.kind === "success" ? "complete" : activePhase,
+          state: outcome.kind === "success" ? "ready" : "failed",
+          ...(outcome.kind === "success"
+            ? {}
+            : { message: outcome.stderr || `${outcome.kind} during browser execution.` }),
+        });
         if (!options.createWorker && isReusableOutcome(outcome) && !prewarmedWorker && !prewarmPromise) {
           // Keep the initialized Wasmer runtime hot. Rebuilding the compiler
           // worker after every run makes the next run pay the full startup cost

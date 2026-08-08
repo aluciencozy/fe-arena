@@ -270,7 +270,8 @@ test("rejects conflicting retries while retaining a pending snapshot", async () 
       repository.persistTerminalMatch({ ...first, terminalOutcome: "draw" }),
       /pending match snapshot/,
     );
-    const pending = (repository as unknown as { pendingSnapshots: Map<string, TerminalMatchSnapshot> }).pendingSnapshots;
+    const pending = (repository as unknown as { pendingSnapshots: Map<string, TerminalMatchSnapshot> })
+      .pendingSnapshots;
     assert.deepEqual(pending.get(first.matchId), first);
     await rm(blockedPath, { force: true });
     await repository.replayPending();

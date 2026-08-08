@@ -120,9 +120,7 @@ export default function Home() {
 
   useEffect(() => {
     const created = (payload: { requestId: string; roomId: string; seatId: string; reconnectToken: string }) => {
-      if (
-        !isPrivateCreateResponseForActiveRequest(activePrivateCreate.current?.requestId ?? null, payload.requestId)
-      )
+      if (!isPrivateCreateResponseForActiveRequest(activePrivateCreate.current?.requestId ?? null, payload.requestId))
         return;
       activePrivateCreate.current = null;
       useGameStore.getState().setSession(payload.seatId, payload.reconnectToken, payload.roomId);

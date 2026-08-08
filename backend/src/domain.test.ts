@@ -202,10 +202,7 @@ test("question-bank readiness requires five published noncoding questions", () =
     select: (seed, count, topicIds, includeCoding = false) =>
       selectSeededQuestions(questions, seed, count, topicIds, includeCoding),
   });
-  const partial = [
-    ...publishedNoncoding.slice(0, 4),
-    QUESTION_BANK.find((question) => question.type === "coding")!,
-  ];
+  const partial = [...publishedNoncoding.slice(0, 4), QUESTION_BANK.find((question) => question.type === "coding")!];
   assert.equal(isQuestionBankReady(repositoryFor(partial)), false);
   assert.equal(isQuestionBankReady(repositoryFor(publishedNoncoding.slice(0, 5))), true);
 });

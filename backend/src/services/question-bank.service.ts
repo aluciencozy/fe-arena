@@ -214,8 +214,12 @@ export const setQuestionRepository = (repository: QuestionRepository) => {
 };
 
 export const isQuestionBankReady = (repository: Pick<QuestionRepository, "select"> = questionRepository) =>
-  repository.select("readyz", MIN_PLAYABLE_NONCODING_QUESTIONS, TOPICS.map((topic) => topic.id), false).length >=
-  MIN_PLAYABLE_NONCODING_QUESTIONS;
+  repository.select(
+    "readyz",
+    MIN_PLAYABLE_NONCODING_QUESTIONS,
+    TOPICS.map((topic) => topic.id),
+    false,
+  ).length >= MIN_PLAYABLE_NONCODING_QUESTIONS;
 
 export const publicQuestion = (question: Question): PublicQuestion => toPublicQuestion(question);
 export const revealedQuestion = (question: Question): RevealedQuestion => toRevealedQuestion(question);
