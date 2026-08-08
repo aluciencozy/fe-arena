@@ -196,11 +196,19 @@ test("mixed matches gate coding rounds and keep failed coding runs retryable", (
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
   clearMatchesForTests();
   clearRoomsForTests();
-  const coding = QUESTION_BANK.find((question) => question.type === "coding");
-  const graph = QUESTION_BANK.find((question) => question.id === "q-graph-bfs");
+  const coding = QUESTION_BANK.find(
+    (question) => question.published === true && question.type === "coding" && question.topicId === "arrays-memory",
+  );
+  const graph = QUESTION_BANK.find(
+    (question) => question.published === true && question.id === "q-graph-bfs" && question.topicId === "binary-trees",
+  );
   assert.ok(coding && coding.type === "coding");
   assert.ok(graph && graph.type === "graph");
   if (!coding || coding.type !== "coding" || !graph || graph.type !== "graph") return;
+  assert.equal(coding.published, true);
+  assert.equal(coding.topicId, "arrays-memory");
+  assert.equal(graph.published, true);
+  assert.equal(graph.topicId, "binary-trees");
   setQuestionRepository(fixedQuestionRepository([coding, graph]));
   const mixedConfig = {
     topicIds: ["arrays-memory"],
@@ -300,11 +308,19 @@ test("mixed rematches do not reuse an exhausted coding question", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
   clearMatchesForTests();
   clearRoomsForTests();
-  const coding = QUESTION_BANK.find((question) => question.type === "coding");
-  const graph = QUESTION_BANK.find((question) => question.id === "q-graph-bfs");
+  const coding = QUESTION_BANK.find(
+    (question) => question.published === true && question.type === "coding" && question.topicId === "arrays-memory",
+  );
+  const graph = QUESTION_BANK.find(
+    (question) => question.published === true && question.id === "q-graph-bfs" && question.topicId === "binary-trees",
+  );
   assert.ok(coding && coding.type === "coding");
   assert.ok(graph && graph.type === "graph");
   if (!coding || coding.type !== "coding" || !graph || graph.type !== "graph") return;
+  assert.equal(coding.published, true);
+  assert.equal(coding.topicId, "arrays-memory");
+  assert.equal(graph.published, true);
+  assert.equal(graph.topicId, "binary-trees");
   setQuestionRepository(fixedQuestionRepository([coding, graph]));
   const mixedConfig = {
     topicIds: [graph.topicId],
@@ -326,8 +342,14 @@ test("mixed rematches do not reuse an exhausted coding question", (t) => {
     t.mock.timers.tick(3_000);
     const first = getMatchState(room.metadata.roomId)!;
     assert.equal(first.question?.id, coding.id);
-    assert.equal(submitCodingProgress(room.metadata.roomId, room.seat.seatId, "failed", events()).ok, true);
-    assert.equal(submitCodingProgress(room.metadata.roomId, guest.seat.seatId, "failed", events()).ok, true);
+    const codingResult = {
+      questionId: coding.id,
+      passed: false,
+      tests: [{ index: 1, name: "sum", passed: false }],
+      outcome: "success" as const,
+    };
+    assert.equal(submitCodingResult(room.metadata.roomId, room.seat.seatId, codingResult, events()).ok, true);
+    assert.equal(submitCodingResult(room.metadata.roomId, guest.seat.seatId, codingResult, events()).ok, true);
     t.mock.timers.tick(60_000);
     assert.equal(getMatchState(room.metadata.roomId)?.phase, "RESULTS");
     assert.equal(requestRematch(room.metadata.roomId, room.seat.seatId, events()).ok, true);
@@ -350,8 +372,12 @@ test("rematches exclude every previously used question while fresh questions rem
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
   clearMatchesForTests();
   clearRoomsForTests();
-  const coding = QUESTION_BANK.find((question) => question.type === "coding");
-  const graph = QUESTION_BANK.find((question) => question.id === "q-graph-bfs");
+  const coding = QUESTION_BANK.find(
+    (question) => question.published === true && question.type === "coding" && question.topicId === "arrays-memory",
+  );
+  const graph = QUESTION_BANK.find(
+    (question) => question.published === true && question.id === "q-graph-bfs" && question.topicId === "binary-trees",
+  );
   const extra = QUESTION_BANK.find(
     (question) => question.published !== false && question.topicId === graph?.topicId && question.id === "q-tree-level",
   );
@@ -359,6 +385,12 @@ test("rematches exclude every previously used question while fresh questions rem
   assert.ok(graph && graph.type === "graph");
   assert.ok(extra);
   if (!coding || coding.type !== "coding" || !graph || graph.type !== "graph" || !extra) return;
+  assert.equal(coding.published, true);
+  assert.equal(coding.topicId, "arrays-memory");
+  assert.equal(graph.published, true);
+  assert.equal(graph.topicId, "binary-trees");
+  assert.equal(extra.published, true);
+  assert.equal(extra.topicId, "binary-trees");
   let available: Question[] = [coding, graph];
   setQuestionRepository({
     list: () => [...available],
@@ -385,8 +417,14 @@ test("rematches exclude every previously used question while fresh questions rem
     t.mock.timers.tick(3_000);
     const first = getMatchState(room.metadata.roomId)!;
     assert.equal(first.question?.id, coding.id);
-    assert.equal(submitCodingProgress(room.metadata.roomId, room.seat.seatId, "failed", events()).ok, true);
-    assert.equal(submitCodingProgress(room.metadata.roomId, guest.seat.seatId, "failed", events()).ok, true);
+    const codingResult = {
+      questionId: coding.id,
+      passed: false,
+      tests: [{ index: 1, name: "sum", passed: false }],
+      outcome: "success" as const,
+    };
+    assert.equal(submitCodingResult(room.metadata.roomId, room.seat.seatId, codingResult, events()).ok, true);
+    assert.equal(submitCodingResult(room.metadata.roomId, guest.seat.seatId, codingResult, events()).ok, true);
     t.mock.timers.tick(60_000);
     assert.equal(getMatchState(room.metadata.roomId)?.phase, "RESULTS");
 
