@@ -25,7 +25,7 @@ import { Select } from "@/components/ui/select";
 import { DeadlineTimer } from "@/components/DeadlineTimer";
 import { copyTextWithFallback } from "@/lib/clipboard";
 import { graphEdgePoints, graphTextAlternative } from "@/lib/graph";
-import { isActiveRoomAsyncContext, type RoomAsyncContext } from "@/lib/room-async";
+import { attachRoomAsyncCompletion, isActiveRoomAsyncContext, type RoomAsyncContext } from "@/lib/room-async";
 import {
   codingProgressForRunnerStatus,
   getCWorkerStatus,
@@ -97,6 +97,7 @@ export default function Room() {
   const [codingReadyRetry, setCodingReadyRetry] = useState(0);
   const [codingRunnerStatus, setCodingRunnerStatus] = useState<CRunnerStatus>(() => getCWorkerStatus());
   const codingReadyAttempted = useRef(false);
+  const codingReadyScopeRef = useRef(`${roomId}:${seatId ?? ""}`);
   const [codingReadyAttempts, setCodingReadyAttempts] = useState(0);
   const [copied, setCopied] = useState(false);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
@@ -139,8 +140,38 @@ export default function Room() {
       stageId: `prewarm:${match?.phase ?? "none"}`,
     };
     const isCurrent = () => active && isActiveRoomAsyncContext(capturedContext, activeRoomContextRef.current);
-    const cleanup = () => {
+    const scope = `${roomId}:${seatId ?? ""}`;
+    const scopeChanged = codingReadyScopeRef.current !== scope;
+    if (scopeChanged) {
+      codingReadyScopeRef.current = scope;
+      codingReadyAttempted.current = false;
+      queueMicrotask(() => setCodingReadyAttempts(0));
+    }
+    const cleanup = (detach?: () => void) => {
       active = false;
+      detach?.();
+    };
+    const attachPrewarmCompletion = () => {
+      const prewarm = prewarmCWorker({
+        onProgress: (status) => {
+          if (isCurrent()) setCodingRunnerStatus(status);
+        },
+      });
+      return attachRoomAsyncCompletion(
+        prewarm,
+        capturedContext,
+        () => activeRoomContextRef.current,
+        () => {
+          if (!isCurrent()) return;
+          setCodingReadyError("");
+          markCodingReady();
+        },
+        (error) => {
+          if (!isCurrent()) return;
+          codingReadyAttempted.current = false;
+          setCodingReadyError(error instanceof Error ? error.message : "The browser C compiler could not initialize.");
+        },
+      );
     };
     if (!match?.config.includeCoding) {
       codingReadyAttempted.current = false;
@@ -155,34 +186,19 @@ export default function Room() {
     if (
       !seatId ||
       match.codingReady[seatId] ||
-      codingReadyAttempted.current ||
-      codingReadyAttempts >= MAX_CODING_READY_ATTEMPTS ||
+      (!codingReadyAttempted.current && !scopeChanged && codingReadyAttempts >= MAX_CODING_READY_ATTEMPTS) ||
       !["LOBBY", "SETUP", "READY"].includes(match.phase)
     )
       return cleanup;
-    codingReadyAttempted.current = true;
-    queueMicrotask(() => {
-      if (isCurrent()) setCodingReadyAttempts((attempts) => attempts + 1);
-    });
     if (!capabilityReady) return cleanup;
-    // Match updates must not cancel this browser-local initialization. The server
-    // accepts readiness only after the worker has initialized successfully.
-    void prewarmCWorker({
-      onProgress: (status) => {
-        if (isCurrent()) setCodingRunnerStatus(status);
-      },
-    })
-      .then(() => {
-        if (!isCurrent()) return;
-        setCodingReadyError("");
-        markCodingReady();
-      })
-      .catch((error) => {
-        if (!isCurrent()) return;
-        codingReadyAttempted.current = false;
-        setCodingReadyError(error instanceof Error ? error.message : "The browser C compiler could not initialize.");
+    if (!codingReadyAttempted.current) {
+      codingReadyAttempted.current = true;
+      queueMicrotask(() => {
+        if (isCurrent()) setCodingReadyAttempts((attempts) => attempts + 1);
       });
-    return cleanup;
+    }
+    const detach = attachPrewarmCompletion();
+    return () => cleanup(detach);
   }, [
     codingReadyAttempts,
     codingReadyRetry,
