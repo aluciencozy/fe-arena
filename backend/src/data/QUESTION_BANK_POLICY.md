@@ -8,7 +8,7 @@
 
 ## Publication and retirement
 
-The source bank remains append-only. `backend/src/data/questions.ts` marks all legacy `intro` prompts as `published: false` while retaining their IDs and answers. The loader and deterministic selector exclude unpublished rows; the Supabase seed upserts them with the same flag rather than deleting them. New reviewed core/stretch prompts are version 2 and published. The forward migration `202603080007_question_bank_publishing_policy.sql` adds the monotonic `version` column and preserves all existing rows.
+The source bank remains append-only. `backend/src/data/questions.ts` marks all legacy `intro` prompts as `published: false` while retaining their IDs and answers. The loader and deterministic selector exclude unpublished rows; the Supabase seed upserts the structured repository bank and retires legacy `q-fe-*` rows without deleting them. New reviewed core/stretch prompts are version 2 and published. The forward migration `202603080007_question_bank_publishing_policy.sql` adds the monotonic `version` column and preserves all existing rows.
 
 ## Research boundary
 

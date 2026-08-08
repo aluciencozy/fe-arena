@@ -105,7 +105,7 @@ test("disconnecting a Socket.IO guest clears its non-resumable solo session", as
     await postPacket(
       base,
       session,
-      `42${JSON.stringify(["solo:start", { topicIds: ["stacks"], count: 1, timerSeconds: 30 }])}`,
+      `42${JSON.stringify(["solo:start", { topicIds: ["stacks"], count: 1, timerSeconds: 30, supportsCoding: true }])}`,
     );
     assert.equal(soloSessionCountForTests(), 1);
     await postPacket(base, session, "41");

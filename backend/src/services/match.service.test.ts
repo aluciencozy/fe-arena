@@ -821,18 +821,36 @@ test("public and private rooms isolate match state and submitted answers", (t) =
   toggleReady(privateRoom.metadata.roomId, privateGuest.seat.seatId, events());
   toggleReady(publicRoom.metadata.roomId, publicRoom.seat.seatId, events());
   toggleReady(publicRoom.metadata.roomId, publicGuest.seat.seatId, events());
+  markCodingReady(publicRoom.metadata.roomId, publicRoom.seat.seatId, events());
+  markCodingReady(publicRoom.metadata.roomId, publicGuest.seat.seatId, events());
   t.mock.timers.tick(3_000);
   const privateQuestionId = getMatchState(privateRoom.metadata.roomId)?.question?.id;
   const publicQuestionId = getMatchState(publicRoom.metadata.roomId)?.question?.id;
+  const publicQuestion = getMatchState(publicRoom.metadata.roomId)?.question;
   assert.ok(privateQuestionId);
   assert.ok(publicQuestionId);
+  assert.ok(publicQuestion);
+  const submitPublic = (seatId: string) =>
+    publicQuestion!.type === "coding"
+      ? submitCodingResult(
+          publicRoom.metadata.roomId,
+          seatId,
+          {
+            questionId: publicQuestionId!,
+            passed: false,
+            tests: [{ index: 1, name: "isolation", passed: false }],
+            outcome: "success",
+          },
+          events(),
+        )
+      : submitAnswer(
+          publicRoom.metadata.roomId,
+          seatId,
+          { questionId: publicQuestionId!, answer: "public answer" },
+          events(),
+        );
   assert.equal(
-    submitAnswer(
-      publicRoom.metadata.roomId,
-      publicRoom.seat.seatId,
-      { questionId: publicQuestionId!, answer: "public answer" },
-      events(),
-    ).ok,
+    submitPublic(publicRoom.seat.seatId).ok,
     true,
   );
   assert.equal(getMatchState(privateRoom.metadata.roomId)?.submissions[privateRoom.seat.seatId]?.submitted, false);
@@ -847,16 +865,13 @@ test("public and private rooms isolate match state and submitted answers", (t) =
     false,
   );
   assert.equal(
-    submitAnswer(
-      publicRoom.metadata.roomId,
-      publicGuest.seat.seatId,
-      { questionId: publicQuestionId!, answer: "public guest answer" },
-      events(),
-    ).ok,
+    submitPublic(publicGuest.seat.seatId).ok,
     true,
   );
   assert.equal(getMatchState(publicRoom.metadata.roomId)?.phase, "REVEAL");
-  assert.equal(getMatchState(publicRoom.metadata.roomId)?.submissions[publicRoom.seat.seatId]?.answer, "public answer");
+  const publicAnswer = getMatchState(publicRoom.metadata.roomId)?.submissions[publicRoom.seat.seatId]?.answer;
+  if (publicQuestion.type === "coding") assert.equal((publicAnswer as { type?: string } | null)?.type, "coding");
+  else assert.equal(publicAnswer, "public answer");
   assert.equal(getMatchState(privateRoom.metadata.roomId)?.submissions[privateRoom.seat.seatId]?.answer, null);
   clearMatchesForTests();
   clearRoomsForTests();

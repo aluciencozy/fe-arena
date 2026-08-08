@@ -521,6 +521,8 @@ export const ReconnectSchema = z.object({
 export const QueueJoinSchema = z.object({
   username: z.string().trim().min(1).max(24),
   queueToken: z.string().uuid().optional(),
+  /** Public queue matches include browser coding rounds. */
+  supportsCoding: z.boolean().default(false),
 });
 export const ChatSchema = z.object({ message: z.string().trim().min(1).max(280) });
 export const SubmitSchema = QuestionAttemptSchema;
@@ -528,6 +530,8 @@ export const SoloStartSchema = z.object({
   topicIds: z.array(TopicIdSchema).min(1).max(TOPICS.length),
   count: z.number().int().min(1).max(MAX_ROUND_COUNT).default(DEFAULT_ROUND_COUNT),
   timerSeconds: z.number().int().min(QUESTION_TIMER_MIN_SECONDS).max(QUESTION_TIMER_MAX_SECONDS).default(120),
+  /** Solo playlists include browser coding rounds and require a ready runner. */
+  supportsCoding: z.boolean().default(false),
 });
 export const AuthUpdateSchema = z.object({ accessToken: z.string().max(8192).nullable() });
 
@@ -730,6 +734,7 @@ export const ClientEventSchemas = {
   "chat:send": ChatSchema,
   "solo:start": SoloStartSchema,
   "solo:submit": SubmitSchema,
+  "solo:coding-complete": CodingRunResultSchema,
   "solo:next": NoPayloadSchema,
   "auth:update": AuthUpdateSchema,
 } as const;

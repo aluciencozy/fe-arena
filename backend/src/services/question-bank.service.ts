@@ -213,13 +213,26 @@ export const setQuestionRepository = (repository: QuestionRepository) => {
   questionRepository = repository;
 };
 
-export const isQuestionBankReady = (repository: Pick<QuestionRepository, "select"> = questionRepository) =>
-  repository.select(
-    "readyz",
-    MIN_PLAYABLE_NONCODING_QUESTIONS,
-    TOPICS.map((topic) => topic.id),
-    false,
-  ).length >= MIN_PLAYABLE_NONCODING_QUESTIONS;
+export const isQuestionBankReady = (
+  repository: Pick<QuestionRepository, "select" | "list"> = questionRepository,
+) => {
+  const requiredTypes = new Set<Question["type"]>([
+    "multiple-choice",
+    "numeric",
+    "short-answer",
+    "code-output",
+    "ordered-sequence",
+    "graph",
+    "coding",
+  ]);
+  const published = repository.list();
+  const publishedTypes = new Set(published.map((question) => question.type));
+  const hasTypeCoverage = [...requiredTypes].every((type) => publishedTypes.has(type));
+  const hasPlayableNoncodingQuestions =
+    repository.select("readyz", MIN_PLAYABLE_NONCODING_QUESTIONS, TOPICS.map((topic) => topic.id), false).length >=
+    MIN_PLAYABLE_NONCODING_QUESTIONS;
+  return hasTypeCoverage && hasPlayableNoncodingQuestions;
+};
 
 export const publicQuestion = (question: Question): PublicQuestion => toPublicQuestion(question);
 export const revealedQuestion = (question: Question): RevealedQuestion => toRevealedQuestion(question);

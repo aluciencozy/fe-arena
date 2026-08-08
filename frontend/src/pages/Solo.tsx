@@ -1,19 +1,37 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Editor from "@monaco-editor/react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ArrowRight, BookOpen, Check, RotateCcw } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Check, CircleAlert, Play, RotateCcw } from "lucide-react";
 import { AppSettings } from "@/components/AppSettings";
+import { CRunnerProgress } from "@/components/CRunnerProgress";
 import { connectSocket, scheduleSocketDisconnect, socket, socketUrl } from "@/lib/socket";
 import { socketConnectionErrorMessage, socketDisconnectedMessage } from "@/lib/socket-errors";
+import { CODING_CAPABILITY_MESSAGE, isCodingCapabilityAvailable } from "@/lib/coding-capability";
+import {
+  getCPrewarmStatus,
+  prewarmCWorker,
+  runCInWorker,
+  type CExecutionOutcome,
+  type CRunnerStatus,
+  type CTestResult,
+} from "@/lib/c-runner";
 import { DeadlineTimer } from "@/components/DeadlineTimer";
 import { graphEdgePoints, graphTextAlternative } from "@/lib/graph";
-import { TOPICS, type PublicQuestion, type TopicId, type TopicPerformance } from "../../../shared/domain";
+import { QuestionPrompt } from "@/components/QuestionPrompt";
+import {
+  TOPICS,
+  type PublicAnswer,
+  type PublicQuestion,
+  type TopicId,
+  type TopicPerformance,
+} from "../../../shared/domain";
 
 type SoloState = {
   phase: "QUESTION" | "RESULT" | "COMPLETE";
   question: PublicQuestion | null;
   revealedQuestion: {
     type: PublicQuestion["type"];
-    answer: string | number | boolean | string[];
+    answer: PublicAnswer;
     explanation: string;
     assumptions: string[];
     provenance: { source: string; note: string };
@@ -25,7 +43,7 @@ type SoloState = {
   runCorrect: number;
   runTotal: number;
 };
-type SoloStartRequest = { topicIds: TopicId[]; count: number; timerSeconds: number };
+type SoloStartRequest = { topicIds: TopicId[]; count: number; timerSeconds: number; supportsCoding: boolean };
 const DEFAULT_TOPICS: TopicId[] = [
   "arrays-memory",
   "linked-lists",
@@ -48,6 +66,21 @@ export default function Solo() {
   const connectionRef = useRef(socket.connected);
   const stateRef = useRef<SoloState | null>(null);
   const pendingStart = useRef<SoloStartRequest | null>(null);
+  const capabilityReady = isCodingCapabilityAvailable();
+  const [workerStatus, setWorkerStatus] = useState<CRunnerStatus>(() => getCPrewarmStatus());
+  const [prewarmError, setPrewarmError] = useState("");
+  const startPrewarm = useCallback(() => {
+    if (!capabilityReady) return;
+    setPrewarmError("");
+    void prewarmCWorker({ onProgress: setWorkerStatus }).catch((failure) => {
+      setPrewarmError(failure instanceof Error ? failure.message : "The browser C runner could not initialize.");
+    });
+  }, [capabilityReady]);
+  useEffect(() => {
+    if (!capabilityReady) return;
+    const timer = window.setTimeout(startPrewarm, 0);
+    return () => window.clearTimeout(timer);
+  }, [capabilityReady, startPrewarm]);
   useEffect(() => {
     let active = true;
     const onState = (next: SoloState) => {
@@ -130,12 +163,26 @@ export default function Solo() {
     setError("");
     socket.emit("solo:start", request);
   };
+  const requireCodingRunner = () => {
+    if (!capabilityReady) {
+      setError(CODING_CAPABILITY_MESSAGE);
+      return false;
+    }
+    if (workerStatus.state !== "ready") {
+      setError("The browser C runner is still warming up. Try again when readiness reaches ready.");
+      startPrewarm();
+      return false;
+    }
+    return true;
+  };
   const start = () => {
-    if (topics.length) startRun({ topicIds: topics, count: 5, timerSeconds: 120 });
+    if (topics.length && requireCodingRunner())
+      startRun({ topicIds: topics, count: 5, timerSeconds: 120, supportsCoding: true });
   };
   const startTopic = (topicId: TopicId) => {
     setTopics([topicId]);
-    startRun({ topicIds: [topicId], count: 5, timerSeconds: 120 });
+    if (requireCodingRunner())
+      startRun({ topicIds: [topicId], count: 5, timerSeconds: 120, supportsCoding: true });
   };
   const submit = () => {
     if (!state?.question || !requireConnection()) return;
@@ -179,7 +226,23 @@ export default function Solo() {
                 </button>
               ))}
             </div>
-            <button className="button button-primary mt-7" onClick={start} disabled={!topics.length}>
+            {!capabilityReady && (
+              <div className="notice-error mt-7" role="alert">
+                <CircleAlert size={16} className="shrink-0" />
+                <span>{CODING_CAPABILITY_MESSAGE}</span>
+              </div>
+            )}
+            <CRunnerProgress
+              status={workerStatus}
+              error={capabilityReady ? prewarmError : ""}
+              onRetry={startPrewarm}
+              retryDisabled={!capabilityReady}
+            />
+            <button
+              className="button button-primary mt-7"
+              onClick={start}
+              disabled={!topics.length || !capabilityReady || workerStatus.state !== "ready"}
+            >
               <BookOpen size={16} /> start five-question run <ArrowRight size={16} />
             </button>
             {error && (
@@ -311,24 +374,34 @@ export default function Solo() {
               {connection === "connecting" && (
                 <p className="mt-3 text-sm text-muted">Connecting to the study server…</p>
               )}
-              <article className="panel mt-8 p-6 sm:p-9">
-                <h1 className="text-2xl font-semibold leading-snug sm:text-4xl">{question.prompt}</h1>
-                <QuestionArtifact question={question} />
-                <SoloControl
+              {question.type === "coding" ? (
+                <SoloCodingQuestionStage
+                  key={question.id}
                   question={question}
-                  answer={answer}
-                  setAnswer={setAnswer}
-                  ordered={ordered}
-                  setOrdered={setOrdered}
+                  capabilityReady={capabilityReady}
+                  connection={connection}
+                  onComplete={(result) => socket.emit("solo:coding-complete", result)}
                 />
-                <button
-                  className="button button-primary mt-8 w-full"
-                  onClick={submit}
-                  disabled={connection !== "connected" || !hasAnswer(question, answer, ordered)}
-                >
-                  <Check size={16} /> submit once
-                </button>
-              </article>
+              ) : (
+                <article className="panel mt-8 p-6 sm:p-9">
+                  <QuestionPrompt className="text-2xl font-semibold leading-snug sm:text-4xl" prompt={question.prompt} />
+                  <QuestionArtifact question={question} />
+                  <SoloControl
+                    question={question}
+                    answer={answer}
+                    setAnswer={setAnswer}
+                    ordered={ordered}
+                    setOrdered={setOrdered}
+                  />
+                  <button
+                    className="button button-primary mt-8 w-full"
+                    onClick={submit}
+                    disabled={connection !== "connected" || !hasAnswer(question, answer, ordered)}
+                  >
+                    <Check size={16} /> submit once
+                  </button>
+                </article>
+              )}
             </section>
           )
         )}
@@ -336,6 +409,119 @@ export default function Solo() {
     </Shell>
   );
 }
+const SoloCodingQuestionStage = ({
+  question,
+  capabilityReady,
+  connection,
+  onComplete,
+}: {
+  question: PublicQuestion;
+  capabilityReady: boolean;
+  connection: "connecting" | "connected" | "disconnected";
+  onComplete: (result: { questionId: string; passed: boolean; tests: CTestResult[]; outcome: "success" }) => void;
+}) => {
+  const problem = question.problem;
+  const [code, setCode] = useState(problem?.starterCode ?? "");
+  const [outcome, setOutcome] = useState<CExecutionOutcome | null>(null);
+  const [runnerStatus, setRunnerStatus] = useState<CRunnerStatus>(() => getCPrewarmStatus());
+  const [runnerError, setRunnerError] = useState("");
+  const [runPending, setRunPending] = useState(false);
+  const [locked, setLocked] = useState(false);
+  if (!problem) return null;
+  const run = async () => {
+    if (!capabilityReady || connection !== "connected" || runPending || locked) return;
+    setRunPending(true);
+    setOutcome(null);
+    setRunnerError("");
+    try {
+      const result = await runCInWorker(problem, code, { onProgress: setRunnerStatus });
+      setOutcome(result);
+      if (result.kind === "success") {
+        setLocked(true);
+        onComplete({ questionId: question.id, passed: result.passed, tests: result.tests, outcome: "success" });
+      }
+    } catch (error) {
+      const failure = error instanceof Error ? error.message : "The browser C runner failed.";
+      setRunnerError(failure);
+      setOutcome({ kind: "runtime-error", stdout: "", stderr: failure, tests: [] });
+    } finally {
+      setRunPending(false);
+    }
+  };
+  return (
+    <article className="panel mt-8 overflow-hidden">
+      <div className="p-6 sm:p-9">
+        <p className="eyebrow text-gold">{problem.title} · browser worker</p>
+        <QuestionPrompt className="mt-3 text-2xl font-semibold leading-snug sm:text-4xl" prompt={question.prompt} />
+        {!capabilityReady && (
+          <div id="solo-c-capability-help" className="notice-error mt-5" role="alert">
+            <CircleAlert size={16} className="shrink-0" />
+            <span>{CODING_CAPABILITY_MESSAGE}</span>
+          </div>
+        )}
+        <CRunnerProgress status={runnerStatus} error={runnerError} onRetry={run} retryLabel="retry tests" />
+        <div className="mt-7 border border-line">
+          <div className="border-b border-line bg-ink px-4 py-3 font-mono text-xs text-gold">
+            locked · {problem.functionSignature} {"{"}
+          </div>
+          <Editor
+            height="min(52vh, 500px)"
+            language="c"
+            theme="vs-dark"
+            value={code}
+            onChange={(value) => setCode(value ?? "")}
+            options={{
+              minimap: { enabled: false },
+              readOnly: runPending || locked,
+              wordWrap: "on",
+              scrollBeyondLastLine: false,
+            }}
+          />
+          <div className="flex items-center justify-between gap-3 border-t border-line p-4">
+            <span className="text-xs text-muted">Local-only execution · no anti-cheat guarantee</span>
+            <button
+              className="button button-primary"
+              onClick={run}
+              disabled={!capabilityReady || connection !== "connected" || runPending || locked || !code.trim()}
+              aria-describedby={!capabilityReady ? "solo-c-capability-help" : undefined}
+            >
+              <Play size={15} /> {runPending ? "running…" : locked ? "answer locked" : "run tests"}
+            </button>
+          </div>
+        </div>
+        {outcome && (
+          <div className="mt-5 rounded border border-line p-4 text-sm" aria-live="polite">
+            <p className="eyebrow">runner result</p>
+            <p className="mt-2">
+              {outcome.kind === "success" && outcome.passed
+                ? "all tests passed"
+                : outcome.kind === "success"
+                  ? "tests need attention"
+                  : outcome.kind === "timeout"
+                    ? `${outcome.phase} timed out`
+                    : outcome.kind}
+            </p>
+            {outcome.tests.length > 0 && (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {outcome.tests.map((test) => (
+                  <div key={test.index} className="flex items-center justify-between rounded border border-line px-3 py-2">
+                    <span>{test.name}</span>
+                    <span className={test.passed ? "text-green-300" : "text-red-300"}>
+                      {test.passed ? "PASS" : "FAIL"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {outcome.kind !== "success" && (
+              <p className="mt-3 text-xs text-muted">This attempt stayed unlocked. Fix the code or retry the run.</p>
+            )}
+          </div>
+        )}
+      </div>
+    </article>
+  );
+};
 const SoloControl = ({
   question,
   answer,
@@ -473,8 +659,11 @@ const QuestionArtifact = ({ question }: { question: PublicQuestion }) => {
     </div>
   );
 };
-const formatAnswer = (answer: string | number | boolean | string[]) =>
-  Array.isArray(answer) ? answer.join(" → ") : String(answer);
+const formatAnswer = (answer: PublicAnswer) => {
+  if (typeof answer === "object" && !Array.isArray(answer))
+    return answer.passed ? "Passed all tests" : `Did not pass (${answer.outcome.replace("-", " ")})`;
+  return Array.isArray(answer) ? answer.join(" → ") : String(answer);
+};
 const topicName = (id: string) => TOPICS.find((topic) => topic.id === id)?.label ?? id;
 const Shell = ({ children }: { children: React.ReactNode }) => (
   <div className="min-h-screen bg-ink text-cream">

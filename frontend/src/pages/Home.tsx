@@ -18,6 +18,8 @@ import AuthPanel from "@/components/AuthPanel";
 import { AppSettings } from "@/components/AppSettings";
 import { Select } from "@/components/ui/select";
 import { isPrivateCreateResponseForActiveRequest } from "@/lib/private-create";
+import { CODING_CAPABILITY_MESSAGE, isCodingCapabilityAvailable } from "@/lib/coding-capability";
+import { prewarmCWorker } from "@/lib/c-runner";
 import { connectSocket, socket, socketUrl } from "@/lib/socket";
 import { socketConnectionErrorMessage, socketDisconnectedMessage } from "@/lib/socket-errors";
 import { useGameStore } from "@/store/gameStore";
@@ -157,13 +159,27 @@ export default function Home() {
     const onConnect = () => {
       setConnection("connected");
       if (pendingPrivateCreate.current) emitPrivateCreate(pendingPrivateCreate.current);
-      if (queuedName.current)
-        socket.emit(
-          "queue:join",
-          queueToken.current
-            ? { username: queuedName.current, queueToken: queueToken.current }
-            : { username: queuedName.current },
+      if (queuedName.current) {
+        void prewarmCWorker().then(
+          () => {
+            if (!queuedName.current || !socket.connected) return;
+            setBusy(false);
+            socket.emit(
+              "queue:join",
+              queueToken.current
+                ? { username: queuedName.current, queueToken: queueToken.current, supportsCoding: true }
+                : { username: queuedName.current, supportsCoding: true },
+            );
+          },
+          (error) => {
+            setBusy(false);
+            setNotice({
+              kind: "error",
+              text: error instanceof Error ? error.message : "The browser C runner could not initialize.",
+            });
+          },
         );
+      }
     };
     const onDisconnect = () => {
       setConnection("disconnected");
@@ -262,17 +278,54 @@ export default function Home() {
   };
   const joinQueue = () => {
     if (!begin()) return;
-    queuedName.current = name.trim();
-    queueToken.current = null;
-    if (socket.connected) socket.emit("queue:join", { username: queuedName.current });
-    setView("queue");
+    if (!isCodingCapabilityAvailable()) {
+      setNotice({ kind: "error", text: CODING_CAPABILITY_MESSAGE });
+      return;
+    }
+    setBusy(true);
+    setNotice({ kind: "info", text: "Preparing the browser C runner before joining the public queue…" });
+    void prewarmCWorker().then(
+      () => {
+        queuedName.current = name.trim();
+        queueToken.current = null;
+        setBusy(false);
+        setNotice(null);
+        if (socket.connected) socket.emit("queue:join", { username: queuedName.current, supportsCoding: true });
+        setView("queue");
+      },
+      (error) => {
+        setBusy(false);
+        setNotice({
+          kind: "error",
+          text: error instanceof Error ? error.message : "The browser C runner could not initialize.",
+        });
+      },
+    );
   };
   const retryQueue = () => {
     if (!queuedName.current) return;
+    if (!isCodingCapabilityAvailable()) {
+      setNotice({ kind: "error", text: CODING_CAPABILITY_MESSAGE });
+      return;
+    }
     setNotice(null);
+    setBusy(true);
     setConnection("connecting");
     connectSocket();
-    if (socket.connected) socket.emit("queue:join", { username: queuedName.current });
+    if (!socket.connected) return;
+    void prewarmCWorker().then(
+      () => {
+        setBusy(false);
+        if (socket.connected) socket.emit("queue:join", { username: queuedName.current, supportsCoding: true });
+      },
+      (error) => {
+        setBusy(false);
+        setNotice({
+          kind: "error",
+          text: error instanceof Error ? error.message : "The browser C runner could not initialize.",
+        });
+      },
+    );
   };
   const leaveQueue = () => {
     queuedName.current = null;
@@ -335,6 +388,7 @@ export default function Home() {
               <button
                 className="button button-primary"
                 onClick={joinQueue}
+                disabled={busy}
                 aria-describedby={!validName ? "public-queue-validation" : undefined}
               >
                 <Radio size={16} /> public queue <ArrowRight size={16} />

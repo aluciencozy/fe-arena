@@ -140,10 +140,10 @@ test("normalization is stable and explicit aliases grade short answers", () => {
 
 test("reviewed bank has complete topic/type coverage, valid unique IDs, and hidden public solutions", () => {
   const questions = validateQuestionBank();
-  assert.equal(questions.length, 201);
+  assert.equal(questions.length, 202);
   assert.equal(new Set(questions.map((question) => question.id)).size, questions.length);
   assert.equal(questions.filter((question) => question.type === "graph").length, 19);
-  assert.equal(questions.filter((question) => question.type === "coding").length, 38);
+  assert.equal(questions.filter((question) => question.type === "coding").length, 39);
   assert.ok(questions.filter((question) => question.difficulty === "stretch").length >= 70);
   assert.ok(questions.some((question) => question.published === false));
   assert.ok(questions.filter((question) => question.published !== false && question.type === "coding").length >= 30);
@@ -194,17 +194,19 @@ test("publication policy retains retired content but excludes it from play", () 
   assert.equal(selectSeededQuestions([retired], "retired-only", 1, [retired.topicId]).length, 0);
 });
 
-test("question-bank readiness requires five published noncoding questions", () => {
+test("question-bank readiness requires type coverage and five published noncoding questions", () => {
   const publishedNoncoding = QUESTION_BANK.filter(
     (question) => question.published !== false && question.type !== "coding",
   );
-  const repositoryFor = (questions: readonly Question[]): Pick<QuestionRepository, "select"> => ({
+  const repositoryFor = (questions: readonly Question[]): Pick<QuestionRepository, "select" | "list"> => ({
+    list: () => questions.filter((question) => question.published !== false),
     select: (seed, count, topicIds, includeCoding = false) =>
       selectSeededQuestions(questions, seed, count, topicIds, includeCoding),
   });
   const partial = [...publishedNoncoding.slice(0, 4), QUESTION_BANK.find((question) => question.type === "coding")!];
   assert.equal(isQuestionBankReady(repositoryFor(partial)), false);
-  assert.equal(isQuestionBankReady(repositoryFor(publishedNoncoding.slice(0, 5))), true);
+  assert.equal(isQuestionBankReady(repositoryFor(publishedNoncoding.slice(0, 5))), false);
+  assert.equal(isQuestionBankReady(repositoryFor(QUESTION_BANK.filter((question) => question.published !== false))), true);
 });
 
 test("reviewed C traces match independent output oracles", () => {
@@ -239,7 +241,7 @@ test("reviewed graph answers match independent traversal oracles", () => {
 });
 
 test("browser coding fixtures are schema-valid and bounded", () => {
-  assert.equal(CODING_PROBLEMS.length, 38);
+  assert.equal(CODING_PROBLEMS.length, 39);
   assert.equal(new Set(CODING_PROBLEMS.map((problem) => problem.id)).size, CODING_PROBLEMS.length);
   for (const problem of CODING_PROBLEMS) {
     assert.equal(CodingProblemSchema.safeParse(problem).success, true, problem.id);

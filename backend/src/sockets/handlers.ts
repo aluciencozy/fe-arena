@@ -32,7 +32,7 @@ import {
   submitCodingResult,
   requestRematch,
 } from "../services/match.service.js";
-import { clearSolo, soloNext, soloSubmit, startSolo } from "../services/solo.service.js";
+import { clearSolo, soloCodingComplete, soloNext, soloSubmit, startSolo } from "../services/solo.service.js";
 import { FixedWindowLimiter } from "../security.js";
 
 const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -223,8 +223,22 @@ export const registerHandlers = (io: Server, socket: Socket, authVerifier: AuthV
   socket.on("queue:join", (payload: unknown) => {
     const input = validate(socket, ClientEventSchemas["queue:join"], payload);
     if (!input) return;
+    if (!input.supportsCoding) {
+      error(
+        socket,
+        "Public queue matches include browser C rounds. Enable cross-origin isolation and warm the C runner first.",
+        "CODING_CAPABILITY_REQUIRED",
+      );
+      return;
+    }
     const result = enqueue(
-      { socketId: socket.id, username: input.username, queueToken: input.queueToken, queuedAt: Date.now() },
+      {
+        socketId: socket.id,
+        username: input.username,
+        queueToken: input.queueToken,
+        queuedAt: Date.now(),
+        supportsCoding: input.supportsCoding,
+      },
       () => socket.emit("queue:state", output(ServerEventSchemas["queue:state"], { status: "expired" })),
     );
     if (result.status === "expired") {
@@ -245,7 +259,12 @@ export const registerHandlers = (io: Server, socket: Socket, authVerifier: AuthV
     const opponentSocket = io.sockets.sockets.get(result.opponent.socketId);
     if (!opponentSocket) {
       const retry = enqueue(
-        { socketId: socket.id, username: result.entry.username, queuedAt: result.entry.queuedAt },
+        {
+          socketId: socket.id,
+          username: result.entry.username,
+          queuedAt: result.entry.queuedAt,
+          supportsCoding: result.entry.supportsCoding,
+        },
         () => socket.emit("queue:state", output(ServerEventSchemas["queue:state"], { status: "expired" })),
       );
       if (retry.status === "waiting")
@@ -417,8 +436,13 @@ export const registerHandlers = (io: Server, socket: Socket, authVerifier: AuthV
   socket.on("solo:start", (payload: unknown) => {
     const input = validate(socket, ClientEventSchemas["solo:start"], payload);
     if (!input) return;
-    const result = startSolo(socket.id, input.topicIds, input.count, input.timerSeconds, (state) =>
-      socket.emit("solo:state", output(ServerEventSchemas["solo:state"], state)),
+    const result = startSolo(
+      socket.id,
+      input.topicIds,
+      input.count,
+      input.timerSeconds,
+      (state) => socket.emit("solo:state", output(ServerEventSchemas["solo:state"], state)),
+      input.supportsCoding,
     );
     if (!result.ok) error(socket, result.error, "SOLO_START_ERROR");
   });
@@ -429,6 +453,14 @@ export const registerHandlers = (io: Server, socket: Socket, authVerifier: AuthV
       socket.emit("solo:state", output(ServerEventSchemas["solo:state"], state)),
     );
     if (!result.ok) error(socket, result.error, "SOLO_SUBMISSION_ERROR");
+  });
+  socket.on("solo:coding-complete", (payload: unknown) => {
+    const input = validate(socket, ClientEventSchemas["solo:coding-complete"], payload);
+    if (!input) return;
+    const result = soloCodingComplete(socket.id, input, (state) =>
+      socket.emit("solo:state", output(ServerEventSchemas["solo:state"], state)),
+    );
+    if (!result.ok) error(socket, result.error, "SOLO_CODING_ERROR");
   });
   socket.on("solo:next", (payload?: unknown) => {
     if (!validateEmpty(socket, ClientEventSchemas["solo:next"], payload)) return;
