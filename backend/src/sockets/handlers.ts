@@ -139,6 +139,7 @@ export const registerHandlers = (io: Server, socket: Socket, authVerifier: AuthV
     ["match:coding-progress", new FixedWindowLimiter(30, 60_000)],
     ["match:coding-complete", new FixedWindowLimiter(12, 60_000)],
     ["solo:submit", new FixedWindowLimiter(20, 60_000)],
+    ["solo:coding-complete", new FixedWindowLimiter(12, 60_000)],
     ["chat:send", new FixedWindowLimiter(10, 10_000)],
     ["room:create-private", new FixedWindowLimiter(10, 60_000)],
     ["queue:join", new FixedWindowLimiter(10, 60_000)],

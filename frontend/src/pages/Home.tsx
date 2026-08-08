@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import AuthPanel from "@/components/AuthPanel";
 import { AppSettings } from "@/components/AppSettings";
+import { attachAsyncCompletion } from "@/lib/async-completion";
 import { Select } from "@/components/ui/select";
 import { isPrivateCreateResponseForActiveRequest } from "@/lib/private-create";
 import { CODING_CAPABILITY_MESSAGE, isCodingCapabilityAvailable } from "@/lib/coding-capability";
@@ -68,6 +69,7 @@ export default function Home() {
   const activePrivateCreate = useRef<ActivePrivateCreate | null>(null);
   const privateCreateAttempt = useRef(0);
   const privateAckTimer = useRef<number | null>(null);
+  const queuePrewarmCleanup = useRef<(() => void) | null>(null);
   const validName = name.trim().length > 0;
   const closeTopicDialog = useCallback(() => setView("home"), []);
   const clearPrivateAckTimer = useCallback(() => {
@@ -75,6 +77,18 @@ export default function Home() {
       window.clearTimeout(privateAckTimer.current);
       privateAckTimer.current = null;
     }
+  }, []);
+  const runQueuePrewarm = useCallback((onReady: () => void, onError: (error: unknown) => void) => {
+    queuePrewarmCleanup.current?.();
+    queuePrewarmCleanup.current = attachAsyncCompletion(prewarmCWorker(), onReady, onError);
+  }, []);
+  const cancelQueueAdmission = useCallback(() => {
+    queuePrewarmCleanup.current?.();
+    queuePrewarmCleanup.current = null;
+    const wasQueued = Boolean(queuedName.current);
+    queuedName.current = null;
+    queueToken.current = null;
+    if (wasQueued && socket.connected) socket.emit("queue:leave");
   }, []);
   const emitPrivateCreate = useCallback(
     (request: PrivateCreateRequest) => {
@@ -160,7 +174,7 @@ export default function Home() {
       setConnection("connected");
       if (pendingPrivateCreate.current) emitPrivateCreate(pendingPrivateCreate.current);
       if (queuedName.current) {
-        void prewarmCWorker().then(
+        runQueuePrewarm(
           () => {
             if (!queuedName.current || !socket.connected) return;
             setBusy(false);
@@ -222,6 +236,7 @@ export default function Home() {
     socket.on("server:error", failed);
     return () => {
       clearPrivateAckTimer();
+      cancelQueueAdmission();
       socket.off("room:created", created);
       socket.off("queue:seat", queueSeat);
       socket.off("queue:state", waiting);
@@ -230,7 +245,7 @@ export default function Home() {
       socket.off("connect_error", onConnectError);
       socket.off("server:error", failed);
     };
-  }, [clearPrivateAckTimer, emitPrivateCreate, navigate]);
+  }, [cancelQueueAdmission, clearPrivateAckTimer, emitPrivateCreate, navigate, runQueuePrewarm]);
   useEffect(() => {
     if (view !== "queue") return;
     const id = window.setInterval(() => setNow(Date.now()), 500);
@@ -284,7 +299,7 @@ export default function Home() {
     }
     setBusy(true);
     setNotice({ kind: "info", text: "Preparing the browser C runner before joining the public queue…" });
-    void prewarmCWorker().then(
+    runQueuePrewarm(
       () => {
         queuedName.current = name.trim();
         queueToken.current = null;
@@ -313,10 +328,11 @@ export default function Home() {
     setConnection("connecting");
     connectSocket();
     if (!socket.connected) return;
-    void prewarmCWorker().then(
+    runQueuePrewarm(
       () => {
+        if (!queuedName.current || !socket.connected) return;
         setBusy(false);
-        if (socket.connected) socket.emit("queue:join", { username: queuedName.current, supportsCoding: true });
+        socket.emit("queue:join", { username: queuedName.current, supportsCoding: true });
       },
       (error) => {
         setBusy(false);
@@ -328,9 +344,7 @@ export default function Home() {
     );
   };
   const leaveQueue = () => {
-    queuedName.current = null;
-    queueToken.current = null;
-    socket.emit("queue:leave");
+    cancelQueueAdmission();
     setView("home");
     setQueueExpiresAt(null);
   };
