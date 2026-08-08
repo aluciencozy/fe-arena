@@ -399,8 +399,6 @@ export const gradeQuestion = (question: Question, attempt: QuestionAttempt): boo
 export const QUESTION_TIMER_MIN_SECONDS = 30;
 export const QUESTION_TIMER_MAX_SECONDS = 300;
 export const PUBLIC_QUESTION_SECONDS = 300;
-/** Toolchain initialization is outside this deadline; coding gets a 60-second run window. */
-export const CODING_QUESTION_SECONDS = 60;
 export const PUBLIC_QUEUE_MAX_WAIT_SECONDS = 300;
 export const PAUSE_SECONDS = 30;
 export const REVEAL_SECONDS = 30;

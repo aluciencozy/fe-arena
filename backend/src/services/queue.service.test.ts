@@ -24,6 +24,18 @@ test("queue leave is idempotent", () => {
   clearQueueForTests();
 });
 
+test("public queue rejects duplicate names case-insensitively without disturbing the waiting guest", () => {
+  clearQueueForTests();
+  const first = enqueue({ socketId: "socket-a", username: "Ada", queuedAt: Date.now(), supportsCoding: true });
+  assert.equal(first.status, "waiting");
+  assert.equal(suspend("socket-a"), true);
+  const duplicate = enqueue({ socketId: "socket-b", username: " ada ", queuedAt: Date.now(), supportsCoding: true });
+  assert.equal(duplicate.status, "name-taken");
+  assert.equal(queuePosition("socket-a"), 1);
+  assert.equal(queuePosition("socket-b"), 0);
+  clearQueueForTests();
+});
+
 test("queue entries expire after five minutes", (t) => {
   t.mock.timers.enable({ apis: ["Date", "setTimeout"], now: 0 });
   clearQueueForTests();

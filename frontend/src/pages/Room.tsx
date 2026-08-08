@@ -511,8 +511,8 @@ const Lobby = ({
           <span>
             <span className="eyebrow text-gold">host controls</span>
             <span className="mt-1 block font-semibold">
-              {selectedTopics.length} topics · {timer}s per non-coding question
-              {includeCoding ? " · 60s per coding round" : ""}
+              {selectedTopics.length} topics · {timer}s per question
+              {includeCoding ? " · includes coding rounds" : ""}
             </span>
           </span>
           <ChevronDown className={settingsOpen ? "rotate-180 text-gold" : "text-muted"} size={17} />

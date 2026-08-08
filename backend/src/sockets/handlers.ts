@@ -15,7 +15,13 @@ import {
   reconnectRoom,
   removeSeat,
 } from "../services/room.service.js";
-import { enqueue, dequeue, publicConfig, suspend } from "../services/queue.service.js";
+import {
+  dequeue,
+  enqueue,
+  publicConfig,
+  QUEUE_NAME_TAKEN_MESSAGE,
+  suspend,
+} from "../services/queue.service.js";
 import {
   clearMatch,
   configureMatch,
@@ -244,6 +250,10 @@ export const registerHandlers = (io: Server, socket: Socket, authVerifier: AuthV
     );
     if (result.status === "expired") {
       socket.emit("queue:state", output(ServerEventSchemas["queue:state"], { status: "expired" }));
+      return;
+    }
+    if (result.status === "name-taken") {
+      error(socket, QUEUE_NAME_TAKEN_MESSAGE, "QUEUE_NAME_TAKEN");
       return;
     }
     if (result.status === "waiting") {

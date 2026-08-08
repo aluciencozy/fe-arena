@@ -3,6 +3,7 @@ import test from "node:test";
 import { startServer, type ServerRuntime } from "./server.js";
 import type { RuntimeConfig } from "./config.js";
 import { clearSoloForTests, soloSessionCountForTests } from "./services/solo.service.js";
+import { clearQueueForTests } from "./services/queue.service.js";
 
 const runtimeConfig = (isProduction: boolean): RuntimeConfig => ({
   nodeEnv: isProduction ? "production" : "test",
@@ -112,6 +113,37 @@ test("Socket.IO packet middleware limits solo coding completions like match comp
     }
     assert.match(await pollPacket(base, session), /SOCKET_RATE_LIMIT/);
   } finally {
+    await closeRuntime(runtime);
+  }
+});
+
+test("public queue rejects a duplicate guest name before consuming the waiting entry", async () => {
+  clearQueueForTests();
+  const { runtime, base } = await start(false);
+  try {
+    const first = await openPolling(base, "http://localhost:5173");
+    const second = await openPolling(base, "http://localhost:5173");
+    await connectNamespace(base, first);
+    await connectNamespace(base, second);
+    await postPacket(
+      base,
+      first,
+      `42${JSON.stringify(["queue:join", { username: "Ada", supportsCoding: true }])}`,
+    );
+    assert.match(await pollPacket(base, first), /waiting/);
+    await postPacket(
+      base,
+      second,
+      `42${JSON.stringify(["queue:join", { username: " ada ", supportsCoding: true }])}`,
+    );
+    const duplicateError = await pollPacket(base, second);
+    assert.match(duplicateError, /QUEUE_NAME_TAKEN/);
+    assert.match(duplicateError, /already waiting in the public queue/);
+    assert.match(duplicateError, /Choose a different name/);
+    await postPacket(base, first, `42${JSON.stringify(["queue:leave"])}`);
+    assert.match(await pollPacket(base, first), /cancelled/);
+  } finally {
+    clearQueueForTests();
     await closeRuntime(runtime);
   }
 });
