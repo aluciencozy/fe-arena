@@ -7,7 +7,13 @@ import {
   type MatchConfig,
 } from "../../../shared/domain.js";
 
-export type QueueEntry = { socketId: string; username: string; queuedAt: number; queueToken?: string };
+export type QueueEntry = {
+  socketId: string;
+  username: string;
+  queuedAt: number;
+  supportsCoding: boolean;
+  queueToken?: string;
+};
 type StoredQueueEntry = QueueEntry & { queueToken: string; connected: boolean };
 const entries: StoredQueueEntry[] = [];
 const queueTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -16,6 +22,7 @@ export const publicConfig: MatchConfig = {
   topicIds: TOPICS.map((topic) => topic.id),
   roundCount: DEFAULT_ROUND_COUNT,
   questionTimerSeconds: PUBLIC_QUESTION_SECONDS,
+  includeCoding: true,
 };
 
 const clearTimer = (queueToken: string) => {
@@ -53,6 +60,7 @@ export const enqueue = (entry: QueueEntry, onExpire?: () => void) => {
     if (existing.socketId !== entry.socketId) dequeue(entry.socketId);
     existing.socketId = entry.socketId;
     existing.username = entry.username;
+    existing.supportsCoding = entry.supportsCoding;
     existing.connected = true;
     if (onExpire) expiryHandlers.set(existing.queueToken, onExpire);
     return {
@@ -64,7 +72,9 @@ export const enqueue = (entry: QueueEntry, onExpire?: () => void) => {
 
   dequeue(entry.socketId);
   const normalized: StoredQueueEntry = { ...entry, queueToken: entry.queueToken ?? randomUUID(), connected: true };
-  const opponentIndex = entries.findIndex((candidate) => candidate.connected);
+  const opponentIndex = entries.findIndex(
+    (candidate) => candidate.connected && candidate.supportsCoding === normalized.supportsCoding,
+  );
   if (opponentIndex >= 0) {
     const [opponent] = entries.splice(opponentIndex, 1);
     if (!opponent) throw new Error("Queue opponent disappeared.");

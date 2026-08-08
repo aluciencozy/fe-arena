@@ -4,20 +4,21 @@ import { clearQueueForTests, dequeue, enqueue, publicConfig, queuePosition, susp
 
 test("public queue matches FIFO entries and uses fixed five-minute settings", () => {
   clearQueueForTests();
-  const first = enqueue({ socketId: "socket-a", username: "Ada", queuedAt: 10 });
+  const first = enqueue({ socketId: "socket-a", username: "Ada", queuedAt: 10, supportsCoding: true });
   assert.equal(first.status, "waiting");
   if (first.status === "waiting") assert.equal(first.expiresAt, 300010);
-  const second = enqueue({ socketId: "socket-b", username: "Grace", queuedAt: 20 });
+  const second = enqueue({ socketId: "socket-b", username: "Grace", queuedAt: 20, supportsCoding: true });
   assert.equal(second.status, "matched");
   if (second.status === "matched") assert.equal(second.opponent.username, "Ada");
   assert.equal(publicConfig.questionTimerSeconds, 300);
   assert.equal(publicConfig.roundCount, 5);
+  assert.equal(publicConfig.includeCoding, true);
   clearQueueForTests();
 });
 
 test("queue leave is idempotent", () => {
   clearQueueForTests();
-  enqueue({ socketId: "socket-a", username: "Ada", queuedAt: Date.now() });
+  enqueue({ socketId: "socket-a", username: "Ada", queuedAt: Date.now(), supportsCoding: true });
   assert.equal(dequeue("socket-a"), true);
   assert.equal(dequeue("socket-a"), false);
   clearQueueForTests();
@@ -27,7 +28,7 @@ test("queue entries expire after five minutes", (t) => {
   t.mock.timers.enable({ apis: ["Date", "setTimeout"], now: 0 });
   clearQueueForTests();
   let expired = false;
-  enqueue({ socketId: "socket-a", username: "Ada", queuedAt: 0 }, () => {
+  enqueue({ socketId: "socket-a", username: "Ada", queuedAt: 0, supportsCoding: true }, () => {
     expired = true;
   });
   t.mock.timers.tick(299_999);
@@ -42,24 +43,25 @@ test("queue entries expire after five minutes", (t) => {
 test("queue reattachment preserves the original position and deadline", () => {
   clearQueueForTests();
   const queuedAt = Date.now();
-  const first = enqueue({ socketId: "socket-a", username: "Ada", queuedAt });
+  const first = enqueue({ socketId: "socket-a", username: "Ada", queuedAt, supportsCoding: true });
   assert.equal(first.status, "waiting");
   if (first.status !== "waiting") return;
   assert.equal(suspend("socket-a"), true);
-  const second = enqueue({ socketId: "socket-b", username: "Grace", queuedAt: queuedAt + 1 });
+  const second = enqueue({ socketId: "socket-b", username: "Grace", queuedAt: queuedAt + 1, supportsCoding: true });
   assert.equal(second.status, "waiting");
   assert.equal(queuePosition("socket-b"), 2);
   const reattached = enqueue({
     socketId: "socket-a-new",
     username: "Ada",
     queuedAt: Date.now(),
+    supportsCoding: true,
     queueToken: first.queueToken,
   });
   assert.equal(reattached.status, "waiting");
   if (reattached.status !== "waiting") return;
   assert.equal(reattached.expiresAt, first.expiresAt);
   assert.equal(queuePosition("socket-a-new"), 1);
-  const third = enqueue({ socketId: "socket-c", username: "Lin", queuedAt: Date.now() });
+  const third = enqueue({ socketId: "socket-c", username: "Lin", queuedAt: Date.now(), supportsCoding: true });
   assert.equal(third.status, "matched");
   if (third.status === "matched") assert.equal(third.opponent.username, "Ada");
   clearQueueForTests();
@@ -68,7 +70,7 @@ test("queue reattachment preserves the original position and deadline", () => {
 test("expired queue tokens cannot start a new wait", (t) => {
   t.mock.timers.enable({ apis: ["Date", "setTimeout"], now: 0 });
   clearQueueForTests();
-  const first = enqueue({ socketId: "socket-a", username: "Ada", queuedAt: 0 });
+  const first = enqueue({ socketId: "socket-a", username: "Ada", queuedAt: 0, supportsCoding: true });
   assert.equal(first.status, "waiting");
   if (first.status !== "waiting") return;
   t.mock.timers.tick(300_000);
@@ -76,6 +78,7 @@ test("expired queue tokens cannot start a new wait", (t) => {
     socketId: "socket-a-new",
     username: "Ada",
     queuedAt: Date.now(),
+    supportsCoding: true,
     queueToken: first.queueToken,
   });
   assert.equal(retry.status, "expired");

@@ -2,7 +2,7 @@ import type { CodingProblem } from "./domain.js";
 
 /** Original, deterministic browser-practice fixtures. The harness is compiled with the student's function. */
 const C_PREFIX =
-  "#include <stddef.h>\n#include <stdio.h>\n#include <limits.h>\n\n/* Reviewed fixtures may define these tags in their harness after the locked prototype. */\nstruct Node;\nstruct TreeNode;\n";
+  "#include <stddef.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <limits.h>\n\n/* Reviewed fixtures may define these tags in their harness after the locked prototype. */\nstruct Node;\nstruct TreeNode;\n";
 
 const problem = (value: Omit<CodingProblem, "prefix">): CodingProblem => ({ ...value, prefix: C_PREFIX });
 
@@ -535,6 +535,58 @@ int main(void) {
     testHarness: `int main(void) {
   printf("FEA_TEST|1|leading zero|%s\\n", parse_decimal("0042") == 42u ? "PASS" : "FAIL");
   printf("FEA_TEST|2|single digit|%s\\n", parse_decimal("7") == 7u ? "PASS" : "FAIL"); return 0;
+}`,
+  }),
+  problem({
+    id: "c-triangular-sum",
+    title: "Allocate a triangular sum",
+    description:
+      "Given a non-empty base array, allocate and return a triangular sum. Row zero must copy base, and every later row contains adjacent sums from the row above. Allocate only the outer pointer array and the exact number of integers required by each row.",
+    functionSignature: "int **triangular_sum(const int base[], size_t length)",
+    starterCode:
+      "int **rows = malloc(sizeof(*rows) * length);\nfor (size_t row = 0; row < length; row++) {\n  size_t width = length - row;\n  rows[row] = malloc(sizeof(*rows[row]) * width);\n}\nfor (size_t i = 0; i < length; i++) rows[0][i] = base[i];\nfor (size_t row = 1; row < length; row++) {\n  for (size_t i = 0; i < length - row; i++) {\n    rows[row][i] = rows[row - 1][i] + rows[row - 1][i + 1];\n  }\n}\nreturn rows;",
+    testHarness: `static int rows_match(int **rows, size_t length) {
+  const int expected[4][4] = {
+    {1, 3, 2, 4},
+    {4, 5, 6, 0},
+    {9, 11, 0, 0},
+    {20, 0, 0, 0}
+  };
+  for (size_t row = 0; row < length; row++)
+    for (size_t i = 0; i < length - row; i++)
+      if (rows[row][i] != expected[row][i]) return 0;
+  return 1;
+}
+static void release_rows(int **rows, size_t length) {
+  if (rows == NULL) return;
+  for (size_t row = 0; row < length; row++) free(rows[row]);
+  free(rows);
+}
+static size_t allocation_count = 0;
+static size_t allocation_bytes = 0;
+static void *tracked_malloc(size_t bytes) {
+  allocation_count++;
+  allocation_bytes += bytes;
+  return malloc(bytes);
+}
+#define malloc tracked_malloc
+int main(void) {
+  const int base[] = {1, 3, 2, 4};
+  int **rows = triangular_sum(base, 4);
+  size_t first_allocations = allocation_count;
+  size_t first_bytes = allocation_bytes;
+  allocation_count = 0;
+  allocation_bytes = 0;
+  int one_value[] = {7};
+  int **one = triangular_sum(one_value, 1);
+  size_t second_allocations = allocation_count;
+  size_t second_bytes = allocation_bytes;
+  size_t expected_first_bytes = sizeof(*rows) * 4 + sizeof(*rows[0]) * 10;
+  printf("FEA_TEST|1|four-row exact triangle|%s\\n", rows != NULL && rows_match(rows, 4) && first_allocations == 5 && first_bytes == expected_first_bytes ? "PASS" : "FAIL");
+  printf("FEA_TEST|2|single exact allocation|%s\\n", one != NULL && one[0][0] == 7 && second_allocations == 2 && second_bytes == sizeof(*one) + sizeof(*one[0]) ? "PASS" : "FAIL");
+  release_rows(rows, 4);
+  release_rows(one, 1);
+  return 0;
 }`,
   }),
 ];

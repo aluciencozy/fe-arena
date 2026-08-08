@@ -16,8 +16,11 @@ import {
 } from "lucide-react";
 import AuthPanel from "@/components/AuthPanel";
 import { AppSettings } from "@/components/AppSettings";
+import { attachAsyncCompletion } from "@/lib/async-completion";
 import { Select } from "@/components/ui/select";
 import { isPrivateCreateResponseForActiveRequest } from "@/lib/private-create";
+import { CODING_CAPABILITY_MESSAGE, isCodingCapabilityAvailable } from "@/lib/coding-capability";
+import { prewarmCWorker } from "@/lib/c-runner";
 import { connectSocket, socket, socketUrl } from "@/lib/socket";
 import { socketConnectionErrorMessage, socketDisconnectedMessage } from "@/lib/socket-errors";
 import { useGameStore } from "@/store/gameStore";
@@ -66,6 +69,7 @@ export default function Home() {
   const activePrivateCreate = useRef<ActivePrivateCreate | null>(null);
   const privateCreateAttempt = useRef(0);
   const privateAckTimer = useRef<number | null>(null);
+  const queuePrewarmCleanup = useRef<(() => void) | null>(null);
   const validName = name.trim().length > 0;
   const closeTopicDialog = useCallback(() => setView("home"), []);
   const clearPrivateAckTimer = useCallback(() => {
@@ -73,6 +77,18 @@ export default function Home() {
       window.clearTimeout(privateAckTimer.current);
       privateAckTimer.current = null;
     }
+  }, []);
+  const runQueuePrewarm = useCallback((onReady: () => void, onError: (error: unknown) => void) => {
+    queuePrewarmCleanup.current?.();
+    queuePrewarmCleanup.current = attachAsyncCompletion(prewarmCWorker(), onReady, onError);
+  }, []);
+  const cancelQueueAdmission = useCallback(() => {
+    queuePrewarmCleanup.current?.();
+    queuePrewarmCleanup.current = null;
+    const wasQueued = Boolean(queuedName.current);
+    queuedName.current = null;
+    queueToken.current = null;
+    if (wasQueued && socket.connected) socket.emit("queue:leave");
   }, []);
   const emitPrivateCreate = useCallback(
     (request: PrivateCreateRequest) => {
@@ -157,13 +173,27 @@ export default function Home() {
     const onConnect = () => {
       setConnection("connected");
       if (pendingPrivateCreate.current) emitPrivateCreate(pendingPrivateCreate.current);
-      if (queuedName.current)
-        socket.emit(
-          "queue:join",
-          queueToken.current
-            ? { username: queuedName.current, queueToken: queueToken.current }
-            : { username: queuedName.current },
+      if (queuedName.current) {
+        runQueuePrewarm(
+          () => {
+            if (!queuedName.current || !socket.connected) return;
+            setBusy(false);
+            socket.emit(
+              "queue:join",
+              queueToken.current
+                ? { username: queuedName.current, queueToken: queueToken.current, supportsCoding: true }
+                : { username: queuedName.current, supportsCoding: true },
+            );
+          },
+          (error) => {
+            setBusy(false);
+            setNotice({
+              kind: "error",
+              text: error instanceof Error ? error.message : "The browser C runner could not initialize.",
+            });
+          },
         );
+      }
     };
     const onDisconnect = () => {
       setConnection("disconnected");
@@ -206,6 +236,7 @@ export default function Home() {
     socket.on("server:error", failed);
     return () => {
       clearPrivateAckTimer();
+      cancelQueueAdmission();
       socket.off("room:created", created);
       socket.off("queue:seat", queueSeat);
       socket.off("queue:state", waiting);
@@ -214,7 +245,7 @@ export default function Home() {
       socket.off("connect_error", onConnectError);
       socket.off("server:error", failed);
     };
-  }, [clearPrivateAckTimer, emitPrivateCreate, navigate]);
+  }, [cancelQueueAdmission, clearPrivateAckTimer, emitPrivateCreate, navigate, runQueuePrewarm]);
   useEffect(() => {
     if (view !== "queue") return;
     const id = window.setInterval(() => setNow(Date.now()), 500);
@@ -262,22 +293,58 @@ export default function Home() {
   };
   const joinQueue = () => {
     if (!begin()) return;
-    queuedName.current = name.trim();
-    queueToken.current = null;
-    if (socket.connected) socket.emit("queue:join", { username: queuedName.current });
-    setView("queue");
+    if (!isCodingCapabilityAvailable()) {
+      setNotice({ kind: "error", text: CODING_CAPABILITY_MESSAGE });
+      return;
+    }
+    setBusy(true);
+    setNotice({ kind: "info", text: "Preparing the browser C runner before joining the public queue…" });
+    runQueuePrewarm(
+      () => {
+        queuedName.current = name.trim();
+        queueToken.current = null;
+        setBusy(false);
+        setNotice(null);
+        if (socket.connected) socket.emit("queue:join", { username: queuedName.current, supportsCoding: true });
+        setView("queue");
+      },
+      (error) => {
+        setBusy(false);
+        setNotice({
+          kind: "error",
+          text: error instanceof Error ? error.message : "The browser C runner could not initialize.",
+        });
+      },
+    );
   };
   const retryQueue = () => {
     if (!queuedName.current) return;
+    if (!isCodingCapabilityAvailable()) {
+      setNotice({ kind: "error", text: CODING_CAPABILITY_MESSAGE });
+      return;
+    }
     setNotice(null);
+    setBusy(true);
     setConnection("connecting");
     connectSocket();
-    if (socket.connected) socket.emit("queue:join", { username: queuedName.current });
+    if (!socket.connected) return;
+    runQueuePrewarm(
+      () => {
+        if (!queuedName.current || !socket.connected) return;
+        setBusy(false);
+        socket.emit("queue:join", { username: queuedName.current, supportsCoding: true });
+      },
+      (error) => {
+        setBusy(false);
+        setNotice({
+          kind: "error",
+          text: error instanceof Error ? error.message : "The browser C runner could not initialize.",
+        });
+      },
+    );
   };
   const leaveQueue = () => {
-    queuedName.current = null;
-    queueToken.current = null;
-    socket.emit("queue:leave");
+    cancelQueueAdmission();
     setView("home");
     setQueueExpiresAt(null);
   };
@@ -335,6 +402,7 @@ export default function Home() {
               <button
                 className="button button-primary"
                 onClick={joinQueue}
+                disabled={busy}
                 aria-describedby={!validName ? "public-queue-validation" : undefined}
               >
                 <Radio size={16} /> public queue <ArrowRight size={16} />

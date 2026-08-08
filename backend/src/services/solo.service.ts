@@ -3,6 +3,7 @@ import {
   gradeQuestion,
   PUBLIC_QUESTION_SECONDS,
   TOPICS,
+  CodingRunResultSchema,
   emptyTopicPerformance,
   QuestionAttemptSchema,
   type TopicPerformance,
@@ -120,13 +121,24 @@ export const startSolo = (
   count: number,
   timerSeconds: number,
   emit: (state: SoloState) => void,
+  supportsCoding = true,
 ) => {
+  if (!supportsCoding)
+    return {
+      ok: false as const,
+      error: "Solo practice includes browser C rounds. Enable cross-origin isolation and warm the C runner first.",
+    };
   const config: MatchConfig = {
     topicIds,
     roundCount: Math.min(5, Math.max(1, count)),
     questionTimerSeconds: Math.min(PUBLIC_QUESTION_SECONDS, Math.max(30, timerSeconds)),
   };
-  const questions = questionRepository.select(`solo:${sessionId}:${Date.now()}`, config.roundCount, config.topicIds);
+  const questions = questionRepository.select(
+    `solo:${sessionId}:${Date.now()}`,
+    config.roundCount,
+    config.topicIds,
+    true,
+  );
   if (questions.length !== config.roundCount)
     return { ok: false as const, error: "There are not enough reviewed questions for that topic selection." };
   clearSolo(sessionId);
@@ -141,11 +153,37 @@ export const startSolo = (
   sendQuestion(record, emit);
   return { ok: true as const };
 };
+export const soloCodingComplete = (
+  sessionId: string,
+  result: unknown,
+  emit: (state: SoloState) => void,
+) => {
+  const record = sessions.get(sessionId);
+  const question = record && questionRepository.get(record.ids[record.index] ?? "");
+  if (!record || !question || question.type !== "coding" || record.state.phase !== "QUESTION")
+    return { ok: false as const, error: "Coding results are not accepted right now." };
+  const parsed = CodingRunResultSchema.safeParse(result);
+  if (!parsed.success) return { ok: false as const, error: "That coding result is invalid." };
+  if (record.state.questionEndsAt !== null && record.state.questionEndsAt <= Date.now()) {
+    finishQuestion(record, emit, false);
+    return { ok: false as const, error: "Question time has expired." };
+  }
+  if (parsed.data.questionId !== question.id)
+    return { ok: false as const, error: "That coding question is no longer active." };
+  if (parsed.data.outcome !== "success")
+    return { ok: false as const, error: "That browser run did not complete. Retry the coding run." };
+  const elapsedMs = Math.max(0, Date.now() - (record.state.questionStartedAt ?? Date.now()));
+  const score = calculateScore(parsed.data.passed, elapsedMs, record.timerSeconds * 1000);
+  finishQuestion(record, emit, parsed.data.passed, score);
+  return { ok: true as const, score };
+};
 export const soloSubmit = (sessionId: string, attempt: QuestionAttempt, emit: (state: SoloState) => void) => {
   const record = sessions.get(sessionId);
   const question = record && questionRepository.get(record.ids[record.index] ?? "");
   if (!record || !question || record.state.phase !== "QUESTION")
     return { ok: false as const, error: "Solo practice is not accepting an answer." };
+  if (question.type === "coding")
+    return { ok: false as const, error: "Use the browser coding runner for this question." };
   const parsed = QuestionAttemptSchema.safeParse(attempt);
   if (!parsed.success || parsed.data.questionId !== question.id)
     return { ok: false as const, error: "That answer does not match the active question." };

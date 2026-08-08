@@ -638,6 +638,8 @@ export const submitAnswer = (roomId: string, seatId: string, attempt: QuestionAt
     return { ok: false as const, error: "Answers are not being accepted right now." };
   const submission = record.state.submissions[seatId];
   if (!submission) return { ok: false as const, error: "You are not seated in this match." };
+  if (question.type === "coding")
+    return { ok: false as const, error: "Use the browser coding runner for this question." };
   if (record.state.questionEndsAt !== null && record.state.questionEndsAt <= Date.now()) {
     revealRound(roomId, events);
     return { ok: false as const, error: "Question time has expired." };

@@ -96,6 +96,26 @@ test("Socket.IO packet middleware enforces event-specific limits", async () => {
   }
 });
 
+test("Socket.IO packet middleware limits solo coding completions like match completions", async () => {
+  const { runtime, base } = await start(false);
+  try {
+    const session = await openPolling(base, "http://localhost:5173");
+    await connectNamespace(base, session);
+    const result = {
+      questionId: "q-c-triangular-sum",
+      passed: false,
+      tests: [],
+      outcome: "timeout",
+    };
+    for (let index = 0; index < 13; index += 1) {
+      await postPacket(base, session, `42${JSON.stringify(["solo:coding-complete", result])}`);
+    }
+    assert.match(await pollPacket(base, session), /SOCKET_RATE_LIMIT/);
+  } finally {
+    await closeRuntime(runtime);
+  }
+});
+
 test("disconnecting a Socket.IO guest clears its non-resumable solo session", async () => {
   clearSoloForTests();
   const { runtime, base } = await start(false);
@@ -105,7 +125,7 @@ test("disconnecting a Socket.IO guest clears its non-resumable solo session", as
     await postPacket(
       base,
       session,
-      `42${JSON.stringify(["solo:start", { topicIds: ["stacks"], count: 1, timerSeconds: 30 }])}`,
+      `42${JSON.stringify(["solo:start", { topicIds: ["stacks"], count: 1, timerSeconds: 30, supportsCoding: true }])}`,
     );
     assert.equal(soloSessionCountForTests(), 1);
     await postPacket(base, session, "41");

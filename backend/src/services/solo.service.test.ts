@@ -4,6 +4,7 @@ import { QUESTION_BANK } from "../data/questions.js";
 import {
   clearSolo,
   clearSoloForTests,
+  soloCodingComplete,
   soloNext,
   soloSessionCountForTests,
   soloSubmit,
@@ -90,6 +91,49 @@ test("clearing a disconnected solo session makes reconnect non-resumable", () =>
     clearSolo("solo-disconnect");
     assert.equal(soloSessionCountForTests(), 0);
     assert.equal(soloSubmit("solo-disconnect", { questionId: question.id, answer: "late" }, () => undefined).ok, false);
+  } finally {
+    setQuestionRepository(inMemoryQuestionRepository);
+    clearSoloForTests();
+  }
+});
+
+test("solo coding results stay retryable until a completed browser run arrives", () => {
+  clearSoloForTests();
+  const question = QUESTION_BANK.find((candidate) => candidate.published !== false && candidate.type === "coding");
+  assert.ok(question);
+  setQuestionRepository(fixedQuestionRepository(question));
+  try {
+    const states: SoloState[] = [];
+    assert.equal(startSolo("solo-coding", ["arrays-memory"], 1, 30, (state) => states.push(state)).ok, true);
+    assert.equal(
+      soloCodingComplete(
+        "solo-coding",
+        {
+          questionId: question.id,
+          passed: false,
+          tests: [],
+          outcome: "compile-error",
+        },
+        (state) => states.push(state),
+      ).ok,
+      false,
+    );
+    assert.equal(states.at(-1)?.phase, "QUESTION");
+    assert.equal(
+      soloCodingComplete(
+        "solo-coding",
+        {
+          questionId: question.id,
+          passed: true,
+          tests: [{ index: 1, name: "reviewed case", passed: true }],
+          outcome: "success",
+        },
+        (state) => states.push(state),
+      ).ok,
+      true,
+    );
+    assert.equal(states.at(-1)?.phase, "RESULT");
+    assert.equal(states.at(-1)?.result?.correct, true);
   } finally {
     setQuestionRepository(inMemoryQuestionRepository);
     clearSoloForTests();

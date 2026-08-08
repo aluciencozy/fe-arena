@@ -28,7 +28,7 @@ test("health and readiness expose state without configuration details", async ()
     assert.deepEqual(await readiness.json(), {
       status: "not_ready",
       liveness: { status: "ok" },
-      questionBank: { status: "ready", mode: "in-memory-fallback", publishedQuestions: 186 },
+      questionBank: { status: "ready", mode: "in-memory-fallback", publishedQuestions: 187 },
       persistence: { status: "fallback", configured: false, guestGameplay: true, outbox: "not-configured" },
     });
   } finally {

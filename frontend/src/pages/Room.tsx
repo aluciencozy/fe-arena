@@ -21,9 +21,11 @@ import {
 import { useArenaSocket } from "@/hooks/useSocket";
 import { useGameStore } from "@/store/gameStore";
 import { CRunnerProgress } from "@/components/CRunnerProgress";
+import { QuestionPrompt } from "@/components/QuestionPrompt";
 import { Select } from "@/components/ui/select";
 import { DeadlineTimer } from "@/components/DeadlineTimer";
 import { copyTextWithFallback } from "@/lib/clipboard";
+import { CODING_CAPABILITY_MESSAGE, isCodingCapabilityAvailable } from "@/lib/coding-capability";
 import { graphEdgePoints, graphTextAlternative } from "@/lib/graph";
 import { attachRoomAsyncCompletion, isActiveRoomAsyncContext, type RoomAsyncContext } from "@/lib/room-async";
 import {
@@ -101,10 +103,10 @@ export default function Room() {
   const [codingReadyAttempts, setCodingReadyAttempts] = useState(0);
   const [copied, setCopied] = useState(false);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
-  const capabilityReady = typeof window !== "undefined" && window.crossOriginIsolated;
+  const capabilityReady = isCodingCapabilityAvailable();
   const codingEnvironmentError = capabilityReady
     ? ""
-    : "Coding rounds need a cross-origin isolated Chromium tab. Use a supported Chromium-based browser, keep the site's COOP/COEP headers enabled, then reload the room.";
+    : CODING_CAPABILITY_MESSAGE;
   const activeRoomContextRef = useRef<RoomAsyncContext>({
     roomId,
     seatId,
@@ -607,7 +609,7 @@ const CodingQuestionStage = ({
 }) => {
   const question = match.question;
   const problem = question?.type === "coding" ? question.problem : undefined;
-  const capabilityReady = typeof window !== "undefined" && window.crossOriginIsolated;
+  const capabilityReady = isCodingCapabilityAvailable();
   const [code, setCode] = useState(problem?.starterCode ?? "");
   const [outcome, setOutcome] = useState<CExecutionOutcome | null>(null);
   const [runPending, setRunPending] = useState(false);
@@ -692,8 +694,7 @@ const CodingQuestionStage = ({
       </p>
       {!capabilityReady && (
         <div id="room-c-capability-help" className="notice-error mt-5" role="alert">
-          Browser C execution is unavailable in this tab. Use a supported Chromium-based browser with the site&apos;s
-          COOP/COEP headers enabled, then reload the room.
+          {CODING_CAPABILITY_MESSAGE}
         </div>
       )}
       <CRunnerProgress status={runnerStatus} error={runnerError} onRetry={run} retryLabel="retry tests" />
@@ -807,7 +808,7 @@ const QuestionStage = ({
       <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_18rem]">
         <article className="panel p-6 sm:p-9">
           <div className="flex items-start justify-between gap-5">
-            <h1 className="text-2xl font-semibold leading-snug sm:text-4xl">{question.prompt}</h1>
+            <QuestionPrompt className="text-2xl font-semibold leading-snug sm:text-4xl" prompt={question.prompt} />
             <span className="type-pill">{typeLabel(question.type)}</span>
           </div>
           <QuestionArtifact question={question} />
@@ -1212,7 +1213,7 @@ const Results = ({
             <summary className="flex cursor-pointer list-none items-center justify-between">
               <span>
                 <span className="eyebrow">round {round.round}</span>
-                <span className="ml-4 font-medium">{round.question.prompt}</span>
+                <QuestionPrompt as="span" className="ml-4 font-medium" prompt={round.question.prompt} />
               </span>
               <ChevronDown className="group-open:rotate-180" size={16} />
             </summary>
@@ -1398,4 +1399,5 @@ const typeLabel = (type: string) =>
     "code-output": "C trace",
     "ordered-sequence": "ordered sequence",
     graph: "graph reasoning",
+    coding: "browser coding",
   })[type] ?? type;

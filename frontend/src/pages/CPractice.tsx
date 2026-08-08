@@ -13,6 +13,7 @@ import {
 import { AppSettings } from "@/components/AppSettings";
 import { CRunnerProgress } from "@/components/CRunnerProgress";
 import { Select } from "@/components/ui/select";
+import { CODING_CAPABILITY_MESSAGE, isCodingCapabilityAvailable } from "@/lib/coding-capability";
 
 export default function CPractice() {
   const [problemId, setProblemId] = useState(CODING_PROBLEMS[0]!.id);
@@ -22,7 +23,7 @@ export default function CPractice() {
   const [running, setRunning] = useState(false);
   const [workerStatus, setWorkerStatus] = useState<CRunnerStatus>(() => getCPrewarmStatus());
   const [prewarmError, setPrewarmError] = useState("");
-  const capabilityReady = typeof window !== "undefined" && window.crossOriginIsolated;
+  const capabilityReady = isCodingCapabilityAvailable();
   const startPrewarm = useCallback(() => {
     if (!capabilityReady) return;
     setPrewarmError("");
@@ -85,7 +86,7 @@ export default function CPractice() {
               <p className="eyebrow text-gold">practice lab · temporary browser surface</p>
               <h1 className="display mt-3 text-5xl">FE Arena C practice</h1>
               <p className="mt-4 leading-7 text-muted">
-                Try reviewed C function bodies locally in Chromium. Code stays in this browser; the server never
+                Try reviewed C function bodies locally in this browser. Code stays in this browser; the server never
                 compiles or receives it.
               </p>
             </div>
@@ -112,10 +113,7 @@ export default function CPractice() {
             {!capabilityReady && (
               <div id="c-capability-help" className="notice-error mb-5" role="alert">
                 <CircleAlert size={16} className="shrink-0" />
-                <span>
-                  This lab needs a cross-origin isolated Chromium tab. Use a supported Chromium-based browser, enable
-                  the site&apos;s COOP/COEP headers, then reload the lab before running code.
-                </span>
+                <span>{CODING_CAPABILITY_MESSAGE} Reload the lab before running code.</span>
               </div>
             )}
             <CRunnerProgress status={workerStatus} error={prewarmError} onRetry={startPrewarm} />

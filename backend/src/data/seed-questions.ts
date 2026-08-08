@@ -16,4 +16,11 @@ const client = createClient(url, secretKey, {
 });
 const { error } = await client.from("question_bank").upsert(rows, { onConflict: "id" });
 if (error) throw new Error(`Question-bank seed failed: ${error.message}`);
-console.log(`Seeded ${rows.length} reviewed questions idempotently.`);
+const { data: retired, error: retirementError } = await client
+  .from("question_bank")
+  .update({ published: false, updated_at: new Date().toISOString() })
+  .eq("published", true)
+  .like("id", "q-fe-%")
+  .select("id");
+if (retirementError) throw new Error(`Legacy question retirement failed: ${retirementError.message}`);
+console.log(`Seeded ${rows.length} reviewed questions and retired ${retired?.length ?? 0} legacy rows idempotently.`);
