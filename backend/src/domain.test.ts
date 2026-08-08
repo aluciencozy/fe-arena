@@ -186,6 +186,10 @@ test("publication policy retains retired content but excludes it from play", () 
     false,
   );
   assert.ok(inMemoryQuestionRepository.list().every((question) => question.published !== false));
+  const stacks = inMemoryQuestionRepository.list(["stacks"]);
+  assert.ok(stacks.length > 0);
+  assert.ok(stacks.every((question) => question.published !== false && question.topicId === "stacks"));
+  assert.equal(selectSeededQuestions([retired], "retired-only", 1, [retired.topicId]).length, 0);
 });
 
 test("reviewed C traces match independent output oracles", () => {
@@ -267,7 +271,11 @@ test("seeded selection is deterministic, topic-filtered, and has no repeated que
     second.map((question) => question.id),
   );
   assert.equal(new Set(first.map((question) => question.id)).size, first.length);
-  assert.ok(first.every((question) => question.topicId === "stacks" || question.topicId === "queues"));
+  assert.ok(
+    first.every(
+      (question) => question.published !== false && (question.topicId === "stacks" || question.topicId === "queues"),
+    ),
+  );
   assert.equal(selectSeededQuestions(first, "replay-seed", first.length + 1).length, 0);
 });
 

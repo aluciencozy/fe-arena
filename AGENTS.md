@@ -12,6 +12,7 @@ Run from the matching package directory:
 - Frontend lint/build: `cd frontend && npm run lint && npm run build`
 - Backend dev: `cd backend && npm run dev`
 - Backend typecheck/tests: `cd backend && npm run typecheck && npm test`
+- Repository CI-equivalent gate: `npm run ci` (backend typecheck/tests, frontend lint/tests/build)
 
 Defaults are frontend `http://localhost:5173` and backend `http://localhost:3001`; see `frontend/.env.example` and `backend/.env.example`.
 

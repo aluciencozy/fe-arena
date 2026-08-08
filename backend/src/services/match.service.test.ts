@@ -333,7 +333,9 @@ test("rematches exclude every previously used question while fresh questions rem
   clearRoomsForTests();
   const coding = QUESTION_BANK.find((question) => question.type === "coding");
   const graph = QUESTION_BANK.find((question) => question.id === "q-graph-bfs");
-  const extra = QUESTION_BANK.find((question) => question.id === "q-tree-height");
+  const extra = QUESTION_BANK.find(
+    (question) => question.published !== false && question.topicId === graph?.topicId && question.id === "q-tree-level",
+  );
   assert.ok(coding && coding.type === "coding");
   assert.ok(graph && graph.type === "graph");
   assert.ok(extra);
@@ -443,7 +445,7 @@ test("rematch is two-sided, preserves results while pending, and selects a fresh
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
   clearMatchesForTests();
   clearRoomsForTests();
-  const eligible = QUESTION_BANK.filter((question) => question.topicId === "stacks");
+  const eligible = QUESTION_BANK.filter((question) => question.published !== false && question.topicId === "stacks");
   const first = eligible[0];
   const second = eligible[1];
   assert.ok(first && second);

@@ -6,7 +6,6 @@ import {
   Check,
   ChevronDown,
   CircleHelp,
-  Clock3,
   Copy,
   LogOut,
   MessageCircle,
@@ -22,7 +21,9 @@ import {
 import { useArenaSocket } from "@/hooks/useSocket";
 import { useGameStore } from "@/store/gameStore";
 import { Select } from "@/components/ui/select";
-import { graphEdgePoints } from "@/lib/graph";
+import { DeadlineTimer } from "@/components/DeadlineTimer";
+import { copyTextWithFallback } from "@/lib/clipboard";
+import { graphEdgePoints, graphTextAlternative } from "@/lib/graph";
 import { prewarmCWorker, runCInWorker, type CExecutionOutcome, type CTestResult } from "@/lib/c-runner";
 import {
   canConfigureMatch,
@@ -86,7 +87,7 @@ export default function Room() {
   const codingReadyAttempted = useRef(false);
   const [codingReadyAttempts, setCodingReadyAttempts] = useState(0);
   const [copied, setCopied] = useState(false);
-  const [now, setNow] = useState(() => Date.now());
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
   const codingEnvironmentError = window.crossOriginIsolated
     ? ""
     : "Coding rounds require a cross-origin isolated Chromium tab.";
@@ -105,10 +106,6 @@ export default function Room() {
   useEffect(() => {
     if (!name || !roomId) navigate("/", { replace: true });
   }, [name, navigate, roomId]);
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 250);
-    return () => window.clearInterval(id);
-  }, []);
   useEffect(() => {
     if (!match?.config.includeCoding) {
       codingReadyAttempted.current = false;
@@ -159,12 +156,6 @@ export default function Room() {
       ? canConfigureMatch(room.metadata.source, room.metadata.hostSeatId, seatId)
       : false;
   const isSubmitted = seatId ? Boolean(match?.submissions[seatId]?.submitted) : false;
-  const seconds =
-    match?.phase === "COUNTDOWN"
-      ? Math.max(0, Math.ceil(((match.countdownEndsAt ?? now) - now) / 1000))
-      : match?.questionEndsAt
-        ? Math.max(0, Math.ceil((match.questionEndsAt - now) / 1000))
-        : null;
   const configure = () => {
     if (selectedTopics.length) {
       api.configure({ topicIds: selectedTopics, roundCount: 5, questionTimerSeconds: timer, includeCoding });
@@ -191,13 +182,13 @@ export default function Room() {
     setChatText("");
   };
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(roomId);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
-    } catch {
-      /* clipboard is optional */
-    }
+    const copiedSuccessfully = await copyTextWithFallback(roomId);
+    setCopyStatus(copiedSuccessfully ? "copied" : "failed");
+    setCopied(copiedSuccessfully);
+    window.setTimeout(() => {
+      setCopied(false);
+      setCopyStatus("idle");
+    }, 1600);
   };
   const submit = () => {
     if (!match?.question || isSubmitted || match.phase !== "QUESTION") return;
@@ -226,10 +217,13 @@ export default function Room() {
               {self?.name ?? name} <span className="text-line">vs</span> {opponent?.name ?? "open seat"}
             </p>
           </div>
-          <button className="code-pill" onClick={copy}>
+          <button className="code-pill" type="button" onClick={copy} aria-label={`Copy room code ${roomId}`}>
             <span>{roomId}</span>
             {copied ? <Check size={14} /> : <Copy size={14} />}
           </button>
+          <span className="sr-only" role="status" aria-live="polite">
+            {copyStatus === "copied" ? "Room code copied." : copyStatus === "failed" ? "Could not copy room code." : ""}
+          </span>
           <button
             className="icon-button relative"
             onClick={() => setChatOpen((open) => !open)}
@@ -290,16 +284,17 @@ export default function Room() {
             setIncludeCoding={setIncludeCoding}
             onConfigure={configure}
             onReady={api.ready}
+            copyRoom={copy}
+            copyStatus={copyStatus}
           />
         ) : match.phase === "COUNTDOWN" ? (
-          <Countdown seconds={seconds ?? 3} round={match.roundIndex + 1} />
+          <Countdown deadline={match.countdownEndsAt} round={match.roundIndex + 1} />
         ) : match.phase === "QUESTION" ? (
           match.question?.type === "coding" ? (
             <CodingQuestionStage
               key={match.question.id}
               match={match}
               seatId={seatId}
-              now={now}
               onProgress={api.codingProgress}
               onComplete={api.codingComplete}
             />
@@ -308,7 +303,7 @@ export default function Room() {
               match={match}
               seatId={seatId}
               opponent={opponent?.name}
-              seconds={seconds}
+              deadline={match.questionEndsAt}
               answer={answer}
               setAnswer={setAnswer}
               ordered={ordered}
@@ -321,13 +316,12 @@ export default function Room() {
           <Reveal
             match={match}
             seatId={seatId}
-            now={now}
             selfName={self?.name ?? name}
             opponentName={opponent?.name ?? "opponent"}
             onSkip={api.skipReveal}
           />
         ) : match.phase === "PAUSED" ? (
-          <Paused pause={match.pause} now={now} />
+          <Paused pause={match.pause} />
         ) : (
           <Results
             match={match}
@@ -368,6 +362,8 @@ const Lobby = ({
   setIncludeCoding,
   onConfigure,
   onReady,
+  copyRoom,
+  copyStatus,
 }: {
   match: MatchPublicState;
   seatId: string | null;
@@ -384,6 +380,8 @@ const Lobby = ({
   setIncludeCoding: (include: boolean) => void;
   onConfigure: () => void;
   onReady: () => void;
+  copyRoom: () => void;
+  copyStatus: "idle" | "copied" | "failed";
 }) => (
   <section className="mx-auto max-w-5xl py-6 sm:py-14">
     <div className="text-center">
@@ -392,9 +390,17 @@ const Lobby = ({
       <p className="mx-auto mt-4 max-w-lg text-muted">
         Both guests ready up when the pool and timer feel right. Five rounds. One server clock.
       </p>
-      <button className="code-pill mx-auto mt-6" onClick={() => navigator.clipboard.writeText(match.roomId)}>
+      <button
+        className="code-pill mx-auto mt-6"
+        type="button"
+        onClick={copyRoom}
+        aria-label={`Copy room code ${match.roomId}`}
+      >
         {match.roomId} <Copy size={14} />
       </button>
+      <p className="sr-only" role="status" aria-live="polite">
+        {copyStatus === "copied" ? "Room code copied." : copyStatus === "failed" ? "Could not copy room code." : ""}
+      </p>
     </div>
     <div className="mt-10 grid gap-4 sm:grid-cols-2">
       <SeatCard label="you" name={self} ready={Boolean(seatId && match.ready[seatId])} />
@@ -426,7 +432,9 @@ const Lobby = ({
               {TOPICS.map((topic) => (
                 <button
                   key={topic.id}
+                  type="button"
                   className={`topic-chip ${selectedTopics.includes(topic.id) ? "topic-chip-active" : ""}`}
+                  aria-pressed={selectedTopics.includes(topic.id)}
                   onClick={() =>
                     setSelectedTopics(
                       selectedTopics.includes(topic.id)
@@ -489,10 +497,10 @@ const SeatCard = ({ label, name, ready, empty }: { label: string; name: string; 
   </article>
 );
 
-const Countdown = ({ seconds, round }: { seconds: number; round: number }) => (
+const Countdown = ({ deadline, round }: { deadline: number | null; round: number }) => (
   <section className="mx-auto flex min-h-[65vh] max-w-xl flex-col items-center justify-center text-center">
     <p className="eyebrow text-gold">round {round} of 5</p>
-    <p className="display mt-4 text-[9rem] leading-none text-gold">{seconds}</p>
+    <DeadlineTimer deadline={deadline} urgentAfter={0} className="display mt-4 text-[9rem] leading-none text-gold" />
     <p className="mt-5 text-muted">Get your scratch paper ready. The next prompt is coming.</p>
   </section>
 );
@@ -500,13 +508,11 @@ const Countdown = ({ seconds, round }: { seconds: number; round: number }) => (
 const CodingQuestionStage = ({
   match,
   seatId,
-  now,
   onProgress,
   onComplete,
 }: {
   match: MatchPublicState;
   seatId: string | null;
-  now: number;
   onProgress: (status: "compiling" | "running") => void;
   onComplete: (result: {
     questionId: string;
@@ -558,10 +564,7 @@ const CodingQuestionStage = ({
           <p className="eyebrow text-gold">coding round · browser worker</p>
           <h1 className="display mt-3 text-5xl">run the solution.</h1>
         </div>
-        <div className="timer">
-          <Clock3 size={16} />
-          {match.questionEndsAt ? Math.max(0, Math.ceil((match.questionEndsAt - now) / 1000)) : 0}s
-        </div>
+        <DeadlineTimer deadline={match.questionEndsAt} />
       </div>
       <p className="mt-4 max-w-2xl text-muted">
         {problem.description} The server receives only typed progress and test results, never source code.
@@ -627,7 +630,7 @@ const QuestionStage = ({
   match,
   seatId,
   opponent,
-  seconds,
+  deadline,
   answer,
   setAnswer,
   ordered,
@@ -638,7 +641,7 @@ const QuestionStage = ({
   match: MatchPublicState;
   seatId: string | null;
   opponent?: string;
-  seconds: number | null;
+  deadline: number | null;
   answer: string | number | boolean | string[];
   setAnswer: (answer: string | number | boolean | string[]) => void;
   ordered: string[];
@@ -661,10 +664,7 @@ const QuestionStage = ({
             {topicName(question.topicId)} · {question.difficulty}
           </p>
         </div>
-        <div className={`timer ${seconds !== null && seconds <= 10 ? "timer-hot" : ""}`}>
-          <Clock3 size={16} />
-          {seconds ?? "--"}s
-        </div>
+        <DeadlineTimer deadline={deadline} />
       </div>
       <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_18rem]">
         <article className="panel p-6 sm:p-9">
@@ -684,6 +684,7 @@ const QuestionStage = ({
           <button
             className="button button-primary mt-8 w-full"
             disabled={submitted || !hasAnswer(question, answer, ordered)}
+            aria-label={submitted ? "Answer locked" : "Submit answer"}
             onClick={submit}
           >
             {submitted ? (
@@ -853,11 +854,15 @@ const QuestionArtifact = ({ question }: { question: PublicQuestion }) => {
   const positions = new Map(question.graph.nodes.map((node) => [node.id, node]));
   return (
     <div className="graph-card mt-8">
+      <p id={`graph-description-${question.id}`} className="sr-only">
+        {graphTextAlternative(question.graph)} Question: {graphQueryLabel(question)}.
+      </p>
       <svg
         className="graph-svg"
         viewBox="0 0 100 100"
         role="img"
-        aria-label={`${question.graph.directed ? "Directed" : "Undirected"} graph diagram`}
+        aria-label={`${question.graph.directed ? "Directed" : "Undirected"} graph diagram for ${graphQueryLabel(question)}`}
+        aria-describedby={`graph-description-${question.id}`}
       >
         <defs>
           <marker id={`arrow-${question.id}`} markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
@@ -924,21 +929,18 @@ const MiniScore = ({
 const Reveal = ({
   match,
   seatId,
-  now,
   selfName,
   opponentName,
   onSkip,
 }: {
   match: MatchPublicState;
   seatId: string | null;
-  now: number;
   selfName: string;
   opponentName: string;
   onSkip: () => void;
 }) => {
   const question = match.revealedQuestion;
   const skipped = Boolean(seatId && match.revealSkips[seatId]);
-  const seconds = Math.max(0, Math.ceil(((match.revealEndsAt ?? now) - now) / 1000));
   return (
     <section className="mx-auto max-w-3xl py-6 sm:py-12">
       <div className="flex items-center justify-between">
@@ -946,10 +948,7 @@ const Reveal = ({
           <p className="eyebrow text-gold">round reveal · {match.history.at(-1)?.round ?? match.roundIndex + 1}</p>
           <h1 className="display mt-3 text-5xl">review the reasoning.</h1>
         </div>
-        <div className="timer">
-          <Clock3 size={16} />
-          {seconds}s
-        </div>
+        <DeadlineTimer deadline={match.revealEndsAt} />
       </div>
       <div className="panel mt-8 p-7 text-left">
         <p className="eyebrow">correct answer</p>
@@ -1006,15 +1005,13 @@ const Reveal = ({
   );
 };
 
-const Paused = ({ pause, now }: { pause: MatchPublicState["pause"]; now: number }) => (
+const Paused = ({ pause }: { pause: MatchPublicState["pause"] }) => (
   <section className="mx-auto flex min-h-[65vh] max-w-xl flex-col items-center justify-center text-center">
     <WifiOff className="text-gold" size={34} />
     <p className="eyebrow mt-6 text-gold">match paused</p>
     <h1 className="display mt-3 text-4xl">waiting for {pause?.seatName ?? "a guest"}</h1>
     <p className="mt-4 text-muted">Both players are paused. Timers resume only when the guest reconnects.</p>
-    <p className="mt-7 font-mono text-2xl text-gold">
-      {pause ? Math.max(0, Math.ceil((pause.expiresAt - now) / 1000)) : 0}s
-    </p>
+    <DeadlineTimer deadline={pause?.expiresAt ?? null} className="mt-7 font-mono text-2xl text-gold" />
   </section>
 );
 

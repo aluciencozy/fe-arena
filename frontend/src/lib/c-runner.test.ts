@@ -4,8 +4,10 @@ import { CODING_PROBLEMS } from "../../../shared/coding-problems";
 import {
   generateCSource,
   parseExecutionOutput,
+  getCWorkerStatus,
   prewarmCWorker,
   runCInWorker,
+  subscribeCWorkerStatus,
   type CExecutionOutcome,
 } from "./c-runner";
 
@@ -43,6 +45,8 @@ test("parses machine-readable test results while preserving student stdout", () 
 
 test("shares an in-flight prewarm and permits one retry after initialization failure", async () => {
   let workerCount = 0;
+  const statuses: string[] = [];
+  const unsubscribe = subscribeCWorkerStatus((status) => statuses.push(`${status.phase}:${status.state}`));
   const createWorker = () => {
     workerCount += 1;
     const worker = {
@@ -52,7 +56,12 @@ test("shares an in-flight prewarm and permits one retry after initialization fai
         if (workerCount === 1) {
           setTimeout(() => worker.onerror?.({ message: "transient startup failure" } as ErrorEvent), 0);
         } else {
-          setTimeout(() => worker.onmessage?.({ data: { kind: "ready" } }), 0);
+          setTimeout(() => {
+            worker.onmessage?.({ data: { kind: "progress", phase: "sdk" } } as MessageEvent);
+            worker.onmessage?.({ data: { kind: "progress", phase: "runtime" } } as MessageEvent);
+            worker.onmessage?.({ data: { kind: "progress", phase: "compiler" } } as MessageEvent);
+            worker.onmessage?.({ data: { kind: "ready" } } as MessageEvent);
+          }, 0);
         }
       },
       terminate: () => undefined,
@@ -65,7 +74,13 @@ test("shares an in-flight prewarm and permits one retry after initialization fai
   const second = prewarmCWorker({ createWorker });
   assert.strictEqual(first, second);
   await Promise.all([first, second]);
+  unsubscribe();
   assert.equal(workerCount, 2);
+  assert.ok(statuses.includes("worker:loading"));
+  assert.ok(statuses.includes("sdk:loading"));
+  assert.ok(statuses.includes("runtime:loading"));
+  assert.ok(statuses.includes("compiler:loading"));
+  assert.equal(getCWorkerStatus().phase, "ready");
 });
 
 test("runs the curated sum fixture after compilation completes", async () => {

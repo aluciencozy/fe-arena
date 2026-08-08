@@ -1,9 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Editor from "@monaco-editor/react";
 import { ArrowLeft, Check, CircleAlert, Clock3, Code2, Play, RotateCcw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { CODING_PROBLEMS } from "../../../shared/coding-problems";
-import { prewarmCWorker, runCInWorker, type CExecutionOutcome } from "@/lib/c-runner";
+import {
+  getCWorkerStatus,
+  prewarmCWorker,
+  runCInWorker,
+  subscribeCWorkerStatus,
+  type CExecutionOutcome,
+  type CRunnerPhase,
+  type CRunnerStatus,
+} from "@/lib/c-runner";
 import { AppSettings } from "@/components/AppSettings";
 import { Select } from "@/components/ui/select";
 
@@ -13,12 +21,23 @@ export default function CPractice() {
   const [studentCode, setStudentCode] = useState(problem.starterCode);
   const [outcome, setOutcome] = useState<CExecutionOutcome | null>(null);
   const [running, setRunning] = useState(false);
+  const [workerStatus, setWorkerStatus] = useState<CRunnerStatus>(() => getCWorkerStatus());
+  const [prewarmError, setPrewarmError] = useState("");
+  const capabilityReady = typeof window !== "undefined" && window.crossOriginIsolated;
+  const startPrewarm = useCallback(() => {
+    if (!capabilityReady) return;
+    setPrewarmError("");
+    void prewarmCWorker().catch((error) => {
+      setPrewarmError(error instanceof Error ? error.message : "The browser C runner could not initialize.");
+    });
+  }, [capabilityReady]);
 
+  useEffect(() => subscribeCWorkerStatus(setWorkerStatus), []);
   useEffect(() => {
     // Start loading the SDK, runtime, and public compiler as soon as the lab
     // opens so the first click does not pay the complete cold-start cost.
-    void prewarmCWorker().catch(() => undefined);
-  }, []);
+    startPrewarm();
+  }, [startPrewarm]);
 
   const chooseProblem = (nextId: string) => {
     const next = CODING_PROBLEMS.find((item) => item.id === nextId);
@@ -28,8 +47,10 @@ export default function CPractice() {
     setOutcome(null);
   };
   const run = async () => {
+    if (!capabilityReady) return;
     setRunning(true);
     setOutcome(null);
+    setPrewarmError("");
     try {
       const result = await runCInWorker(problem, studentCode);
       setOutcome(result);
@@ -83,13 +104,23 @@ export default function CPractice() {
             <div className="notice-info">
               <Clock3 size={16} className="mt-0.5 shrink-0" />
               <span>
-                The browser compiler warms up while this page loads. A cold visit downloads the local toolchain and
-                can take around 30 seconds; later runs reuse it. Worker startup, compilation, and execution each have
-                a 30-second limit. Infinite loops recover by terminating the worker.
+                The browser compiler warms up while this page loads. A cold visit downloads the local toolchain and can
+                take around 30 seconds; later runs reuse it. Worker startup, compilation, and execution each have a
+                30-second limit. Infinite loops recover by terminating the worker.
               </span>
             </div>
           </aside>
           <section className="min-w-0">
+            {!capabilityReady && (
+              <div id="c-capability-help" className="notice-error mb-5" role="alert">
+                <CircleAlert size={16} className="shrink-0" />
+                <span>
+                  This lab needs a cross-origin isolated Chromium tab. Use a supported Chromium-based browser, enable
+                  the site&apos;s COOP/COEP headers, then reload the lab before running code.
+                </span>
+              </div>
+            )}
+            <RunnerProgress status={workerStatus} error={prewarmError} onRetry={startPrewarm} />
             <div className="panel overflow-hidden">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
                 <div>
@@ -122,7 +153,12 @@ export default function CPractice() {
                 }}
               />
               <div className="flex justify-end border-t border-line p-4">
-                <button className="button button-primary" onClick={run} disabled={running || !studentCode.trim()}>
+                <button
+                  className="button button-primary"
+                  onClick={run}
+                  disabled={!capabilityReady || running || !studentCode.trim()}
+                  aria-describedby={!capabilityReady ? "c-capability-help" : undefined}
+                >
                   <Play size={15} /> {running ? "compiling…" : "run tests"}
                 </button>
               </div>
@@ -134,6 +170,61 @@ export default function CPractice() {
     </Shell>
   );
 }
+
+const RUNNER_PHASES: Array<{ phase: CRunnerPhase; label: string }> = [
+  { phase: "worker", label: "Worker creation" },
+  { phase: "sdk", label: "SDK loading" },
+  { phase: "runtime", label: "Runtime loading" },
+  { phase: "compiler", label: "Compiler loading" },
+  { phase: "compilation", label: "Compilation" },
+  { phase: "execution", label: "Execution" },
+];
+const RunnerProgress = ({ status, error, onRetry }: { status: CRunnerStatus; error: string; onRetry: () => void }) => {
+  const currentIndex =
+    status.phase === "complete" || status.phase === "ready"
+      ? RUNNER_PHASES.length
+      : RUNNER_PHASES.findIndex((item) => item.phase === status.phase);
+  return (
+    <section className="panel mb-5 p-5" aria-live="polite">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="eyebrow text-gold">browser runner readiness</p>
+          <p className="mt-1 text-sm text-muted">Phases report state only; no unmeasured percentage is shown.</p>
+        </div>
+        {(error || status.state === "failed") && (
+          <button className="button button-ghost px-3 py-2 text-xs" type="button" onClick={onRetry}>
+            <RotateCcw size={14} /> retry setup
+          </button>
+        )}
+      </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        {RUNNER_PHASES.map((item, index) => {
+          const failed = status.state === "failed" && status.phase === item.phase;
+          const active = !failed && index === currentIndex && status.state === "loading";
+          const complete = index < currentIndex || (status.phase === "ready" && index < RUNNER_PHASES.length);
+          return (
+            <div
+              key={item.phase}
+              className="flex items-center justify-between rounded border border-line px-3 py-2 text-sm"
+            >
+              <span>{item.label}</span>
+              <span
+                className={failed ? "text-red-300" : complete ? "text-green-300" : active ? "text-gold" : "text-muted"}
+              >
+                {failed ? "failed" : complete ? "ready" : active ? "loading…" : "waiting"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {(error || status.message) && (
+        <p className="mt-3 text-sm text-red-300" role="alert">
+          {error || status.message}
+        </p>
+      )}
+    </section>
+  );
+};
 
 const ProblemPicker = ({
   problemId,
@@ -187,6 +278,9 @@ const RunnerOutput = ({ outcome }: { outcome: CExecutionOutcome }) => {
                     ? "all tests passed"
                     : "tests need attention"}
           </h2>
+          {!successful && (
+            <p className="mt-2 text-xs text-muted">Edit the function body and run tests again to retry.</p>
+          )}
         </div>
       </div>
       {outcome.tests.length > 0 && (

@@ -143,7 +143,8 @@ export function Select({
         aria-controls={listboxId}
         aria-expanded={open}
         aria-haspopup="listbox"
-        aria-activedescendant={open ? `${listboxId}-${options[highlightedIndex]?.value}` : undefined}
+        aria-autocomplete="none"
+        aria-activedescendant={open ? `${listboxId}-option-${highlightedIndex}` : undefined}
         disabled={disabled}
         onClick={() => {
           clearTypeahead();
@@ -160,16 +161,21 @@ export function Select({
           id={listboxId}
           className="select-menu"
           role="listbox"
+          tabIndex={-1}
           aria-label={ariaLabel}
           aria-labelledby={ariaLabelledBy}
+          aria-activedescendant={`${listboxId}-option-${highlightedIndex}`}
         >
           {options.map((option, index) => (
             <div
               key={option.value}
-              id={`${listboxId}-${option.value}`}
+              id={`${listboxId}-option-${index}`}
               className={`select-option ${index === highlightedIndex ? "select-option-active" : ""}`}
               role="option"
+              tabIndex={-1}
               aria-selected={option.value === value}
+              aria-posinset={index + 1}
+              aria-setsize={options.length}
               onMouseEnter={() => setHighlightedIndex(index)}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => choose(index)}

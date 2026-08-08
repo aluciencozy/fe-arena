@@ -2,6 +2,21 @@ export const GRAPH_NODE_RADIUS = 6;
 
 type GraphPoint = { x: number; y: number };
 export type GraphEdgePoints = { x1: number; y1: number; x2: number; y2: number };
+type GraphDescription = {
+  directed: boolean;
+  nodes: Array<{ id: string; label: string }>;
+  edges: Array<{ from: string; to: string }>;
+};
+
+export const graphTextAlternative = (graph: GraphDescription): string => {
+  const labels = new Map(graph.nodes.map((node) => [node.id, node.label]));
+  const edges = graph.edges.map((edge) => {
+    const from = labels.get(edge.from) ?? edge.from;
+    const to = labels.get(edge.to) ?? edge.to;
+    return graph.directed ? `${from} to ${to}` : `${from} and ${to}`;
+  });
+  return `${graph.directed ? "Directed" : "Undirected"} graph. Nodes: ${graph.nodes.map((node) => node.label).join(", ")}. Edges: ${edges.join(", ") || "none"}.`;
+};
 
 export const graphEdgePoints = (from: GraphPoint, to: GraphPoint): GraphEdgePoints => {
   const dx = to.x - from.x;

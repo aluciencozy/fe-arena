@@ -16,18 +16,23 @@ type ActiveWrite = {
   idempotencyKey: string;
   promise: Promise<PersistTerminalResult>;
 };
+export type OutboxReadiness = "starting" | "ready" | "degraded";
 
 export class DurableMatchRepository implements MatchRepository, AccountHistoryRepository {
   private readonly activeWrites = new Map<string, ActiveWrite>();
   private readonly startupReplay: Promise<void>;
   private retryTimer: ReturnType<typeof setTimeout> | undefined;
+  private outboxReadiness: OutboxReadiness = "starting";
 
   constructor(
     private readonly delegate: MatchRepository,
     private readonly outboxDirectory = DEFAULT_MATCH_OUTBOX_DIRECTORY,
     private readonly retryDelayMs = 5_000,
   ) {
-    this.startupReplay = this.replayOutbox().catch(() => this.scheduleRetry());
+    this.startupReplay = this.replayOutbox().catch(() => {
+      this.outboxReadiness = "degraded";
+      this.scheduleRetry();
+    });
   }
 
   async getAccountHistory(authUserId: string): Promise<AccountHistory> {
@@ -54,6 +59,10 @@ export class DurableMatchRepository implements MatchRepository, AccountHistoryRe
   async replayPending(): Promise<void> {
     await this.startupReplay;
     await this.replayOutbox();
+  }
+
+  readiness(): { status: OutboxReadiness } {
+    return { status: this.outboxReadiness };
   }
 
   close(): void {
@@ -137,6 +146,7 @@ export class DurableMatchRepository implements MatchRepository, AccountHistoryRe
         retryNeeded = true;
       }
     }
+    this.outboxReadiness = retryNeeded ? "degraded" : "ready";
     if (retryNeeded) this.scheduleRetry();
   }
 

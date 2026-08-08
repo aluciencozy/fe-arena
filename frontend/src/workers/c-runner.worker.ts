@@ -2,7 +2,8 @@ import type { Runtime, Wasmer } from "@wasmer/sdk";
 
 type RunRequest = { kind?: "initialize"; source: string };
 type RunResponse = {
-  kind: "ready" | "compiled" | "success" | "compile-error" | "runtime-error";
+  kind: "progress" | "ready" | "compiled" | "success" | "compile-error" | "runtime-error";
+  phase?: "sdk" | "runtime" | "compiler";
   stdout?: string;
   stderr?: string;
   exitCode?: number;
@@ -20,11 +21,19 @@ const boundedOutput = (value: string | undefined) => {
 };
 
 const initialize = async () => {
-  const loadedSdk = sdk ?? (sdk = await import("@wasmer/sdk"));
-  initialized ??= loadedSdk.init().then(() => undefined);
+  if (!sdk) {
+    self.postMessage({ kind: "progress", phase: "sdk" } satisfies RunResponse);
+    sdk = await import("@wasmer/sdk");
+  }
+  const loadedSdk = sdk;
+  if (!initialized) {
+    self.postMessage({ kind: "progress", phase: "runtime" } satisfies RunResponse);
+    initialized = loadedSdk.init().then(() => undefined);
+  }
   await initialized;
   runtime ??= new loadedSdk.Runtime();
   if (!compiler) {
+    self.postMessage({ kind: "progress", phase: "compiler" } satisfies RunResponse);
     // The compiler package is fetched as public WASM by the SDK; no application or database credentials are used.
     const packageDefinition = await loadedSdk.Wasmer.fromRegistry("clang/clang@0.160000.1", runtime);
     compiler = packageDefinition;

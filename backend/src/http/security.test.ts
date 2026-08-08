@@ -27,7 +27,35 @@ test("health and readiness expose state without configuration details", async ()
     assert.equal(readiness.status, 503);
     assert.deepEqual(await readiness.json(), {
       status: "not_ready",
-      persistence: { status: "fallback", configured: false, guestGameplay: true },
+      liveness: { status: "ok" },
+      questionBank: { status: "ready", mode: "in-memory-fallback", publishedQuestions: 186 },
+      persistence: { status: "fallback", configured: false, guestGameplay: true, outbox: "not-configured" },
+    });
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test("readiness reports a degraded outbox without hiding a live question bank", async () => {
+  const { server, base } = await listen(
+    createApp({
+      questionBank: { ready: true, mode: "supabase", publishedQuestions: 3 },
+      persistence: {
+        configured: true,
+        mode: "supabase",
+        ready: true,
+        outbox: "degraded",
+      },
+    }),
+  );
+  try {
+    const response = await fetch(`${base}/readyz`);
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), {
+      status: "not_ready",
+      liveness: { status: "ok" },
+      questionBank: { status: "ready", mode: "supabase", publishedQuestions: 3 },
+      persistence: { status: "configured", configured: true, guestGameplay: true, outbox: "degraded" },
     });
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));

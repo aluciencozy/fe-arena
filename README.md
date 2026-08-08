@@ -46,7 +46,7 @@ If the frontend reports that it cannot connect, verify the backend is reachable 
 - `backend/src/services/match.service.ts` owns the explicit state machine and absolute deadlines. The server selects questions, accepts exactly one submission per seat, grades privately, and calculates timing and scores.
 - `backend/src/services/room.service.ts` owns stable guest seats, reconnect tokens, and room isolation. `queue.service.ts` owns FIFO public matching and expiry. `solo.service.ts` reuses the repository and grading engine for current-run-only practice.
 - `backend/src/sockets/handlers.ts` is the validated Socket.IO contract for room, queue, match, chat, reconnect, state-request, solo, and error events. Incoming payloads are parsed with Zod before services run.
-- `frontend/` contains the responsive React/Vite UI and a small Zustand cache. It never selects a live-match question, grades a live answer, or supplies a live score. `/practice/c` uses Monaco plus a fresh Web Worker and public WASM C toolchain for local-only execution. Mixed coding rounds use the same browser runner and send no source or compiler traffic to the server. Optional Supabase Auth uses only `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`; the frontend never receives or bundles `SUPABASE_SECRET_KEY`.
+- `frontend/` contains the responsive React/Vite UI and a small Zustand cache. It never selects a live-match question, grades a live answer, or supplies a live score. `/practice/c` uses Monaco plus a shared prewarmed Web Worker and public WASM C toolchain for local-only execution. Mixed coding rounds use the same browser runner and send no source or compiler traffic to the server. Optional Supabase Auth uses only `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`; the frontend never receives or bundles `SUPABASE_SECRET_KEY`.
 
 ### Synchronization and safety
 
@@ -81,7 +81,13 @@ See [`DEPLOYMENT.md`](DEPLOYMENT.md) for platform-neutral static frontend/API bu
 
 ## Verification
 
-Run the repository-wide Prettier pass (dependency, build, and secret files are ignored) with:
+Run the single CI-equivalent repository gate with:
+
+```bash
+npm run ci
+```
+
+It runs backend typecheck/tests followed by frontend lint/tests/build. For formatting, run the repository-wide Prettier pass (dependency, build, and secret files are ignored) with:
 
 ```bash
 prettier --write --ignore-unknown .
@@ -92,10 +98,10 @@ The SQL migrations are reviewed as SQL text because the repository's Prettier in
 
 ```bash
 cd backend && npm run typecheck && npm test
-cd ../frontend && npm run lint && npm run build
+cd ../frontend && npm run lint && npm test && npm run build
 ```
 
-The backend tests cover normalization, all seven question types, Supabase row compatibility, seeded selection, score boundaries, hidden answers, answer privacy and authorization, reveal deadlines and skips, two-sided rematch coordination, fresh question selection, topic summaries, solo deadline handling, ready/countdown transitions, graph/C lifecycle submissions, duplicate-safe service behavior, queue expiry/cancellation, room isolation, reconnect seat restoration and rematch races, Auth token verification, private history authorization and isolation, account progress aggregation, guest fallback, production configuration validation, exact HTTP/Socket.IO origin checks, security headers, request-size and API/Socket.IO abuse limits, health/readiness responses, and runtime shutdown. Focused frontend tests cover Socket.IO transport fallback, actionable connection and retry messages, source generation, machine-readable result parsing, worker failures, and timeout termination. Production hosting needs a Node process for the backend and a static host/reverse proxy for the Vite build; see [`DEPLOYMENT.md`](DEPLOYMENT.md) for those requirements. Live room and match state are intentionally in memory for this MVP. Supabase question loading and terminal persistence use the server-only secret key. Authenticated terminal summaries use server-verified Auth IDs, while local development without Supabase uses an in-memory history fallback.
+The backend tests cover normalization, all seven question types, Supabase row compatibility, seeded selection, score boundaries, hidden answers, answer privacy and authorization, reveal deadlines and skips, two-sided rematch coordination, fresh question selection, topic summaries, solo deadline handling, disconnect cleanup and non-resumability, ready/countdown transitions, graph/C lifecycle submissions, duplicate-safe service behavior, queue expiry/cancellation, room isolation, reconnect seat restoration and rematch races, Auth token verification, private history authorization and isolation, account progress aggregation, guest fallback, production configuration validation, exact HTTP/Socket.IO origin checks, security headers, request-size and API/Socket.IO abuse limits, health/readiness responses, and runtime shutdown. Focused frontend tests cover Socket.IO transport fallback, actionable connection and retry messages, source generation, machine-readable result parsing, shared worker prewarm status, worker failures, and timeout termination. The closest browser smoke was attempted with `chrome-devtools-axi`, but this environment closed the browser target before a page snapshot; no browser success is claimed. Production hosting needs a Node process for the backend and a static host/reverse proxy for the Vite build; see [`DEPLOYMENT.md`](DEPLOYMENT.md) for those requirements. Live room and match state are intentionally in memory for this MVP. Supabase question loading and terminal persistence use the server-only secret key. Authenticated terminal summaries use server-verified Auth IDs, while local development without Supabase uses an in-memory history fallback.
 
 ## Optional Supabase Auth and account history
 

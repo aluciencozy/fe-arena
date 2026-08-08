@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ArrowRight, BookOpen, Check, Clock3, RotateCcw } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Check, RotateCcw } from "lucide-react";
 import { AppSettings } from "@/components/AppSettings";
 import { connectSocket, scheduleSocketDisconnect, socket, socketUrl } from "@/lib/socket";
 import { socketConnectionErrorMessage, socketDisconnectedMessage } from "@/lib/socket-errors";
-import { graphEdgePoints } from "@/lib/graph";
+import { DeadlineTimer } from "@/components/DeadlineTimer";
+import { graphEdgePoints, graphTextAlternative } from "@/lib/graph";
 import { TOPICS, type PublicQuestion, type TopicId, type TopicPerformance } from "../../../shared/domain";
 
 type SoloState = {
@@ -40,7 +41,6 @@ export default function Solo() {
   const [state, setState] = useState<SoloState | null>(null);
   const [answer, setAnswer] = useState<string | number | boolean | string[]>("");
   const [ordered, setOrdered] = useState<string[]>([]);
-  const [now, setNow] = useState(() => Date.now());
   const [error, setError] = useState("");
   const [connection, setConnection] = useState<"connecting" | "connected" | "disconnected">(
     socket.connected ? "connected" : "connecting",
@@ -51,7 +51,6 @@ export default function Solo() {
   useEffect(() => {
     let active = true;
     const onState = (next: SoloState) => {
-      setNow(Date.now());
       stateRef.current = next;
       setState(next);
       setAnswer("");
@@ -111,10 +110,6 @@ export default function Solo() {
       socket.off("server:error", onError);
       scheduleSocketDisconnect();
     };
-  }, []);
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 500);
-    return () => window.clearInterval(id);
   }, []);
   const requireConnection = () => {
     if (socket.connected) return true;
@@ -253,7 +248,6 @@ export default function Solo() {
       </Shell>
     );
   const question = state.question;
-  const seconds = state.questionEndsAt ? Math.max(0, Math.ceil((state.questionEndsAt - now) / 1000)) : 0;
   return (
     <Shell>
       <main className="mx-auto max-w-4xl px-5 py-8 sm:px-8">
@@ -307,10 +301,7 @@ export default function Solo() {
                     {topicName(question.topicId)} · {question.difficulty}
                   </p>
                 </div>
-                <span className="timer">
-                  <Clock3 size={16} />
-                  {seconds}s
-                </span>
+                <DeadlineTimer deadline={state.questionEndsAt} />
               </div>
               {error && (
                 <p className="mt-4 text-sm text-red-300" role="alert">
@@ -443,11 +434,15 @@ const QuestionArtifact = ({ question }: { question: PublicQuestion }) => {
   const positions = new Map(question.graph.nodes.map((node) => [node.id, node]));
   return (
     <div className="graph-card mt-8">
+      <p id={`solo-graph-description-${question.id}`} className="sr-only">
+        {graphTextAlternative(question.graph)} Question: apply the displayed graph operation and node order.
+      </p>
       <svg
         className="graph-svg"
         viewBox="0 0 100 100"
         role="img"
         aria-label={`${question.graph.directed ? "Directed" : "Undirected"} graph diagram`}
+        aria-describedby={`solo-graph-description-${question.id}`}
       >
         <defs>
           <marker id={`solo-arrow-${question.id}`} markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">

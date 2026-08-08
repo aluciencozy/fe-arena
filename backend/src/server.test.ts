@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { startServer, type ServerRuntime } from "./server.js";
 import type { RuntimeConfig } from "./config.js";
+import { clearSoloForTests, soloSessionCountForTests } from "./services/solo.service.js";
 
 const runtimeConfig = (isProduction: boolean): RuntimeConfig => ({
   nodeEnv: isProduction ? "production" : "test",
@@ -91,6 +92,26 @@ test("Socket.IO packet middleware enforces event-specific limits", async () => {
     }
     assert.match(await pollPacket(base, session), /SOCKET_RATE_LIMIT/);
   } finally {
+    await closeRuntime(runtime);
+  }
+});
+
+test("disconnecting a Socket.IO guest clears its non-resumable solo session", async () => {
+  clearSoloForTests();
+  const { runtime, base } = await start(false);
+  try {
+    const session = await openPolling(base, "http://localhost:5173");
+    await connectNamespace(base, session);
+    await postPacket(
+      base,
+      session,
+      `42${JSON.stringify(["solo:start", { topicIds: ["stacks"], count: 1, timerSeconds: 30 }])}`,
+    );
+    assert.equal(soloSessionCountForTests(), 1);
+    await postPacket(base, session, "41");
+    assert.equal(soloSessionCountForTests(), 0);
+  } finally {
+    clearSoloForTests();
     await closeRuntime(runtime);
   }
 });

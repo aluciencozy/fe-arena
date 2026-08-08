@@ -13,6 +13,13 @@ export type PersistenceReadiness = {
   mode: "supabase" | "in-memory-fallback";
   /** True when the configured persistence path completed startup initialization. */
   ready: boolean;
+  outbox: "not-configured" | "starting" | "ready" | "degraded";
+  readiness?: () => { status: "starting" | "ready" | "degraded" };
+};
+export type QuestionBankReadiness = {
+  ready: boolean;
+  mode: "supabase" | "in-memory-fallback";
+  publishedQuestions: number;
 };
 
 export type AppOptions = {
@@ -21,7 +28,8 @@ export type AppOptions = {
   runtimeConfig?: Pick<RuntimeConfig, "frontendOrigins" | "trustProxy" | "isProduction">;
   authVerifier?: AuthVerifier;
   accountHistoryRepository?: AccountHistoryRepository;
-  persistence?: PersistenceReadiness;
+  persistence?: Partial<PersistenceReadiness> & Pick<PersistenceReadiness, "configured" | "mode" | "ready">;
+  questionBank?: QuestionBankReadiness;
 };
 
 export const createApp = (options: AppOptions = {}): Express => {
@@ -31,7 +39,18 @@ export const createApp = (options: AppOptions = {}): Express => {
     runtime?.frontendOrigins ??
     (options.frontendOrigin ? [options.frontendOrigin] : [process.env.FRONTEND_ORIGIN ?? "http://localhost:5173"]);
   const production = runtime?.isProduction ?? process.env.NODE_ENV === "production";
-  const persistence = options.persistence ?? { configured: false, mode: "in-memory-fallback" as const, ready: true };
+  const persistence = {
+    configured: false,
+    mode: "in-memory-fallback" as const,
+    ready: true,
+    outbox: "not-configured" as const,
+    ...options.persistence,
+  };
+  const questionBank = options.questionBank ?? {
+    ready: questionBankStats().total > 0,
+    mode: "in-memory-fallback" as const,
+    publishedQuestions: questionBankStats().total,
+  };
   const authVerifier = options.authVerifier ?? createAuthVerifier();
   const historyRepository = options.accountHistoryRepository;
   const app = express();
@@ -50,11 +69,25 @@ export const createApp = (options: AppOptions = {}): Express => {
   // Health checks are intentionally cheap and unauthenticated. Other public entry points are bounded by IP.
   app.get("/healthz", (_request, response) => response.status(200).json({ status: "ok" }));
   app.get("/readyz", (_request, response) => {
+    const outboxStatus = persistence.readiness?.().status ?? persistence.outbox;
     const persistenceStatus = persistence.ready ? (persistence.configured ? "configured" : "fallback") : "unavailable";
-    const ready = persistence.ready && (persistence.configured || !production);
+    const questionBankStatus = questionBank.ready ? "ready" : "unavailable";
+    const ready =
+      questionBank.ready && persistence.ready && outboxStatus !== "degraded" && (persistence.configured || !production);
     return response.status(ready ? 200 : 503).json({
       status: ready ? "ready" : "not_ready",
-      persistence: { status: persistenceStatus, configured: persistence.configured, guestGameplay: true },
+      liveness: { status: "ok" },
+      questionBank: {
+        status: questionBankStatus,
+        mode: questionBank.mode,
+        publishedQuestions: questionBank.publishedQuestions,
+      },
+      persistence: {
+        status: persistenceStatus,
+        configured: persistence.configured,
+        guestGameplay: true,
+        outbox: outboxStatus,
+      },
     });
   });
   app.use("/api", createIpRateLimit(120, 60_000));

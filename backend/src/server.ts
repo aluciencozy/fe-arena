@@ -24,14 +24,24 @@ export const createServerRuntime = async (config: RuntimeConfig): Promise<Server
   const questionRepository = await loadQuestionRepository();
   setQuestionRepository(questionRepository);
   const authVerifier = createAuthVerifier();
+  const repositoryReadiness = (
+    matchRepository as Partial<{ readiness: () => { status: "starting" | "ready" | "degraded" } }>
+  ).readiness;
   const app = createApp({
     runtimeConfig: config,
     authVerifier,
     accountHistoryRepository: matchRepository,
+    questionBank: {
+      ready: questionRepository.list().length > 0,
+      mode: config.supabase.configured ? "supabase" : "in-memory-fallback",
+      publishedQuestions: questionRepository.list().length,
+    },
     persistence: {
       configured: config.supabase.configured,
       mode: config.supabase.configured ? "supabase" : "in-memory-fallback",
       ready: true,
+      outbox: config.supabase.configured ? "starting" : "not-configured",
+      ...(repositoryReadiness ? { readiness: repositoryReadiness.bind(matchRepository) } : {}),
     },
   });
 
