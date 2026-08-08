@@ -86,6 +86,7 @@ export function Select({
     }
     if (event.key === "Escape") {
       event.preventDefault();
+      event.stopPropagation();
       clearTypeahead();
       setOpen(false);
       return;

@@ -18,6 +18,7 @@ import {
   type RevealedQuestion,
   type ScoreBreakdown,
   type CodingProgress,
+  type CodingProgressUpdate,
   type CodingRunResult,
   type CodingAnswer,
   CodingRunResultSchema,
@@ -565,7 +566,7 @@ export const markCodingReady = (roomId: string, seatId: string, events: MatchEve
 export const submitCodingProgress = (
   roomId: string,
   seatId: string,
-  status: "compiling" | "running",
+  status: CodingProgressUpdate,
   events: MatchEvents,
 ) => {
   const record = matches.get(roomId);
@@ -594,6 +595,8 @@ export const submitCodingResult = (roomId: string, seatId: string, result: Codin
   }
   if (parsed.data.questionId !== question.id)
     return { ok: false as const, error: "That coding question is no longer active." };
+  if (parsed.data.outcome !== "success")
+    return { ok: false as const, error: "That browser run did not complete. Retry the coding run." };
   const progress = record.state.codingProgress[seatId];
   const submission = record.state.submissions[seatId];
   if (!progress || !submission || progress.status === "complete" || submission.submitted)

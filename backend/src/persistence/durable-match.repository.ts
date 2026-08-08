@@ -20,6 +20,7 @@ export type OutboxReadiness = "starting" | "ready" | "degraded";
 
 export class DurableMatchRepository implements MatchRepository, AccountHistoryRepository {
   private readonly activeWrites = new Map<string, ActiveWrite>();
+  private readonly pendingSnapshots = new Map<string, TerminalMatchSnapshot>();
   private readonly startupReplay: Promise<void>;
   private retryTimer: ReturnType<typeof setTimeout> | undefined;
   private outboxReadiness: OutboxReadiness = "starting";
@@ -30,8 +31,7 @@ export class DurableMatchRepository implements MatchRepository, AccountHistoryRe
     private readonly retryDelayMs = 5_000,
   ) {
     this.startupReplay = this.replayOutbox().catch(() => {
-      this.outboxReadiness = "degraded";
-      this.scheduleRetry();
+      this.markDegraded();
     });
   }
 
@@ -71,12 +71,14 @@ export class DurableMatchRepository implements MatchRepository, AccountHistoryRe
   }
 
   private async persist(snapshot: TerminalMatchSnapshot): Promise<PersistTerminalResult> {
-    const stagedSnapshot = await this.stage(snapshot);
-    await this.startupReplay;
     try {
+      const stagedSnapshot = await this.stage(snapshot);
+      this.pendingSnapshots.delete(snapshot.matchId);
+      await this.startupReplay;
       return await this.deliver(stagedSnapshot);
     } catch (error) {
-      this.scheduleRetry();
+      this.pendingSnapshots.set(snapshot.matchId, snapshot);
+      this.markDegraded();
       throw error;
     }
   }
@@ -142,11 +144,21 @@ export class DurableMatchRepository implements MatchRepository, AccountHistoryRe
       try {
         const snapshot = this.parseSnapshot(await readFile(path, "utf8"), path);
         await this.deliver(snapshot);
+        this.pendingSnapshots.delete(snapshot.matchId);
       } catch {
         retryNeeded = true;
       }
     }
-    this.outboxReadiness = retryNeeded ? "degraded" : "ready";
+    for (const [matchId, snapshot] of this.pendingSnapshots) {
+      try {
+        const stagedSnapshot = await this.stage(snapshot);
+        await this.deliver(stagedSnapshot);
+        this.pendingSnapshots.delete(matchId);
+      } catch {
+        retryNeeded = true;
+      }
+    }
+    this.outboxReadiness = retryNeeded || this.pendingSnapshots.size > 0 ? "degraded" : "ready";
     if (retryNeeded) this.scheduleRetry();
   }
 
@@ -170,9 +182,14 @@ export class DurableMatchRepository implements MatchRepository, AccountHistoryRe
     if (this.retryTimer) return;
     this.retryTimer = setTimeout(() => {
       this.retryTimer = undefined;
-      void this.replayOutbox().catch(() => this.scheduleRetry());
+      void this.replayOutbox().catch(() => this.markDegraded());
     }, this.retryDelayMs);
     this.retryTimer.unref();
+  }
+
+  private markDegraded(): void {
+    this.outboxReadiness = "degraded";
+    this.scheduleRetry();
   }
 
   private async syncDirectory(): Promise<void> {

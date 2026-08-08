@@ -72,8 +72,9 @@ export const createApp = (options: AppOptions = {}): Express => {
     const outboxStatus = persistence.readiness?.().status ?? persistence.outbox;
     const persistenceStatus = persistence.ready ? (persistence.configured ? "configured" : "fallback") : "unavailable";
     const questionBankStatus = questionBank.ready ? "ready" : "unavailable";
+    const outboxReady = persistence.configured ? outboxStatus === "ready" : outboxStatus === "not-configured";
     const ready =
-      questionBank.ready && persistence.ready && outboxStatus !== "degraded" && (persistence.configured || !production);
+      questionBank.ready && persistence.ready && outboxReady && (persistence.configured || !production);
     return response.status(ready ? 200 : 503).json({
       status: ready ? "ready" : "not_ready",
       liveness: { status: "ok" },

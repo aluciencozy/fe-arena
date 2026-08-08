@@ -1,4 +1,4 @@
-import type { CodingProblem } from "../../../shared/domain";
+import type { CodingProblem, CodingProgressUpdate } from "../../../shared/domain";
 
 export type CTestResult = { index: number; name: string; passed: boolean };
 export type CRunnerPhase =
@@ -7,6 +7,26 @@ export type CRunnerStatus = {
   phase: CRunnerPhase;
   state: "idle" | "loading" | "ready" | "failed";
   message?: string;
+};
+export const codingProgressForRunnerStatus = (status: CRunnerStatus): CodingProgressUpdate | null => {
+  if (status.state === "failed") return "failed";
+  if (status.state !== "loading") return null;
+  switch (status.phase) {
+    case "worker":
+      return "worker";
+    case "sdk":
+      return "sdk";
+    case "runtime":
+      return "runtime";
+    case "compiler":
+      return "compiler";
+    case "compilation":
+      return "compiling";
+    case "execution":
+      return "running";
+    default:
+      return null;
+  }
 };
 export type CExecutionOutcome =
   | { kind: "success"; stdout: string; stderr: string; tests: CTestResult[]; passed: boolean }
@@ -180,7 +200,12 @@ export const prewarmCWorker = (
 export const runCInWorker = (
   problem: CodingProblem,
   studentCode: string,
-  options: { timeoutMs?: number; initializationTimeoutMs?: number; createWorker?: WorkerFactory } = {},
+  options: {
+    timeoutMs?: number;
+    initializationTimeoutMs?: number;
+    createWorker?: WorkerFactory;
+    onProgress?: (status: CRunnerStatus) => void;
+  } = {},
 ): Promise<CExecutionOutcome> => {
   const executionTimeoutMs = options.timeoutMs ?? EXECUTION_TIMEOUT_MS;
   const initializationTimeoutMs = options.initializationTimeoutMs ?? 30_000;
@@ -342,5 +367,6 @@ export const runCInWorker = (
         return outcome;
       });
   };
-  return runAttempt(0);
+  const unsubscribe = options.onProgress ? subscribeCWorkerStatus(options.onProgress) : undefined;
+  return runAttempt(0).finally(() => unsubscribe?.());
 };

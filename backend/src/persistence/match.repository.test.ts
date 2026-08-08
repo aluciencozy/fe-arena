@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import {
@@ -185,6 +185,62 @@ test("delivers the staged snapshot when a retry payload changes", async () => {
       finishedAt: "2026-03-08T00:01:00.000Z",
     });
     assert.deepEqual(delivered, [first]);
+    repository.close();
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("marks live outbox failures degraded and retries a delivery", async () => {
+  const directory = await mkdtemp(join(process.cwd(), ".terminal-outbox-test-"));
+  const first = snapshot();
+  const delivered: TerminalMatchSnapshot[] = [];
+  let unavailable = true;
+  const delegate: MatchRepository = {
+    persistTerminalMatch: async (value) => {
+      if (unavailable) throw new Error("database unavailable");
+      delivered.push(structuredClone(value));
+      return { status: "inserted", matchId: value.matchId };
+    },
+  };
+
+  try {
+    const repository = new DurableMatchRepository(delegate, directory, 60_000);
+    await repository.replayPending();
+    await assert.rejects(repository.persistTerminalMatch(first));
+    assert.deepEqual(repository.readiness(), { status: "degraded" });
+    assert.equal((await readdir(directory)).filter((name) => name.endsWith(".json")).length, 1);
+    unavailable = false;
+    await repository.replayPending();
+    assert.deepEqual(delivered, [first]);
+    assert.deepEqual(repository.readiness(), { status: "ready" });
+    repository.close();
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("retries a terminal snapshot after live staging fails", async () => {
+  const directory = await mkdtemp(join(process.cwd(), ".terminal-outbox-test-"));
+  const blockedPath = join(directory, "blocked-outbox");
+  await writeFile(blockedPath, "not a directory", "utf8");
+  const first = snapshot();
+  const delivered: TerminalMatchSnapshot[] = [];
+  const delegate: MatchRepository = {
+    persistTerminalMatch: async (value) => {
+      delivered.push(structuredClone(value));
+      return { status: "inserted", matchId: value.matchId };
+    },
+  };
+
+  try {
+    const repository = new DurableMatchRepository(delegate, blockedPath, 60_000);
+    await assert.rejects(repository.persistTerminalMatch(first));
+    assert.deepEqual(repository.readiness(), { status: "degraded" });
+    await rm(blockedPath, { force: true });
+    await repository.replayPending();
+    assert.deepEqual(delivered, [first]);
+    assert.deepEqual(repository.readiness(), { status: "ready" });
     repository.close();
   } finally {
     await rm(directory, { recursive: true, force: true });

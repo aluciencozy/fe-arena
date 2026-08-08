@@ -4,12 +4,24 @@ import { CODING_PROBLEMS } from "../../../shared/coding-problems";
 import {
   generateCSource,
   parseExecutionOutput,
+  codingProgressForRunnerStatus,
   getCWorkerStatus,
   prewarmCWorker,
   runCInWorker,
   subscribeCWorkerStatus,
   type CExecutionOutcome,
 } from "./c-runner";
+
+test("maps browser runner phases to typed match progress without percentages", () => {
+  assert.equal(codingProgressForRunnerStatus({ phase: "worker", state: "loading" }), "worker");
+  assert.equal(codingProgressForRunnerStatus({ phase: "sdk", state: "loading" }), "sdk");
+  assert.equal(codingProgressForRunnerStatus({ phase: "runtime", state: "loading" }), "runtime");
+  assert.equal(codingProgressForRunnerStatus({ phase: "compiler", state: "loading" }), "compiler");
+  assert.equal(codingProgressForRunnerStatus({ phase: "compilation", state: "loading" }), "compiling");
+  assert.equal(codingProgressForRunnerStatus({ phase: "execution", state: "loading" }), "running");
+  assert.equal(codingProgressForRunnerStatus({ phase: "execution", state: "failed", message: "trap" }), "failed");
+  assert.equal(codingProgressForRunnerStatus({ phase: "complete", state: "ready" }), null);
+});
 
 test("generates a complete C translation unit without allowing signature edits", () => {
   const problem = CODING_PROBLEMS[0]!;
@@ -85,7 +97,9 @@ test("shares an in-flight prewarm and permits one retry after initialization fai
 
 test("runs the curated sum fixture after compilation completes", async () => {
   let receivedSource = "";
+  const progress: string[] = [];
   const outcome = await runCInWorker(CODING_PROBLEMS[0]!, CODING_PROBLEMS[0]!.starterCode, {
+    onProgress: (status) => progress.push(`${status.phase}:${status.state}`),
     createWorker: () => {
       const worker = {
         onmessage: null as ((event: MessageEvent) => void) | null,
@@ -113,6 +127,9 @@ test("runs the curated sum fixture after compilation completes", async () => {
   assert.equal(outcome.kind, "success");
   if (outcome.kind === "success") assert.equal(outcome.passed, true);
   assert.match(receivedSource, /int sum_array\(const int values\[\], size_t length\)/);
+  assert.ok(progress.includes("worker:loading"));
+  assert.ok(progress.includes("compilation:loading"));
+  assert.ok(progress.includes("execution:loading"));
 });
 
 test("retries a transient Wasmer cancellation with a fresh worker", async () => {

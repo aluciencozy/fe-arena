@@ -20,16 +20,26 @@ import {
 } from "lucide-react";
 import { useArenaSocket } from "@/hooks/useSocket";
 import { useGameStore } from "@/store/gameStore";
+import { CRunnerProgress } from "@/components/CRunnerProgress";
 import { Select } from "@/components/ui/select";
 import { DeadlineTimer } from "@/components/DeadlineTimer";
 import { copyTextWithFallback } from "@/lib/clipboard";
 import { graphEdgePoints, graphTextAlternative } from "@/lib/graph";
-import { prewarmCWorker, runCInWorker, type CExecutionOutcome, type CTestResult } from "@/lib/c-runner";
+import {
+  codingProgressForRunnerStatus,
+  getCWorkerStatus,
+  prewarmCWorker,
+  runCInWorker,
+  type CExecutionOutcome,
+  type CRunnerStatus,
+  type CTestResult,
+} from "@/lib/c-runner";
 import {
   canConfigureMatch,
   TOPICS,
   type PublicAnswer,
   type PublicQuestion,
+  type CodingProgressUpdate,
   type TopicId,
 } from "../../../shared/domain";
 import type { MatchPublicState } from "@/types";
@@ -88,9 +98,10 @@ export default function Room() {
   const [codingReadyAttempts, setCodingReadyAttempts] = useState(0);
   const [copied, setCopied] = useState(false);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
-  const codingEnvironmentError = window.crossOriginIsolated
+  const capabilityReady = typeof window !== "undefined" && window.crossOriginIsolated;
+  const codingEnvironmentError = capabilityReady
     ? ""
-    : "Coding rounds require a cross-origin isolated Chromium tab.";
+    : "Coding rounds need a cross-origin isolated Chromium tab. Use a supported Chromium-based browser, keep the site's COOP/COEP headers enabled, then reload the room.";
   const codingReadyNotice = codingEnvironmentError || codingReadyError;
   const answer = answerState.questionId === questionId ? answerState.value : "";
   const ordered = orderedState.questionId === questionId ? orderedState.value : [];
@@ -127,7 +138,7 @@ export default function Room() {
       return;
     codingReadyAttempted.current = true;
     queueMicrotask(() => setCodingReadyAttempts((attempts) => attempts + 1));
-    if (!window.crossOriginIsolated) return;
+    if (!capabilityReady) return;
     // Match updates must not cancel this browser-local initialization. The server
     // accepts readiness only after the worker has initialized successfully.
     void prewarmCWorker()
@@ -142,6 +153,7 @@ export default function Room() {
   }, [
     codingReadyAttempts,
     codingReadyRetry,
+    capabilityReady,
     markCodingReady,
     match?.codingReady,
     match?.config.includeCoding,
@@ -253,13 +265,15 @@ export default function Room() {
         {codingReadyNotice && match?.config.includeCoding && match.phase !== "REMATCH" && (
           <div className="notice-error mb-5 flex items-center justify-between gap-3">
             <span>{codingReadyNotice}</span>
-            <button
-              className="button button-primary shrink-0"
-              onClick={retryCodingReady}
-              disabled={codingReadyAttempts >= MAX_CODING_READY_ATTEMPTS}
-            >
-              retry readiness
-            </button>
+            {!codingEnvironmentError && (
+              <button
+                className="button button-primary shrink-0"
+                onClick={retryCodingReady}
+                disabled={codingReadyAttempts >= MAX_CODING_READY_ATTEMPTS}
+              >
+                retry readiness
+              </button>
+            )}
           </div>
         )}
         {!match ? (
@@ -513,40 +527,54 @@ const CodingQuestionStage = ({
 }: {
   match: MatchPublicState;
   seatId: string | null;
-  onProgress: (status: "compiling" | "running") => void;
+  onProgress: (status: CodingProgressUpdate) => void;
   onComplete: (result: {
     questionId: string;
     passed: boolean;
     tests: CTestResult[];
-    outcome: "success" | "compile-error" | "runtime-error" | "timeout";
+    outcome: "success";
   }) => void;
 }) => {
   const question = match.question;
   const problem = question?.type === "coding" ? question.problem : undefined;
+  const capabilityReady = typeof window !== "undefined" && window.crossOriginIsolated;
   const [code, setCode] = useState(problem?.starterCode ?? "");
   const [outcome, setOutcome] = useState<CExecutionOutcome | null>(null);
   const [runPending, setRunPending] = useState(false);
+  const [runnerStatus, setRunnerStatus] = useState<CRunnerStatus>(() => getCWorkerStatus());
+  const [runnerError, setRunnerError] = useState("");
   const runInFlight = useRef(false);
   if (!question || question.type !== "coding" || !problem) return null;
   const submitted = Boolean(seatId && match.submissions[seatId]?.submitted);
-  const complete = (result: CExecutionOutcome) => {
+  const reportRunnerProgress = (status: CRunnerStatus) => {
+    setRunnerStatus(status);
+    const progress = codingProgressForRunnerStatus(status);
+    if (progress) onProgress(progress);
+    if (status.state === "failed") setRunnerError(status.message ?? "The browser C runner failed.");
+    else if (status.state === "loading") setRunnerError("");
+  };
+  const reportOutcome = (result: CExecutionOutcome) => {
     setOutcome(result);
-    onComplete({
-      questionId: question.id,
-      passed: result.kind === "success" && result.passed,
-      tests: result.tests,
-      outcome: result.kind === "success" ? "success" : result.kind,
-    });
+    if (result.kind !== "success") {
+      onProgress("failed");
+      return;
+    }
+    onComplete({ questionId: question.id, passed: result.passed, tests: result.tests, outcome: "success" });
   };
   const run = async () => {
-    if (runInFlight.current || submitted) return;
+    if (runInFlight.current || submitted || !capabilityReady) return;
     runInFlight.current = true;
     setRunPending(true);
+    setOutcome(null);
+    setRunnerError("");
     try {
-      onProgress("compiling");
-      complete(await runCInWorker(problem, code));
+      reportOutcome(
+        await runCInWorker(problem, code, {
+          onProgress: reportRunnerProgress,
+        }),
+      );
     } catch (error) {
-      complete({
+      reportOutcome({
         kind: "runtime-error",
         stdout: "",
         stderr: error instanceof Error ? error.message : "The browser C runner failed.",
@@ -569,6 +597,13 @@ const CodingQuestionStage = ({
       <p className="mt-4 max-w-2xl text-muted">
         {problem.description} The server receives only typed progress and test results, never source code.
       </p>
+      {!capabilityReady && (
+        <div id="room-c-capability-help" className="notice-error mt-5" role="alert">
+          Browser C execution is unavailable in this tab. Use a supported Chromium-based browser with the site&apos;s
+          COOP/COEP headers enabled, then reload the room.
+        </div>
+      )}
+      <CRunnerProgress status={runnerStatus} error={runnerError} onRetry={run} retryLabel="retry tests" />
       <div className="mt-7 panel overflow-hidden">
         <div className="border-b border-line bg-ink px-4 py-3 font-mono text-xs text-gold">
           locked · {problem.functionSignature} {"{"}
@@ -588,13 +623,18 @@ const CodingQuestionStage = ({
         />
         <div className="flex items-center justify-between border-t border-line p-4">
           <span className="text-xs text-muted">Local-only execution · no anti-cheat guarantee</span>
-          <button className="button button-primary" onClick={run} disabled={submitted || runPending || !code.trim()}>
-            <Zap size={15} /> {runPending ? "running…" : "run tests"}
+          <button
+            className="button button-primary"
+            onClick={run}
+            disabled={!capabilityReady || submitted || runPending || !code.trim()}
+            aria-describedby={!capabilityReady ? "room-c-capability-help" : undefined}
+          >
+            <Zap size={15} /> {runPending ? "running…" : runnerStatus.state === "failed" ? "retry tests" : "run tests"}
           </button>
         </div>
       </div>
       {outcome && (
-        <div className="panel mt-5 p-5 text-sm">
+        <div className="panel mt-5 p-5 text-sm" aria-live="polite">
           <p className="eyebrow">runner result</p>
           <p className="mt-2">
             {outcome.kind === "success" && outcome.passed
@@ -619,6 +659,9 @@ const CodingQuestionStage = ({
                 </div>
               ))}
             </div>
+          )}
+          {outcome.kind !== "success" && (
+            <p className="mt-3 text-xs text-muted">This attempt stayed unlocked. Fix the code or retry the browser run.</p>
           )}
         </div>
       )}

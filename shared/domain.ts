@@ -551,12 +551,34 @@ export const CodingAnswerSchema: z.ZodType<CodingAnswer> = z.object({
   tests: z.array(CodingTestResultSchema).max(20),
 });
 export type CodingProgress = {
-  status: "idle" | "compiling" | "running" | "complete";
+  status: CodingProgressStatus;
   completedAt: number | null;
   passed: boolean | null;
   tests: z.infer<typeof CodingTestResultSchema>[];
   outcome: CodingRunResult["outcome"] | null;
 };
+export const CodingProgressStatusSchema = z.enum([
+  "idle",
+  "worker",
+  "sdk",
+  "runtime",
+  "compiler",
+  "compiling",
+  "running",
+  "failed",
+  "complete",
+]);
+export type CodingProgressStatus = z.infer<typeof CodingProgressStatusSchema>;
+export const CodingProgressUpdateSchema = z.enum([
+  "worker",
+  "sdk",
+  "runtime",
+  "compiler",
+  "compiling",
+  "running",
+  "failed",
+]);
+export type CodingProgressUpdate = z.infer<typeof CodingProgressUpdateSchema>;
 export const PublicQuestionSchema = z.object({
   id: z.string().min(1),
   topicId: TopicIdSchema,
@@ -614,7 +636,7 @@ export const RoundHistorySchema = z.object({
   submissions: z.record(z.string(), SubmissionPublicSchema),
 });
 export const CodingProgressSchema = z.object({
-  status: z.enum(["idle", "compiling", "running", "complete"]),
+  status: CodingProgressStatusSchema,
   completedAt: z.number().nullable(),
   passed: z.boolean().nullable(),
   tests: z.array(CodingTestResultSchema).max(20),
@@ -700,7 +722,7 @@ export const ClientEventSchemas = {
   "match:configure": MatchConfigSchema,
   "match:ready": NoPayloadSchema,
   "match:coding-ready": NoPayloadSchema,
-  "match:coding-progress": z.object({ status: z.enum(["compiling", "running"]) }),
+  "match:coding-progress": z.object({ status: CodingProgressUpdateSchema }),
   "match:coding-complete": CodingRunResultSchema,
   "match:submit": SubmitSchema,
   "match:reveal-skip": NoPayloadSchema,

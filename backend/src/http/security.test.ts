@@ -62,6 +62,31 @@ test("readiness reports a degraded outbox without hiding a live question bank", 
   }
 });
 
+test("readiness waits for configured outbox startup replay", async () => {
+  const { server, base } = await listen(
+    createApp({
+      runtimeConfig: { frontendOrigins: ["https://arena.example"], trustProxy: true, isProduction: true },
+      questionBank: { ready: true, mode: "supabase", publishedQuestions: 3 },
+      persistence: {
+        configured: true,
+        mode: "supabase",
+        ready: true,
+        outbox: "ready",
+        readiness: () => ({ status: "starting" as const }),
+      },
+    }),
+  );
+  try {
+    const response = await fetch(`${base}/readyz`);
+    const body = (await response.json()) as { status: string; persistence: { outbox: string } };
+    assert.equal(response.status, 503);
+    assert.equal(body.status, "not_ready");
+    assert.equal(body.persistence.outbox, "starting");
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
 test("security headers and exact CORS allowlist are applied", async () => {
   const { server, base } = await listen(createApp({ frontendOrigins: ["https://arena.example"] }));
   try {

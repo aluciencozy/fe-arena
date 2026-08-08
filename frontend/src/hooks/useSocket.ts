@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { connectSocket, scheduleSocketDisconnect, socket } from "@/lib/socket";
 import { clearStoredToken, storedTokenForRoom, useGameStore } from "@/store/gameStore";
 import type { ChatMessage, MatchPublicState, RoomState } from "@/types";
+import type { CodingProgressUpdate } from "../../../shared/domain";
 
 export const useArenaSocket = (roomId: string, playerName: string) => {
   const navigate = useNavigate();
@@ -82,7 +83,7 @@ export const useArenaSocket = (roomId: string, playerName: string) => {
     configure: (config: unknown) => socket.emit("match:configure", config),
     ready: () => socket.emit("match:ready"),
     codingReady: markCodingReady,
-    codingProgress: (status: "compiling" | "running") => socket.emit("match:coding-progress", { status }),
+    codingProgress: (status: CodingProgressUpdate) => socket.emit("match:coding-progress", { status }),
     codingComplete: (result: unknown) => socket.emit("match:coding-complete", result),
     submit: (answer: unknown) => socket.emit("match:submit", answer),
     skipReveal: () => socket.emit("match:reveal-skip"),

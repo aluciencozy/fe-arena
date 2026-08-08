@@ -21,6 +21,7 @@ import {
   resumeAfterReconnect,
   skipReveal,
   submitAnswer,
+  submitCodingProgress,
   submitCodingResult,
   toggleReady,
   requestRematch,
@@ -191,7 +192,7 @@ test("graph and C submissions stay server-authoritative through the match lifecy
   }
 });
 
-test("mixed matches gate coding rounds on browser readiness and accept typed completion ordering", (t) => {
+test("mixed matches gate coding rounds and keep failed coding runs retryable", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 1_000 });
   clearMatchesForTests();
   clearRoomsForTests();
@@ -226,6 +227,14 @@ test("mixed matches gate coding rounds on browser readiness and accept typed com
     assert.equal(state.questionEndsAt, (state.questionStartedAt ?? 0) + 60_000);
     t.mock.timers.tick(59_999);
     assert.equal(getMatchState(room.metadata.roomId)?.phase, "QUESTION");
+    assert.equal(submitCodingProgress(room.metadata.roomId, room.seat.seatId, "failed", events()).ok, true);
+    const active = getMatchState(room.metadata.roomId)!;
+    assert.equal(active.phase, "QUESTION");
+    assert.equal(active.codingProgress[room.seat.seatId]?.status, "failed");
+    assert.equal(active.submissions[room.seat.seatId]?.submitted, false);
+    assert.equal(active.codingProgress[room.seat.seatId]?.passed, null);
+    assert.deepEqual(active.codingProgress[room.seat.seatId]?.tests, []);
+    assert.equal(active.codingProgress[room.seat.seatId]?.outcome, null);
     assert.equal(
       submitCodingResult(
         room.metadata.roomId,
@@ -238,22 +247,38 @@ test("mixed matches gate coding rounds on browser readiness and accept typed com
         },
         events(),
       ).ok,
+      false,
+    );
+    assert.equal(submitCodingProgress(room.metadata.roomId, room.seat.seatId, "compiling", events()).ok, true);
+    assert.equal(submitCodingProgress(room.metadata.roomId, room.seat.seatId, "running", events()).ok, true);
+    assert.equal(
+      submitCodingResult(
+        room.metadata.roomId,
+        room.seat.seatId,
+        {
+          questionId: state.question!.id,
+          passed: false,
+          tests: [{ index: 1, name: "sum", passed: false }],
+          outcome: "success",
+        },
+        events(),
+      ).ok,
       true,
     );
-    const active = getMatchState(room.metadata.roomId)!;
-    assert.equal(active.phase, "QUESTION");
-    assert.equal(active.codingProgress[room.seat.seatId]?.passed, null);
-    assert.deepEqual(active.codingProgress[room.seat.seatId]?.tests, []);
-    assert.equal(active.codingProgress[room.seat.seatId]?.outcome, null);
+    const afterRetry = getMatchState(room.metadata.roomId)!;
+    assert.equal(afterRetry.phase, "QUESTION");
+    assert.equal(afterRetry.codingProgress[room.seat.seatId]?.status, "complete");
+    assert.equal(afterRetry.codingProgress[room.seat.seatId]?.passed, null);
+    assert.equal(afterRetry.submissions[room.seat.seatId]?.submitted, true);
     assert.equal(
       submitCodingResult(
         room.metadata.roomId,
         guest.seat.seatId,
         {
           questionId: state.question!.id,
-          passed: false,
-          tests: [{ index: 1, name: "sum", passed: false }],
-          outcome: "compile-error",
+          passed: true,
+          tests: [{ index: 1, name: "sum", passed: true }],
+          outcome: "success",
         },
         events(),
       ).ok,
@@ -263,7 +288,7 @@ test("mixed matches gate coding rounds on browser readiness and accept typed com
     assert.equal(reveal.phase, "REVEAL");
     assert.equal(reveal.codingProgress[room.seat.seatId]?.passed, false);
     assert.deepEqual(reveal.codingProgress[room.seat.seatId]?.tests, [{ index: 1, name: "sum", passed: false }]);
-    assert.equal(reveal.codingProgress[room.seat.seatId]?.outcome, "compile-error");
+    assert.equal(reveal.codingProgress[room.seat.seatId]?.outcome, "success");
   } finally {
     setQuestionRepository(inMemoryQuestionRepository);
     clearMatchesForTests();
@@ -301,15 +326,9 @@ test("mixed rematches do not reuse an exhausted coding question", (t) => {
     t.mock.timers.tick(3_000);
     const first = getMatchState(room.metadata.roomId)!;
     assert.equal(first.question?.id, coding.id);
-    const result = {
-      questionId: coding.id,
-      passed: false,
-      tests: [{ index: 1, name: "sum", passed: false }],
-      outcome: "compile-error" as const,
-    };
-    assert.equal(submitCodingResult(room.metadata.roomId, room.seat.seatId, result, events()).ok, true);
-    assert.equal(submitCodingResult(room.metadata.roomId, guest.seat.seatId, result, events()).ok, true);
-    t.mock.timers.tick(30_000);
+    assert.equal(submitCodingProgress(room.metadata.roomId, room.seat.seatId, "failed", events()).ok, true);
+    assert.equal(submitCodingProgress(room.metadata.roomId, guest.seat.seatId, "failed", events()).ok, true);
+    t.mock.timers.tick(60_000);
     assert.equal(getMatchState(room.metadata.roomId)?.phase, "RESULTS");
     assert.equal(requestRematch(room.metadata.roomId, room.seat.seatId, events()).ok, true);
     assert.equal(requestRematch(room.metadata.roomId, guest.seat.seatId, events()).ok, true);
@@ -366,14 +385,8 @@ test("rematches exclude every previously used question while fresh questions rem
     t.mock.timers.tick(3_000);
     const first = getMatchState(room.metadata.roomId)!;
     assert.equal(first.question?.id, coding.id);
-    const codingResult = {
-      questionId: coding.id,
-      passed: false,
-      tests: [{ index: 1, name: "sum", passed: false }],
-      outcome: "compile-error" as const,
-    };
-    assert.equal(submitCodingResult(room.metadata.roomId, room.seat.seatId, codingResult, events()).ok, true);
-    assert.equal(submitCodingResult(room.metadata.roomId, guest.seat.seatId, codingResult, events()).ok, true);
+    assert.equal(submitCodingProgress(room.metadata.roomId, room.seat.seatId, "failed", events()).ok, true);
+    assert.equal(submitCodingProgress(room.metadata.roomId, guest.seat.seatId, "failed", events()).ok, true);
     t.mock.timers.tick(60_000);
     assert.equal(getMatchState(room.metadata.roomId)?.phase, "RESULTS");
 

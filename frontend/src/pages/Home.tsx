@@ -63,6 +63,7 @@ export default function Home() {
   const pendingPrivateCreate = useRef<PrivateCreateRequest | null>(null);
   const privateAckTimer = useRef<number | null>(null);
   const validName = name.trim().length > 0;
+  const closeTopicDialog = useCallback(() => setView("home"), []);
   const clearPrivateAckTimer = useCallback(() => {
     if (privateAckTimer.current !== null) {
       window.clearTimeout(privateAckTimer.current);
@@ -458,7 +459,7 @@ export default function Home() {
             toggleTopic={toggleTopic}
             timer={timer}
             setTimer={setTimer}
-            close={() => setView("home")}
+            close={closeTopicDialog}
           />
         )}
       </main>
