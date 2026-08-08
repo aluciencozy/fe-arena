@@ -28,7 +28,7 @@ import { graphEdgePoints, graphTextAlternative } from "@/lib/graph";
 import { attachRoomAsyncCompletion, isActiveRoomAsyncContext, type RoomAsyncContext } from "@/lib/room-async";
 import {
   codingProgressForRunnerStatus,
-  getCWorkerStatus,
+  getCPrewarmStatus,
   prewarmCWorker,
   runCInWorker,
   type CExecutionOutcome,
@@ -95,7 +95,7 @@ export default function Room() {
   const [includeCoding, setIncludeCoding] = useState(false);
   const [codingReadyError, setCodingReadyError] = useState("");
   const [codingReadyRetry, setCodingReadyRetry] = useState(0);
-  const [codingRunnerStatus, setCodingRunnerStatus] = useState<CRunnerStatus>(() => getCWorkerStatus());
+  const [codingRunnerStatus, setCodingRunnerStatus] = useState<CRunnerStatus>(() => getCPrewarmStatus());
   const codingReadyAttempted = useRef(false);
   const codingReadyScopeRef = useRef(`${roomId}:${seatId ?? ""}`);
   const [codingReadyAttempts, setCodingReadyAttempts] = useState(0);
@@ -611,7 +611,7 @@ const CodingQuestionStage = ({
   const [code, setCode] = useState(problem?.starterCode ?? "");
   const [outcome, setOutcome] = useState<CExecutionOutcome | null>(null);
   const [runPending, setRunPending] = useState(false);
-  const [runnerStatus, setRunnerStatus] = useState<CRunnerStatus>(() => getCWorkerStatus());
+  const [runnerStatus, setRunnerStatus] = useState<CRunnerStatus>({ phase: "worker", state: "idle" });
   const [runnerError, setRunnerError] = useState("");
   const runInFlight = useRef(false);
   const stageQuestionId = question?.type === "coding" ? question.id : "";

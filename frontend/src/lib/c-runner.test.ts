@@ -5,9 +5,11 @@ import {
   generateCSource,
   parseExecutionOutput,
   codingProgressForRunnerStatus,
+  getCPrewarmStatus,
   getCWorkerStatus,
   prewarmCWorker,
   runCInWorker,
+  subscribeCPrewarmStatus,
   subscribeCWorkerStatus,
   type CExecutionOutcome,
 } from "./c-runner";
@@ -105,6 +107,64 @@ test("shares an in-flight prewarm and permits one retry after initialization fai
   assert.equal(getCWorkerStatus().phase, "ready");
   assert.ok(scopedStatuses.includes("sdk:loading"));
   assert.ok(scopedStatuses.includes("ready:ready"));
+});
+
+test("isolates concurrent run status from prewarm and other runs", async () => {
+  const prewarmStatuses: string[] = [];
+  const oldRunStatuses: string[] = [];
+  const newRunStatuses: string[] = [];
+  const unsubscribePrewarm = subscribeCPrewarmStatus((status) => prewarmStatuses.push(`${status.phase}:${status.state}`));
+  const initialPrewarmStatus = getCPrewarmStatus();
+  let workerCount = 0;
+  const createWorker = () => {
+    const workerId = ++workerCount;
+    const worker = {
+      onmessage: null as ((event: MessageEvent) => void) | null,
+      onerror: null as ((event: ErrorEvent) => void) | null,
+      postMessage: () => {
+        setTimeout(() => worker.onmessage?.({ data: { kind: "ready" } } as MessageEvent), 0);
+        setTimeout(() => worker.onmessage?.({ data: { kind: "compiled" } } as MessageEvent), 1);
+        if (workerId === 1) {
+          setTimeout(
+            () => worker.onmessage?.({ data: { kind: "runtime-error", stderr: "old run failed" } } as MessageEvent),
+            10,
+          );
+        } else {
+          setTimeout(
+            () =>
+              worker.onmessage?.({
+                data: { kind: "success", stdout: "FEA_TEST|1|status isolation|PASS", stderr: "", exitCode: 0 },
+              } as MessageEvent),
+            20,
+          );
+        }
+      },
+      terminate: () => undefined,
+    };
+    return worker;
+  };
+  let oldOutcome: CExecutionOutcome;
+  let newOutcome: CExecutionOutcome;
+  try {
+    [oldOutcome, newOutcome] = await Promise.all([
+      runCInWorker(CODING_PROBLEMS[0]!, CODING_PROBLEMS[0]!.starterCode, {
+        createWorker,
+        onProgress: (status) => oldRunStatuses.push(`${status.phase}:${status.state}:${status.message ?? ""}`),
+      }),
+      runCInWorker(CODING_PROBLEMS[0]!, CODING_PROBLEMS[0]!.starterCode, {
+        createWorker,
+        onProgress: (status) => newRunStatuses.push(`${status.phase}:${status.state}:${status.message ?? ""}`),
+      }),
+    ]);
+  } finally {
+    unsubscribePrewarm();
+  }
+  assert.equal(oldOutcome.kind, "runtime-error");
+  assert.equal(newOutcome.kind, "success");
+  assert.ok(oldRunStatuses.includes("execution:failed:old run failed"));
+  assert.ok(!newRunStatuses.includes("execution:failed:old run failed"));
+  assert.deepEqual(getCPrewarmStatus(), initialPrewarmStatus);
+  assert.ok(prewarmStatuses.every((status) => !status.startsWith("execution:") && !status.startsWith("compilation:")));
 });
 
 test("runs the curated sum fixture after compilation completes", async () => {

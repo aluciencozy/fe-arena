@@ -55,27 +55,42 @@ type WorkerLike = {
   onerror: ((event: ErrorEvent) => void) | null;
 };
 type WorkerFactory = () => WorkerLike;
+type RunnerOperation = "prewarm" | "run";
 
 let prewarmedWorker: WorkerLike | undefined;
 let prewarmPromise: Promise<void> | undefined;
 let runnerStatus: CRunnerStatus = { phase: "worker", state: "idle" };
-const statusListeners = new Set<(status: CRunnerStatus) => void>();
+let prewarmStatus: CRunnerStatus = { phase: "worker", state: "idle" };
+const allStatusListeners = new Set<(status: CRunnerStatus) => void>();
 const prewarmStatusListeners = new Set<(status: CRunnerStatus) => void>();
 
-const publishRunnerStatus = (status: CRunnerStatus) => {
+const publishRunnerStatus = (status: CRunnerStatus, operation: RunnerOperation) => {
   runnerStatus = status;
-  for (const listener of statusListeners) listener(status);
-  for (const listener of prewarmStatusListeners) listener(status);
+  if (operation === "prewarm") {
+    prewarmStatus = status;
+  }
+  for (const listener of allStatusListeners) listener(status);
+  if (operation === "prewarm") for (const listener of prewarmStatusListeners) listener(status);
 };
 
 export const getCWorkerStatus = () => runnerStatus;
-export const subscribeCWorkerStatus = (listener: (status: CRunnerStatus) => void) => {
-  statusListeners.add(listener);
-  listener(runnerStatus);
+export const getCPrewarmStatus = () => prewarmStatus;
+const subscribeToStatus = (
+  listeners: Set<(status: CRunnerStatus) => void>,
+  currentStatus: CRunnerStatus,
+  listener: (status: CRunnerStatus) => void,
+) => {
+  listeners.add(listener);
+  listener(currentStatus);
   return () => {
-    statusListeners.delete(listener);
+    listeners.delete(listener);
   };
 };
+export const subscribeCWorkerStatus = (listener: (status: CRunnerStatus) => void) => {
+  return subscribeToStatus(allStatusListeners, runnerStatus, listener);
+};
+export const subscribeCPrewarmStatus = (listener: (status: CRunnerStatus) => void) =>
+  subscribeToStatus(prewarmStatusListeners, prewarmStatus, listener);
 
 export const generateCSource = (problem: CodingProblem, studentCode: string): string =>
   `${problem.prefix}\n${problem.functionSignature};\n${problem.testHarness}\n${problem.functionSignature} {\n${studentCode}\n}\n`;
@@ -173,7 +188,7 @@ export const prewarmCWorker = (
     if (scopedListener) prewarmStatusListeners.delete(scopedListener);
   };
   if (prewarmedWorker) {
-    publishRunnerStatus({ phase: "ready", state: "ready" });
+    publishRunnerStatus({ phase: "ready", state: "ready" }, "prewarm");
     releaseScopedListener();
     return Promise.resolve();
   }
@@ -182,31 +197,34 @@ export const prewarmCWorker = (
     return prewarmPromise;
   }
   const workerFactory = options.createWorker ?? defaultWorkerFactory;
-  publishRunnerStatus({ phase: "worker", state: "loading" });
+  publishRunnerStatus({ phase: "worker", state: "loading" }, "prewarm");
   let worker: WorkerLike;
   try {
     worker = workerFactory();
   } catch (error) {
     const failure = error instanceof Error ? error : new Error("The browser compiler worker could not start.");
-    publishRunnerStatus({ phase: "worker", state: "failed", message: failure.message });
+    publishRunnerStatus({ phase: "worker", state: "failed", message: failure.message }, "prewarm");
     releaseScopedListener();
     return Promise.reject(failure);
   }
   prewarmPromise = initializeWorker(worker, options.initializationTimeoutMs ?? 30_000, (phase) =>
-    publishRunnerStatus({ phase, state: "loading" }),
+    publishRunnerStatus({ phase, state: "loading" }, "prewarm"),
   ).then(
     () => {
       prewarmedWorker = worker;
-      publishRunnerStatus({ phase: "ready", state: "ready" });
+      publishRunnerStatus({ phase: "ready", state: "ready" }, "prewarm");
     },
     (error) => {
       prewarmPromise = undefined;
       const failure = error instanceof Error ? error : new Error("The browser compiler worker could not initialize.");
-      publishRunnerStatus({
-        phase: failure.message.includes("startup") ? "worker" : runnerStatus.phase,
-        state: "failed",
-        message: failure.message,
-      });
+      publishRunnerStatus(
+        {
+          phase: failure.message.includes("startup") ? "worker" : prewarmStatus.phase,
+          state: "failed",
+          message: failure.message,
+        },
+        "prewarm",
+      );
       throw failure;
     },
   );
@@ -227,6 +245,10 @@ export const runCInWorker = (
   const executionTimeoutMs = options.timeoutMs ?? EXECUTION_TIMEOUT_MS;
   const initializationTimeoutMs = options.initializationTimeoutMs ?? 30_000;
   const source = generateCSource(problem, studentCode);
+  const reportRunStatus = (status: CRunnerStatus) => {
+    publishRunnerStatus(status, "run");
+    options.onProgress?.(status);
+  };
   const execute = (worker: WorkerLike) =>
     new Promise<CExecutionOutcome>((resolve) => {
       let settled = false;
@@ -242,13 +264,15 @@ export const runCInWorker = (
         if (settled) return;
         settled = true;
         clearTimers();
-        publishRunnerStatus({
-          phase: outcome.kind === "success" ? "complete" : activePhase,
-          state: outcome.kind === "success" ? "ready" : "failed",
-          ...(outcome.kind === "success"
-            ? {}
-            : { message: outcome.stderr || `${outcome.kind} during browser execution.` }),
-        });
+        reportRunStatus(
+          {
+            phase: outcome.kind === "success" ? "complete" : activePhase,
+            state: outcome.kind === "success" ? "ready" : "failed",
+            ...(outcome.kind === "success"
+              ? {}
+              : { message: outcome.stderr || `${outcome.kind} during browser execution.` }),
+          },
+        );
         if (!options.createWorker && isReusableOutcome(outcome) && !prewarmedWorker && !prewarmPromise) {
           // Keep the initialized Wasmer runtime hot. Rebuilding the compiler
           // worker after every run makes the next run pay the full startup cost
@@ -302,17 +326,17 @@ export const runCInWorker = (
       worker.onmessage = ({ data }) => {
         if (data.kind === "ready") {
           if (initializationTimer !== undefined) globalThis.clearTimeout(initializationTimer);
-          publishRunnerStatus({ phase: "ready", state: "ready" });
+          reportRunStatus({ phase: "ready", state: "ready" });
           activePhase = "compilation";
           startCompilationTimer();
-          publishRunnerStatus({ phase: "compilation", state: "loading" });
+          reportRunStatus({ phase: "compilation", state: "loading" });
           return;
         }
         if (data.kind === "compiled") {
           if (compilationTimer !== undefined) globalThis.clearTimeout(compilationTimer);
           activePhase = "execution";
           startExecutionTimer();
-          publishRunnerStatus({ phase: "execution", state: "loading" });
+          reportRunStatus({ phase: "execution", state: "loading" });
           return;
         }
         if (data.kind === "compile-error") {
@@ -362,15 +386,18 @@ export const runCInWorker = (
   };
   const runAttempt = (attempt: number): Promise<CExecutionOutcome> => {
     const start = options.createWorker
-      ? Promise.resolve().then(() => publishRunnerStatus({ phase: "worker", state: "loading" }))
-      : prewarmCWorker({ initializationTimeoutMs });
+      ? Promise.resolve().then(() => reportRunStatus({ phase: "worker", state: "loading" }))
+      : prewarmCWorker({
+          initializationTimeoutMs,
+          onProgress: reportRunStatus,
+        });
     return start
       .then(() => {
         try {
           return execute(takeWorker());
         } catch (error) {
           const failure = error instanceof Error ? error.message : "The browser compiler worker could not start.";
-          publishRunnerStatus({ phase: "worker", state: "failed", message: failure });
+          reportRunStatus({ phase: "worker", state: "failed", message: failure });
           return {
             kind: "runtime-error" as const,
             stdout: "",
@@ -384,6 +411,5 @@ export const runCInWorker = (
         return outcome;
       });
   };
-  const unsubscribe = options.onProgress ? subscribeCWorkerStatus(options.onProgress) : undefined;
-  return runAttempt(0).finally(() => unsubscribe?.());
+  return runAttempt(0);
 };
