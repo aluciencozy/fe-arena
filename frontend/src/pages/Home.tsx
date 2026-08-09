@@ -21,6 +21,8 @@ import { Select } from "@/components/ui/select";
 import { isPrivateCreateResponseForActiveRequest } from "@/lib/private-create";
 import { CODING_CAPABILITY_MESSAGE, isCodingCapabilityAvailable } from "@/lib/coding-capability";
 import { prewarmCWorker } from "@/lib/c-runner";
+import { isDevelopmentBuild } from "@/lib/environment";
+import { DEFAULT_TIMER_SECONDS, formatQuestionTimer, QUESTION_TIMER_OPTIONS } from "@/lib/question-timer";
 import { connectSocket, socket, socketUrl } from "@/lib/socket";
 import { socketConnectionErrorMessage, socketDisconnectedMessage } from "@/lib/socket-errors";
 import { useGameStore } from "@/store/gameStore";
@@ -53,7 +55,7 @@ export default function Home() {
   const [name, setName] = useState(playerName);
   const [roomCode, setRoomCode] = useState("");
   const [topics, setTopics] = useState<TopicId[]>(DEFAULT_TOPICS);
-  const [timer, setTimer] = useState(90);
+  const [timer, setTimer] = useState(DEFAULT_TIMER_SECONDS);
   const [view, setView] = useState<"home" | "private" | "join" | "queue">("home");
   const [notice, setNotice] = useState<Notice>(null);
   const [queueExpiresAt, setQueueExpiresAt] = useState<number | null>(null);
@@ -419,9 +421,11 @@ export default function Home() {
               <Link to="/solo" className="button button-ghost">
                 <BookOpen size={16} /> solo practice
               </Link>
-              <Link to="/practice/c" className="button button-ghost">
-                <Code2 size={16} /> C practice lab
-              </Link>
+              {isDevelopmentBuild && (
+                <Link to="/practice/c" className="button button-ghost">
+                  <Code2 size={16} /> C practice lab
+                </Link>
+              )}
             </div>
             {!validName && (
               <p id="public-queue-validation" className="mt-3 text-sm text-muted" role="status">
@@ -490,11 +494,11 @@ export default function Home() {
                 <p id="private-timer-label" className="field-label">
                   question timer
                 </p>
-                <p className="mt-1 text-sm text-muted">{timer} seconds · five rounds</p>
+                <p className="mt-1 text-sm text-muted">{formatQuestionTimer(timer)} · five rounds</p>
               </div>
               <Select
                 value={String(timer)}
-                options={TIMER_OPTIONS}
+                options={QUESTION_TIMER_OPTIONS}
                 onChange={(value) => setTimer(Number(value))}
                 containerClassName="w-auto"
                 buttonClassName="w-auto"
@@ -563,13 +567,6 @@ export default function Home() {
     </Shell>
   );
 }
-
-const TIMER_OPTIONS = [
-  { value: "60", label: "60 sec" },
-  { value: "90", label: "90 sec" },
-  { value: "120", label: "120 sec" },
-  { value: "300", label: "5 min" },
-];
 
 const Feature = ({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) => (
   <div className="flex gap-3">
@@ -659,11 +656,11 @@ const TopicDialog = ({
             <p id="topic-dialog-timer-label" className="field-label">
               question timer
             </p>
-            <p className="mt-1 text-sm text-muted">{timer} seconds · five rounds</p>
+            <p className="mt-1 text-sm text-muted">{formatQuestionTimer(timer)} · five rounds</p>
           </div>
           <Select
             value={String(timer)}
-            options={TIMER_OPTIONS}
+            options={QUESTION_TIMER_OPTIONS}
             onChange={(value) => setTimer(Number(value))}
             containerClassName="w-auto"
             buttonClassName="w-auto"
@@ -704,7 +701,6 @@ const Shell = ({ children }: { children: React.ReactNode }) => (
       <div className="flex items-center gap-5">
         <AuthPanel />
         <AppSettings />
-        <span className="hidden text-xs text-muted sm:inline">v1 study room</span>
       </div>
     </header>
     {children}

@@ -77,17 +77,16 @@ export default function CPractice() {
             <ArrowLeft size={15} /> home
           </Link>
           <span className="status-pill status-good">
-            <Code2 size={12} /> browser-only C runner
+            <Code2 size={12} /> C practice
           </span>
         </div>
         <section className="mt-10 grid gap-6 lg:grid-cols-[minmax(0,.75fr)_minmax(0,1.25fr)]">
           <aside className="space-y-5">
             <div>
-              <p className="eyebrow text-gold">practice lab · temporary browser surface</p>
+              <p className="eyebrow text-gold">practice lab</p>
               <h1 className="display mt-3 text-5xl">FE Arena C practice</h1>
               <p className="mt-4 leading-7 text-muted">
-                Try reviewed C function bodies locally in this browser. Code stays in this browser; the server never
-                compiles or receives it.
+                Practice reviewed C function bodies with a locked signature and test harness.
               </p>
             </div>
             <ProblemPicker problemId={problem.id} onChange={chooseProblem} disabled={running} />
@@ -103,9 +102,8 @@ export default function CPractice() {
             <div className="notice-info">
               <Clock3 size={16} className="mt-0.5 shrink-0" />
               <span>
-                The browser compiler warms up while this page loads. A cold visit downloads the local toolchain and can
-                take around 30 seconds; later runs reuse it. Worker startup, compilation, and execution each have a
-                30-second limit. Infinite loops recover by terminating the worker.
+                The compiler prepares while this page loads. The first run can take around 30 seconds; later runs reuse
+                the prepared environment. Startup, compilation, and execution each have a 30-second limit.
               </span>
             </div>
           </aside>
@@ -121,7 +119,7 @@ export default function CPractice() {
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
                 <div>
                   <p className="eyebrow">editable function body</p>
-                  <p className="mt-1 text-xs text-muted">Only the body below is sent to the local worker.</p>
+                <p className="mt-1 text-xs text-muted">Only the function body is editable.</p>
                 </div>
                 <button className="button button-ghost px-3 py-2 text-xs" onClick={reset} disabled={running}>
                   <RotateCcw size={14} /> reset starter
@@ -259,7 +257,6 @@ const Shell = ({ children }: { children: React.ReactNode }) => (
       </Link>
       <div className="flex items-center gap-5">
         <AppSettings />
-        <span className="hidden text-xs text-muted sm:inline">v1 study room</span>
       </div>
     </header>
     {children}

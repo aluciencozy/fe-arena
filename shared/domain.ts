@@ -397,8 +397,9 @@ export const gradeQuestion = (question: Question, attempt: QuestionAttempt): boo
 };
 
 export const QUESTION_TIMER_MIN_SECONDS = 30;
-export const QUESTION_TIMER_MAX_SECONDS = 300;
-export const PUBLIC_QUESTION_SECONDS = 300;
+export const QUESTION_TIMER_MAX_SECONDS = 900;
+export const DEFAULT_QUESTION_TIMER_SECONDS = 300;
+export const PUBLIC_QUESTION_SECONDS = DEFAULT_QUESTION_TIMER_SECONDS;
 export const PUBLIC_QUEUE_MAX_WAIT_SECONDS = 300;
 export const PAUSE_SECONDS = 30;
 export const REVEAL_SECONDS = 30;
@@ -527,7 +528,12 @@ export const SubmitSchema = QuestionAttemptSchema;
 export const SoloStartSchema = z.object({
   topicIds: z.array(TopicIdSchema).min(1).max(TOPICS.length),
   count: z.number().int().min(1).max(MAX_ROUND_COUNT).default(DEFAULT_ROUND_COUNT),
-  timerSeconds: z.number().int().min(QUESTION_TIMER_MIN_SECONDS).max(QUESTION_TIMER_MAX_SECONDS).default(120),
+  timerSeconds: z
+    .number()
+    .int()
+    .min(QUESTION_TIMER_MIN_SECONDS)
+    .max(QUESTION_TIMER_MAX_SECONDS)
+    .default(DEFAULT_QUESTION_TIMER_SECONDS),
   /** Solo playlists include browser coding rounds and require a ready runner. */
   supportsCoding: z.boolean().default(false),
 });

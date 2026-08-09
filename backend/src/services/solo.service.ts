@@ -1,7 +1,7 @@
 import {
   calculateScore,
   gradeQuestion,
-  PUBLIC_QUESTION_SECONDS,
+  QUESTION_TIMER_MAX_SECONDS,
   TOPICS,
   CodingRunResultSchema,
   emptyTopicPerformance,
@@ -131,7 +131,7 @@ export const startSolo = (
   const config: MatchConfig = {
     topicIds,
     roundCount: Math.min(5, Math.max(1, count)),
-    questionTimerSeconds: Math.min(PUBLIC_QUESTION_SECONDS, Math.max(30, timerSeconds)),
+    questionTimerSeconds: Math.min(QUESTION_TIMER_MAX_SECONDS, Math.max(30, timerSeconds)),
   };
   const questions = questionRepository.select(
     `solo:${sessionId}:${Date.now()}`,
@@ -172,6 +172,10 @@ export const soloCodingComplete = (
     return { ok: false as const, error: "That coding question is no longer active." };
   if (parsed.data.outcome !== "success")
     return { ok: false as const, error: "That browser run did not complete. Retry the coding run." };
+  if (!parsed.data.passed) {
+    emit(record.state);
+    return { ok: true as const, retryable: true as const };
+  }
   const elapsedMs = Math.max(0, Date.now() - (record.state.questionStartedAt ?? Date.now()));
   const score = calculateScore(parsed.data.passed, elapsedMs, record.timerSeconds * 1000);
   finishQuestion(record, emit, parsed.data.passed, score);

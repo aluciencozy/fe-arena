@@ -8,11 +8,11 @@ test("Socket.IO keeps WebSocket and polling with fallback enabled", () => {
   assert.equal(socketConnectionOptions.tryAllTransports, true);
 });
 
-test("connection failures tell local guests how to restore the server connection", () => {
+test("connection failures give guests a production-safe recovery message", () => {
   const message = socketConnectionErrorMessage(new Error("websocket error"), "http://localhost:3001");
   assert.match(message, /Could not connect/);
-  assert.match(message, /cd backend && npm run dev/);
-  assert.match(message, /VITE_SOCKET_URL/);
+  assert.match(message, /try again shortly/);
+  assert.doesNotMatch(message, /npm run dev/);
 });
 
 test("disconnect messages explain automatic recovery", () => {
